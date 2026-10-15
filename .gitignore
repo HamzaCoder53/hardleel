@@ -1,0 +1,14 @@
+# Secrets / private
+.ssh/
+.bash_history
+.sudo_as_admin_successful
+# Installed Python packages (see installed-packages.txt) and caches
+.local/lib/
+.cache/
+__pycache__/
+*.pyc
+# ROS build output and logs (rebuild with colcon)
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+.ros/log/
