@@ -1,0 +1,80 @@
+# Robotics Dojo 2026 game field - editable layout (all lengths in millimetres).
+#
+# Traced from RuleBook_RDJ_2026_V0.9, Figure 1 (top view) and Figure 2 (isometric).
+# The rulebook figure is low resolution: overall size and the labelled dimensions
+# (6703.56 x 4868, 5287.56, 5249.56, 4549.56, 2714, 1746.78, 560, 420) are taken
+# from the drawing; everything marked "GUESS" is an interpretation - fix it here
+# after inspecting / measuring the real field, then run:
+#   python3 arena/generate_arena.py
+# which rewrites worlds/rdj2026.sdf, maps/rdj2026_truth.{pgm,yaml} and arena/preview.png.
+#
+# Frame: origin = bottom-left outer corner of the field (as drawn in Figure 1),
+#        x to the right (6703.56 long side), y up the page (4868 short side).
+
+field:
+  length: 6703.56
+  width: 4868.0
+  wall_height: 300        # GUESS - not stated in the rulebook
+  wall_thickness: 18      # GUESS - plywood
+
+# Internal walls: [x1, y1, x2, y2] centre-lines
+walls:
+  - [5989, 2154, 5989, 4868]   # right corridor wall (2714 from top)
+  - [705, 3599, 5989, 3599]    # upper corridor floor-side wall
+  - [705, 3599, 705, 4022]     # stub at its left end (420)
+  - [1429, 4448, 1429, 4868]   # stub on the top wall (420)
+  - [0, 2875, 5265, 2875]      # middle wall (5249.56 from the left)
+  - [705, 2141, 5989, 2141]    # lower corridor wall (5287.56)
+  - [705, 0, 705, 2141]        # left room wall
+  - [2614, 0, 2614, 2141]      # divider between the lower rooms
+  - [3084, 1417, 4842, 1417]   # loading-zone guide wall (1746.78)  GUESS: may be floor tape
+  - [3084, 731, 4842, 731]   # loading-zone guide wall (1746.78)  GUESS: may be floor tape
+
+# Colour-coded offloading bays along the top wall (560 deep), left -> right.
+# GUESS: which colour is in which bay.
+offloading_bays:
+  depth: 560
+  x_edges: [2680, 3394, 4109, 4842]
+  colours: [blue, white, black]          # blue=plastic, white=organic, black=metal
+  divider_height: 300
+
+# Loading station: the bar with three dots in Figure 1 (one slot per waste type).
+loading_station:
+  centre: [3761, 1075]
+  size: [150, 1250]
+  height: 120            # GUESS - low table the robot docks against
+  slots: [plastic, metal, organic]
+
+# Terrain: low ramps the 2D LiDAR (15 cm high) sees over.  GUESS positions -
+# Figure 1 shows paired tick marks in the 733 mm corridor between y=2141 and y=2875.
+ramps:
+  - {name: ramp_sand,   centre: [1520, 2508], length: 800, width: 700, height: 60, surface: sand}
+  - {name: ramp_gravel, centre: [4690, 2508], length: 1000, width: 700, height: 60, surface: gravel}
+
+# Time-based barrier closing Path 2 (flat route). GUESS: the 724 mm gap between
+# the end of the middle wall and the right corridor wall.
+gate:
+  from: [5265, 2875]
+  to:   [5989, 2875]
+  height: 300
+  open_s: 20             # GUESS - "standard waiting time" not published yet
+  closed_s: 20
+
+# Judges' cylinders (moved between rounds). GUESS sizes - Figure 2 shows can-like cylinders.
+cylinders:
+  diameter: 110
+  height: 200
+  positions:
+    - [1600, 3240]
+    - [3300, 3240]
+    - [4400, 4050]
+
+# Display screen showing the waste type (detection task). GUESS position.
+display_screen:
+  centre: [6346, 4848]
+  size: [500, 20, 300]   # width, depth, height
+
+# Start / finish pad. Figure 1 marks it in the bottom-right corner.
+start:
+  pose: [6346, 400, 90]  # x, y, yaw in degrees (facing +y, up the right corridor)
+  pad_size: [400, 400]

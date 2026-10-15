@@ -36,6 +36,11 @@ Backup of the home folder (`/home/hardleel`) from the Raspberry Pi **hardleel**,
   (Nav2 Jazzy copies with `bond_timeout` 10 s for the Pi 4) and AMCL starts at the map origin.
 - Latest map: `maps/track_20261015_1232.*`
 
+## Simulation (Robotics Dojo 2026 field)
+
+`ros2_ws/src/rdj2026_sim` - Gazebo Fortress + ROS 2 Humble copy of the 2026 game field with a simulated
+hardleel, for mapping / Nav2 / Virtual SLAM practice. See its [README](ros2_ws/src/rdj2026_sim/README.md).
+
 ## Not included
 
 SSH keys, shell history, `/etc` (contains Wi-Fi and password data), installed Python
