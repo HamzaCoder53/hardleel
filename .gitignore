@@ -12,3 +12,7 @@ ros2_ws/build/
 ros2_ws/install/
 ros2_ws/log/
 .ros/log/
+# Logs, local backup copies, autosave duplicates
+*.log
+launch_backup_*/
+maps/*_autosave.*

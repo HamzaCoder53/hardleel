@@ -36,7 +36,7 @@ def generate_launch_description():
 
         # base_link -> laser. EDIT x, y, z (metres, from robot centre; x forward,
         # y left, z up) and yaw (radians) to match where the LiDAR is mounted.
-        static_tf(0.0, 0.0, 0.15, 3.14159, 'base_link', 'laser', 'base_to_laser'),
+        static_tf(0.0, 0.0, 0.15, 0.0, 'base_link', 'laser', 'base_to_laser'),
 
         # odom -> base_link: fixed at zero because there are no encoders
 

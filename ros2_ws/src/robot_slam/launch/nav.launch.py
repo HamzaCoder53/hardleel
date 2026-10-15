@@ -9,7 +9,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 # Keep these identical to slam.launch.py and imu.launch.py
-LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 3.14159
+LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0
 IMU_X, IMU_Y, IMU_Z = 0.0, 0.0, 0.05
 IMU_ROLL, IMU_PITCH, IMU_YAW = 0.0, 0.0, 0.0
 
@@ -77,13 +77,24 @@ def generate_launch_description():
              remappings=[('odometry/filtered', '/odom')]),
 
         # Nav2: map server, AMCL, planner, controller, costmaps, behaviors
+        # Localization (map_server + AMCL)
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(nav2_pkg, 'launch', 'bringup_launch.py')),
+            PythonLaunchDescriptionSource(os.path.join(pkg, 'launch', 'localization_slow_cpu_launch.py')),
             launch_arguments={
-                'slam': 'False',
                 'map': LaunchConfiguration('map'),
                 'params_file': LaunchConfiguration('params_file'),
                 'use_sim_time': 'false',
                 'autostart': 'true',
+                'use_composition': 'False',
+            }.items()),
+
+        # Navigation, with a longer heartbeat timeout for the Pi 4
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(os.path.join(pkg, 'launch', 'navigation_slow_cpu_launch.py')),
+            launch_arguments={
+                'params_file': LaunchConfiguration('params_file'),
+                'use_sim_time': 'false',
+                'autostart': 'true',
+                'use_composition': 'False',
             }.items()),
     ])

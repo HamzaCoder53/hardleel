@@ -1,5 +1,8 @@
 amcl:
   ros__parameters:
+    # Start localized at the map origin (where mapping began)
+    set_initial_pose: true
+    initial_pose: {x: 0.0, y: 0.0, z: 0.0, yaw: 0.0}
     alpha1: 0.3
     alpha2: 0.3
     alpha3: 0.3

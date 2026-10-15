@@ -26,6 +26,16 @@ Backup of the home folder (`/home/hardleel`) from the Raspberry Pi **hardleel**,
 - `ros2_ws/src/sllidar_ros2` — https://github.com/Slamtec/sllidar_ros2 @ `3430009`
 - `ros2_ws/src/rf2o_laser_odometry` — https://github.com/MAPIRlab/rf2o_laser_odometry @ `b38c68e`
 
+## Mapping & navigation (updated 2026-10-15)
+
+- `map_track.sh [name] [autosave_s]` — keyboard-drive the robot while Cartographer maps; autosaves
+  `~/maps/<name>_autosave.*` every few seconds and saves `~/maps/<name>.*` on Ctrl+C.
+- LiDAR mounting yaw fixed to `0.0` (was 180°) in `carto_mapping`, `slam`, `nav`, `nav_slam` launch files.
+- `setup.py` now installs `config/*.lua` (Cartographer config was missing from the install).
+- `nav.launch.py` uses `localization_slow_cpu_launch.py` / `navigation_slow_cpu_launch.py`
+  (Nav2 Jazzy copies with `bond_timeout` 10 s for the Pi 4) and AMCL starts at the map origin.
+- Latest map: `maps/track_20261015_1232.*`
+
 ## Not included
 
 SSH keys, shell history, `/etc` (contains Wi-Fi and password data), installed Python

@@ -8,7 +8,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 # Keep identical to slam.launch.py
-LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 3.14159
+LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0
 
 
 def generate_launch_description():

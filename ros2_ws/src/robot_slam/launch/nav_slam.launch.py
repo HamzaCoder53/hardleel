@@ -9,7 +9,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 # Keep these identical to nav.launch.py
-LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 3.14159
+LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0
 IMU_X, IMU_Y, IMU_Z = 0.0, 0.0, 0.05
 IMU_ROLL, IMU_PITCH, IMU_YAW = 0.0, 0.0, 0.0
 
