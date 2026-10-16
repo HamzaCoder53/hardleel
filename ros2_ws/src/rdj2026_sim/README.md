@@ -8,7 +8,11 @@ Humble + Fortress is the stack Robotics Dojo uses in its own simulation material
 ([GAMEFIELD-2025](https://github.com/roboticsdojo/GAMEFIELD-2025),
 [gazebo_ignition_fortress](https://github.com/roboticsdojo/gazebo_ignition_fortress)).
 
-![Field preview](arena/preview.png)
+![2D plan](arena/plan_2d.png)
+
+**2D plan:** `arena/plan_2d.svg` (vector, for printing / the poster) and `arena/plan_2d.png`, with dimensions
+and every zone; dashed = still a guess. Regenerate with `python3 arena/draw_plan.py`.
+For Nav2 the matching 2D occupancy map is `maps/rdj2026_truth.yaml`.
 
 ## What's in the field
 
