@@ -6,6 +6,27 @@ try:
 except ImportError:
     from tflite_runtime.interpreter import Interpreter
 
+# bay colour for each waste class (rulebook: blue = plastic, white = organic, black = metal)
+CLASS_TO_COLOR = {'plastic': 'blue', 'organic': 'white', 'metal': 'black'}
+
+
+def center_square(bgr):
+    """Crop the centre square - the model was trained on square images, so don't squash 4:3 frames."""
+    h, w = bgr.shape[:2]
+    s = min(h, w)
+    return bgr[(h - s) // 2:(h + s) // 2, (w - s) // 2:(w + s) // 2]
+
+
+def decide(labels, probs, min_conf=0.75, min_margin=0.25):
+    """Pick a class only if it is confident AND clearly ahead of the runner-up, else 'unknown'.
+    Empty views and unfamiliar items (e.g. fabric) tend to give ~0.6 spread over classes."""
+    order = np.argsort(probs)[::-1]
+    best = float(probs[order[0]])
+    second = float(probs[order[1]]) if len(probs) > 1 else 0.0
+    if best >= min_conf and best - second >= min_margin:
+        return labels[order[0]], best
+    return 'unknown', best
+
 
 class WasteModel:
     """norm: 'raw' = 0-255 (model rescales itself), 'unit' = 0-1, 'signed' = -1..1"""

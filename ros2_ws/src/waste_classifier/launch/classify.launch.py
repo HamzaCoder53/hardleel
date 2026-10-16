@@ -5,6 +5,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -12,19 +13,19 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('model_path', default_value=os.path.join(models, 'waste_model.tflite')),
         DeclareLaunchArgument('labels_path', default_value=os.path.join(models, 'labels.txt')),
-        DeclareLaunchArgument('backend', default_value='auto'),       # auto | picamera2 | rpicam
-        DeclareLaunchArgument('settle_time', default_value='1.0'),
-        DeclareLaunchArgument('save_dir', default_value=''),          # e.g. /home/pi/captures
+        DeclareLaunchArgument('min_conf', default_value='0.75'),
+        DeclareLaunchArgument('min_margin', default_value='0.25'),
+        DeclareLaunchArgument('save_dir', default_value=''),          # e.g. /home/hardleel/captures
         Node(
             package='waste_classifier',
             executable='classify_service',
-            name='waste_classifier_service',
+            name='waste_classifier',
             output='screen',
             parameters=[{
                 'model_path': LaunchConfiguration('model_path'),
                 'labels_path': LaunchConfiguration('labels_path'),
-                'backend': LaunchConfiguration('backend'),
-                'settle_time': LaunchConfiguration('settle_time'),
+                'min_conf': ParameterValue(LaunchConfiguration('min_conf'), value_type=float),
+                'min_margin': ParameterValue(LaunchConfiguration('min_margin'), value_type=float),
                 'save_dir': LaunchConfiguration('save_dir'),
             }],
         ),

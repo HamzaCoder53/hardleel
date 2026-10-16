@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+NOT USED - the installed executable is `classify_service` (classify_service.py). Kept for reference only:
+its picamera2 / rpicam-still backends are not installed on this Pi (it uses GStreamer libcamerasrc).
+
 waste_classifier_service.py - ON-DEMAND waste classification (camera is NOT running all the time)
 
 Each call to the service:  open camera -> let exposure/focus settle -> grab 1 frame
