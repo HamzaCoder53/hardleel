@@ -43,6 +43,23 @@ Mini Competition: **26 Oct 2026** · Final: **25 Nov 2026**. Last updated 16 Oct
 - [ ] **Bay colour detection** (blue / white / black) with the camera.
 - [ ] Practise **Virtual SLAM** in the sim (map → save → navigate).
 
+## Added 16 Oct
+- [ ] **Behaviour tree for the competition run** (instead of a plain state machine): BehaviorTree.CPP/Nav2 BT
+      or py_trees — sequence screen → detect → load → terrain → gate decision (wait / reroute with timeout)
+      → deposit → finish, with retry/recovery branches (classifier "unknown" → re-position and retry,
+      Nav2 failure → back up and replan). Build and test in the sim.
+- [ ] **FlySky FS-i6 remote control** for the mapping phase (manual driving is allowed only then):
+      FS-iA6B receiver → iBUS serial into the Pi (or Pico) → `ibus_teleop` node publishing `/cmd_vel`;
+      one switch = manual / autonomous mode, one switch = **emergency stop** (rulebook "stopping mechanism", 2 pts);
+      failsafe: stop if the signal is lost. RC must be off / ignored during the autonomous phase.
+- [ ] **Data logger → CSV**: one row per tick (e.g. 10 Hz) with a timestamp and the latest value of every sensor:
+      LiDAR (min range per sector), IMU (gyro, accel), cmd_vel, motor PWM, odometry / pose (map frame),
+      classifier result, gate state, CPU temperature & load, battery if available, mission/BT state.
+      Also covers the rulebook §8 event timestamps.
+- [ ] **Speed / PWM per floor type** (wood, soil, gravel, sand, grass, ramp up/down): a terrain profile table
+      (max speed, min PWM, acceleration ramp) + switch profile by map zone (Nav2 speed filter mask from
+      `arena_layout.yaml`) or by detected tilt (IMU pitch on ramps). Values tuned after the new motors are fitted.
+
 ## Ask the organisers (roboticsdojo@jkuat.ac.ke)
 - [ ] Which class does **fabric** belong to?
 - [ ] Is **off-board (laptop) processing** allowed during the mapping phase?
