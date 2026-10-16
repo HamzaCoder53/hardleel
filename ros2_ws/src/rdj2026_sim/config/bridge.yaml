@@ -34,3 +34,8 @@
   ros_type_name: sensor_msgs/msg/JointState
   gz_type_name: ignition.msgs.Model
   direction: GZ_TO_ROS
+- ros_topic_name: /ground_truth
+  gz_topic_name: /ground_truth
+  ros_type_name: nav_msgs/msg/Odometry
+  gz_type_name: ignition.msgs.Odometry
+  direction: GZ_TO_ROS

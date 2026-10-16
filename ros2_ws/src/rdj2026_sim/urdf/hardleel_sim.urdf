@@ -132,5 +132,14 @@
     <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher">
       <topic>joint_states</topic>
     </plugin>
+    <!-- ground-truth pose in the world frame (/ground_truth), for testing localization accuracy -->
+    <plugin filename="ignition-gazebo-odometry-publisher-system" name="ignition::gazebo::systems::OdometryPublisher">
+      <odom_frame>world</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <odom_topic>ground_truth</odom_topic>
+      <tf_topic>ground_truth_tf</tf_topic>
+      <odom_publish_frequency>20</odom_publish_frequency>
+      <dimensions>2</dimensions>
+    </plugin>
   </gazebo>
 </robot>

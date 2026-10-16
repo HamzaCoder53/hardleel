@@ -10,7 +10,7 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, SetEnvironmentVariable, TimerAction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
@@ -41,9 +41,19 @@ def generate_launch_description():
         Node(package='robot_state_publisher', executable='robot_state_publisher',
              parameters=[{'robot_description': urdf, 'use_sim_time': True}], output='screen'),
 
+        DeclareLaunchArgument('noisy_odom', default_value='false',
+                              description='Replace the perfect odom->base_link TF with a drifting one (no wheel encoders)'),
         Node(package='ros_gz_bridge', executable='parameter_bridge', name='gz_bridge',
+             condition=UnlessCondition(LaunchConfiguration('noisy_odom')),
              parameters=[{'config_file': os.path.join(pkg, 'config', 'bridge.yaml'), 'use_sim_time': True}],
              output='screen'),
+        Node(package='ros_gz_bridge', executable='parameter_bridge', name='gz_bridge',
+             condition=IfCondition(LaunchConfiguration('noisy_odom')),
+             parameters=[{'config_file': os.path.join(pkg, 'config', 'bridge_noisy_odom.yaml'), 'use_sim_time': True}],
+             output='screen'),
+        Node(package='rdj2026_sim', executable='noisy_odom.py', output='screen',
+             condition=IfCondition(LaunchConfiguration('noisy_odom')),
+             parameters=[{'use_sim_time': True}]),
 
         TimerAction(period=4.0, actions=[
             Node(package='ros_gz_sim', executable='create', output='screen',
