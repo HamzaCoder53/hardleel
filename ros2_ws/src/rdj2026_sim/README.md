@@ -14,17 +14,19 @@ Humble + Fortress is the stack Robotics Dojo uses in its own simulation material
 
 | Feature (rulebook) | In the simulation |
 |---|---|
-| 6703.56 × 4868 mm field, corridors (Fig. 1) | `field_walls`, 30 cm high |
-| Colour-coded offloading zones — blue/white/black | three 560 mm bays on the top wall |
+| 6703.56 × 4868 mm field, corridors (Fig. 1) | `field_walls`, **40 cm** high (pencil-marked panels in the field photos) |
+| Slalom baffles (Fig. 1 ticks, photos) | ten 31 cm boards staggered across the middle corridor |
+| Colour-coded offloading zones — blue/white/black | three 560 mm bays on the top wall under a 40 cm **deck with one V-notch per bay** (photos) |
 | Loading zone (3 stations) | green table + plastic/metal/organic slots |
-| Ramp + sand, ramp + gravel | two 6 cm ramps (LiDAR sees over them, like the real ones) |
+| Ramp + sand/gravel, grass | soil ramp (7 cm) at a dead end, bare-wood ramp (8 cm), 1220 × 580 artificial-grass strip |
 | Time-based dynamic barrier (Path 2 gate) | yellow `gate`, opened/closed at random by `gate_controller.py` |
 | Cylinders placed by judges | three 110 mm cylinders |
 | Display screen (waste detection) | dark panel, top-right |
 | Start position | red pad, bottom-right |
 
-Everything comes from **`arena/arena_layout.yaml`** (millimetres). Items marked `GUESS` there are
-interpretations of the low-resolution rulebook drawing — correct them after inspecting the real
+Everything comes from **`arena/arena_layout.yaml`** (millimetres). Each item is tagged `RULEBOOK`,
+`PHOTO` (checked against 29 photos of the real field under construction, 15 Oct 2026) or `GUESS`
+(not built yet when photographed: gate, cylinders, screen, start pad, loading station, bay colours) — correct them after inspecting the real
 field and regenerate:
 
 ```bash

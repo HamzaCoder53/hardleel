@@ -26,6 +26,7 @@ COLOURS = {  # rgb 0..1
     'black': (0.05, 0.05, 0.05), 'sand': (0.86, 0.75, 0.52), 'gravel': (0.45, 0.45, 0.45),
     'green': (0.20, 0.60, 0.25), 'red': (0.80, 0.10, 0.10), 'gate': (0.95, 0.75, 0.05),
     'cyl': (0.55, 0.55, 0.60), 'screen': (0.10, 0.10, 0.15), 'floor': (0.80, 0.68, 0.48),
+    'grass': (0.15, 0.55, 0.15), 'soil': (0.25, 0.20, 0.15), 'wood': (0.70, 0.55, 0.35),
 }
 
 
@@ -37,7 +38,10 @@ def segment_boxes():
     bays = L['offloading_bays']
     for x in bays['x_edges']:
         segs.append((x * MM, FW, x * MM, FW - bays['depth'] * MM))
-    return [s + (WH,) for s in segs]
+    out = [s + (WH,) for s in segs]
+    for b in L.get('baffles', {}).get('boards', []):
+        out.append(tuple(v * MM for v in b) + (L['baffles']['height'] * MM,))
+    return out
 
 
 def box_from_segment(x1, y1, x2, y2):
@@ -89,6 +93,30 @@ def build_world():
     marks.append(box_link('start_pad', sx * MM, sy * MM, 0.001, 0, px * MM, py * MM, 0.002, 'red', collide=False))
     models.append(static_model('floor_markings', marks))
 
+    # deposit deck: plate at wall height over the bays with one notch per bay (photos 23-29)
+    deck = bays.get('deck')
+    if deck:
+        t, dz = 0.018, deck['height'] * MM - 0.009
+        nd, nw = deck['notch_depth'] * MM, deck['notch_width'] * MM
+        d = bays['depth'] * MM
+        x0, x1 = xe[0] * MM, xe[-1] * MM
+        links = [box_link('back', (x0 + x1) / 2, FW - (d - nd) / 2, dz, 0, x1 - x0, d - nd, t, 'wall')]
+        for i in range(len(xe) - 1):
+            a, b = xe[i] * MM, xe[i + 1] * MM
+            c = (a + b) / 2
+            yc = FW - d + nd / 2
+            for k, (l0, l1) in enumerate(((a, c - nw / 2), (c + nw / 2, b))):
+                links.append(box_link(f'front_{i}_{k}', (l0 + l1) / 2, yc, dz, 0, l1 - l0, nd, t, 'wall'))
+        models.append(static_model('deposit_deck', links))
+
+    # flat terrain patches (grass, soil...) - visual + thin collision
+    for ptch in L.get('patches', []):
+        cx, cy = (v * MM for v in ptch['centre'])
+        sx, sy = ptch['size'][0] * MM, ptch['size'][1] * MM
+        h = ptch.get('height', 10) * MM
+        models.append(static_model(ptch['name'], [box_link('p', cx, cy, h / 2, math.radians(ptch.get('yaw', 0)),
+                                                             sx, sy, h, ptch['surface'])]))
+
     # loading station
     ls = L['loading_station']
     lx, ly = ls['centre']
@@ -106,18 +134,20 @@ def build_world():
     for r in L['ramps']:
         cx, cy = (v * MM for v in r['centre'])
         length, width, h = r['length'] * MM, r['width'] * MM, r['height'] * MM
+        yaw = math.radians(r.get('yaw', 0))
         seg = length / 3
         slope = math.atan2(h, seg)
         hyp = math.hypot(seg, h)
         t = 0.01
+        # built along +x in the model frame, then the whole model is rotated by yaw
         links = [
-            box_link('up', cx - seg, cy, h / 2, 0, hyp, width, t, r['surface'], pitch=-slope),
-            box_link('top', cx, cy, h - t / 2, 0, seg, width, t, r['surface']),
-            box_link('down', cx + seg, cy, h / 2, 0, hyp, width, t, r['surface'], pitch=slope),
+            box_link('up', -seg, 0, h / 2, 0, hyp, width, t, r['surface'], pitch=-slope),
+            box_link('top', 0, 0, h - t / 2, 0, seg, width, t, r['surface']),
+            box_link('down', seg, 0, h / 2, 0, hyp, width, t, r['surface'], pitch=slope),
             # solid fill under the plateau so nothing falls through
-            box_link('fill', cx, cy, (h - t) / 2, 0, seg, width, h - t, r['surface']),
+            box_link('fill', 0, 0, (h - t) / 2, 0, seg, width, h - t, r['surface']),
         ]
-        models.append(static_model(r['name'], links))
+        models.append(static_model(r['name'], links, pose=f'{cx:.4f} {cy:.4f} 0 0 0 {yaw:.4f}'))
 
     # display screen
     ds = L['display_screen']
@@ -265,10 +295,19 @@ def build_preview():
     xe = bays['x_edges']
     for i, colour in enumerate(bays['colours']):
         d.rectangle([P(xe[i] * MM, FW), P(xe[i + 1] * MM, FW - bays['depth'] * MM)], fill=rgb(colour), outline=(90, 90, 90))
+    def rot_rect(cx, cy, sx, sy, yaw_deg, colour):
+        c, s_ = math.cos(math.radians(yaw_deg)), math.sin(math.radians(yaw_deg))
+        pts = [(cx + u * c - v * s_, cy + u * s_ + v * c) for u, v in
+               ((-sx / 2, -sy / 2), (sx / 2, -sy / 2), (sx / 2, sy / 2), (-sx / 2, sy / 2))]
+        d.polygon([P(x, y) for x, y in pts], fill=rgb(colour))
+
+    for ptch in L.get('patches', []):
+        cx, cy = (v * MM for v in ptch['centre'])
+        rot_rect(cx, cy, ptch['size'][0] * MM, ptch['size'][1] * MM, ptch.get('yaw', 0), ptch['surface'])
+        d.text(P(cx - 0.2, cy), ptch['name'], fill=(0, 0, 0))
     for r in L['ramps']:
         cx, cy = (v * MM for v in r['centre'])
-        d.rectangle([P(cx - r['length'] * MM / 2, cy + r['width'] * MM / 2), P(cx + r['length'] * MM / 2, cy - r['width'] * MM / 2)],
-                    fill=rgb(r['surface']))
+        rot_rect(cx, cy, r['length'] * MM, r['width'] * MM, r.get('yaw', 0), r['surface'])
         d.text(P(cx - 0.3, cy + 0.05), r['name'], fill=(0, 0, 0))
     sx, sy, _ = L['start']['pose']
     px, py = L['start']['pad_size']
