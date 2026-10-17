@@ -104,27 +104,30 @@ for r in L['ramps']:
 for p_ in L.get('patches', []):
     cx, cy = p_['centre']; sx, sy = p_['size']
     rect(cx - sx / 2, cy - sy / 2, cx + sx / 2, cy + sy / 2, COL.get(p_['surface'], '#aaa'), '#333', dashed=True)
-    text(cx, cy, p_['surface'].upper(), 11, '#fff', bold=True)
+    text(cx, cy, p_.get('label', p_['surface']).upper(), 11, '#fff', bold=True)
 
 ls = L['loading_station']
-lx, ly = ls['centre']; lsx, lsy = ls['size']
-rect(lx - lsx / 2, ly - lsy / 2, lx + lsx / 2, ly + lsy / 2, COL['loading'], '#1a5a1a', dashed=True)
-for i, slot in enumerate(ls['slots']):
-    sy_ = ly - lsy / 2 + lsy * (i + 0.5) / len(ls['slots'])
-    text(lx + lsx / 2 + 25, sy_ - 5, slot, 10, '#1a5a1a', anchor='start')
-text(lx, ly - lsy / 2 - 90, 'LOADING STATION', 12, '#1a5a1a', bold=True)
+if not L['loading_station'].get('hide'):
+    lx, ly = ls['centre']; lsx, lsy = ls['size']
+    rect(lx - lsx / 2, ly - lsy / 2, lx + lsx / 2, ly + lsy / 2, COL['loading'], '#1a5a1a', dashed=True)
+    for i, slot in enumerate(ls['slots']):
+        sy_ = ly - lsy / 2 + lsy * (i + 0.5) / len(ls['slots'])
+        text(lx + lsx / 2 + 25, sy_ - 5, slot, 10, '#1a5a1a', anchor='start')
+    text(lx, ly - lsy / 2 - 90, 'LOADING STATION', 12, '#1a5a1a', bold=True)
 
-sx, sy, syaw = L['start']['pose']
-px_, py_ = L['start']['pad_size']
-rect(sx - px_ / 2, sy - py_ / 2, sx + px_ / 2, sy + py_ / 2, COL['start'], '#700', dashed=True)
-a = math.radians(syaw)
-line(sx, sy, sx + 260 * math.cos(a), sy + 260 * math.sin(a), '#fff', 3)
-text(sx, sy - py_ / 2 - 100, 'START', 12, COL['start'], bold=True)
+if not L['start'].get('hide'):
+    sx, sy, syaw = L['start']['pose']
+    px_, py_ = L['start']['pad_size']
+    rect(sx - px_ / 2, sy - py_ / 2, sx + px_ / 2, sy + py_ / 2, COL['start'], '#700', dashed=True)
+    a = math.radians(syaw)
+    line(sx, sy, sx + 260 * math.cos(a), sy + 260 * math.sin(a), '#fff', 3)
+    text(sx, sy - py_ / 2 - 100, 'START', 12, COL['start'], bold=True)
 
 ds = L['display_screen']
-dx, dy = ds['centre']; dw = ds['size'][0]
-rect(dx - dw / 2, dy - 25, dx + dw / 2, dy + 25, COL['screen'], dashed=True)
-text(dx, dy - 110, 'SCREEN', 12, COL['screen'], bold=True)
+if not L['display_screen'].get('hide'):
+    dx, dy = ds['centre']; dw = ds['size'][0]
+    rect(dx - dw / 2, dy - 25, dx + dw / 2, dy + 25, COL['screen'], dashed=True)
+    text(dx, dy - 110, 'SCREEN', 12, COL['screen'], bold=True)
 
 c = L['cylinders']
 for x, y in c['positions']:
@@ -141,17 +144,20 @@ for x in xe:
 for x0, y0, x1, y1 in L.get('baffles', {}).get('boards', []):
     line(x0, y0, x1, y1, COL['wall'], max(3, T))
 g = L['gate']
-line(*g['from'], *g['to'], COL['gate'], 6, dashed=True)
-text((g['from'][0] + g['to'][0]) / 2, g['from'][1] - 120, 'GATE', 12, '#9a7000', bold=True)
+if not L['gate'].get('hide'):
+    line(*g['from'], *g['to'], COL['gate'], 6, dashed=True)
+    text((g['from'][0] + g['to'][0]) / 2, g['from'][1] - 120, 'GATE', 12, '#9a7000', bold=True)
+
 
 # ------------------------------------------------------------------ dimensions
 dim(0, 0, FL, 0, f'{FL:.0f} mm', offset_px=40)
 dim(FL, 0, FL, FW, f'{FW:.0f}', offset_px=60, horizontal=False)
-dim(0, 2141, 0, 2875, '734', offset_px=-14, horizontal=False)
-dim(0, 2875, 0, 3599, '724', offset_px=-14, horizontal=False)
-dim(5989, 1200, FL, 1200, '714', offset_px=0)
-dim(0, 1750, 705, 1750, '705', offset_px=0)
-dim(xe[0], FW - bays['depth'] - 150, xe[-1], FW - bays['depth'] - 150, f'{xe[-1] - xe[0]:.0f}', offset_px=0)
+# extra dimension lines come from the layout: plan_dims: [[x0, y0, x1, y1, offset_px], ...] (label = length)
+for x0, y0, x1, y1, off in L.get('plan_dims', []):
+    horiz = abs(y1 - y0) < abs(x1 - x0)
+    dim(x0, y0, x1, y1, f'{math.hypot(x1 - x0, y1 - y0):.0f}', offset_px=off, horizontal=horiz)
+if len(xe) > 1:
+    dim(xe[0], FW - bays['depth'] - 150, xe[-1], FW - bays['depth'] - 150, f'{xe[-1] - xe[0]:.0f}', offset_px=0)
 for gx in range(0, int(FL) + 1, 1000):
     text(*P(gx, 0), f'{gx // 1000} m', 10, '#8a7a5a', px=True)
 

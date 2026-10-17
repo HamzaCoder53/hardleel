@@ -1,0 +1,245 @@
+# ALTERNATIVE layout - reconstructed by Gemini 4 Argon (Medium) from 13 field photos only (16 Oct 2026).
+# Not verified. To try it: cp arena/alternatives/gemini_photos_layout.yaml arena/arena_layout.yaml && python3 arena/generate_arena.py
+field:
+  length: 6704.0
+  width: 4880.0
+  wall_height: 400
+  wall_thickness: 18
+walls:
+- - 610
+  - 0
+  - 610
+  - 2440
+- - 610
+  - 3050
+  - 610
+  - 4270
+- - 610
+  - 4270
+  - 3050
+  - 4270
+- - 1220
+  - 1830
+  - 3050
+  - 1830
+- - 1220
+  - 2440
+  - 2650
+  - 2440
+- - 1220
+  - 2440
+  - 1220
+  - 3660
+- - 3050
+  - 600
+  - 3050
+  - 1830
+- - 3050
+  - 600
+  - 4880
+  - 600
+- - 4880
+  - 600
+  - 4880
+  - 1830
+- - 3050
+  - 1830
+  - 3960
+  - 1830
+- - 4780
+  - 2440
+  - 4780
+  - 3660
+- - 4780
+  - 3660
+  - 4880
+  - 3660
+- - 4880
+  - 3660
+  - 4880
+  - 4880
+- - 5540
+  - 3660
+  - 5540
+  - 4880
+- - 6144
+  - 1900
+  - 6144
+  - 3400
+- - 5540
+  - 2900
+  - 6144
+  - 2900
+- - 5540
+  - 2900
+  - 5540
+  - 3400
+- - 6144.0
+  - 0
+  - 6704.0
+  - 0
+- - 6144.0
+  - 950
+  - 6704.0
+  - 950
+- - 6144.0
+  - 1900
+  - 6704.0
+  - 1900
+- - 6144.0
+  - 2900
+  - 6704.0
+  - 2900
+baffles:
+  height: 400
+  boards:
+  - - 1350
+    - 200
+    - 1350
+    - 550
+  - - 1800
+    - 1100
+    - 1800
+    - 1450
+  - - 2250
+    - 200
+    - 2250
+    - 550
+offloading_bays:
+  depth: 560
+  x_edges: []
+  colours: []
+  divider_height: 400
+loading_station:
+  centre:
+  - 0
+  - 0
+  size:
+  - 1
+  - 1
+  height: 1
+  slots: []
+  hide: true
+ramps:
+- name: ramp_soil
+  centre:
+  - 305
+  - 1050
+  length: 1500
+  width: 590
+  height: 70
+  surface: soil
+  yaw: 90
+- name: ramp_wood
+  centre:
+  - 1935
+  - 2135
+  length: 1300
+  width: 590
+  height: 80
+  surface: wood
+  yaw: 0
+patches:
+- name: grass
+  centre:
+  - 3660
+  - 300
+  size:
+  - 1220
+  - 580
+  height: 12
+  surface: grass
+- name: bay 1
+  centre:
+  - 6424.0
+  - 475.0
+  size:
+  - 560
+  - 950
+  height: 2
+  surface: gravel
+  label: BAY 1 (under deck)
+- name: bay 2
+  centre:
+  - 6424.0
+  - 1425.0
+  size:
+  - 560
+  - 950
+  height: 2
+  surface: gravel
+  label: BAY 2 (under deck)
+- name: bay 3
+  centre:
+  - 6424.0
+  - 2400.0
+  size:
+  - 560
+  - 1000
+  height: 2
+  surface: gravel
+  label: BAY 3 (under deck)
+gate:
+  from:
+  - 0
+  - 0
+  to:
+  - 1
+  - 0
+  height: 1
+  open_s: 20
+  closed_s: 20
+  hide: true
+cylinders:
+  diameter: 110
+  height: 200
+  positions: []
+display_screen:
+  centre:
+  - 0
+  - 0
+  size:
+  - 1
+  - 1
+  - 1
+  hide: true
+start:
+  pose:
+  - 5000
+  - 1200
+  - 90
+  pad_size:
+  - 10
+  - 10
+  hide: true
+plan_dims:
+- - 0
+  - 1600
+  - 610
+  - 1600
+  - 0
+- - 4400
+  - 0
+  - 4400
+  - 600
+  - 0
+- - 2500
+  - 1830
+  - 2500
+  - 2440
+  - 0
+- - 610
+  - 4270
+  - 610
+  - 4880
+  - 0
+- - 5540
+  - 4300
+  - 4880
+  - 4300
+  - 0
+- - 3500
+  - 600
+  - 3500
+  - 1830
+  - 0
