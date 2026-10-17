@@ -1,0 +1,110 @@
+# OLD active layout (traced from rulebook Figure 1) - replaced on 17 Oct 2026 by the Figure 2 course.
+# Robotics Dojo 2026 game field - editable layout (all lengths in millimetres).
+#
+# Sources:
+#   RuleBook_RDJ_2026_V0.9, Figure 1 (top view) + Figure 2 (isometric) - overall plan and labelled dims
+#   29 photos of the real field under construction, 15 Oct 2026 (Drive "Competition Course"),
+#   cross-checked by Claude and Gemini. Photo numbers below refer to that folder in name order.
+# PHOTO = confirmed in the photos, RULEBOOK = from the drawing, GUESS = not built/visible yet.
+# Edit here, then run:  python3 arena/generate_arena.py
+#
+# Frame: origin = bottom-left outer corner of Figure 1, x along the 6703.56 side, y up the page.
+
+field:
+  length: 6703.56          # RULEBOOK (= ~5.5 plywood sheet widths)
+  width: 4868.0            # RULEBOOK (= 2 x 2440 plywood sheets)
+  wall_height: 400         # PHOTO: panels pencil-marked "40 x ..." cm (photos 5, 10-13), ~2x robot height
+  wall_thickness: 18       # PHOTO: 18 mm pine plywood
+
+# Internal walls: [x1, y1, x2, y2] centre-lines (RULEBOOK Figure 1)
+walls:
+  - [5989, 2154, 5989, 4868]   # right corridor wall (2714 from top)
+  - [705, 3599, 5989, 3599]    # upper corridor wall
+  - [705, 3599, 705, 4022]     # stub at its left end (420)
+  - [1429, 4448, 1429, 4868]   # stub on the top wall (420)
+  - [0, 2875, 5265, 2875]      # middle wall (5249.56 from the left)
+  - [705, 2141, 5989, 2141]    # lower corridor wall (5287.56)
+  - [705, 0, 705, 1450]        # left room wall, lower part
+  - [705, 2050, 705, 2141]     # left room wall, upper part - 600 doorway between (PHOTO 6, 7: doorway between the ramps)
+  - [2614, 0, 2614, 2141]      # divider between the lower rooms
+  - [3084, 1417, 4842, 1417]   # loading-zone guide wall (1746.78)  GUESS: not built yet
+  - [3084, 731, 4842, 731]     # loading-zone guide wall (1746.78)  GUESS: not built yet
+
+# Slalom baffles: the short ticks in Figure 1 are 400 mm upright boards standing out from the
+# corridor walls (PHOTO 8, 15, 16, 21), staggered so the robot weaves between them.
+baffles:
+  height: 400
+  boards:                      # [x1, y1, x2, y2]
+    - [1390, 2875, 1390, 2565]
+    - [1814, 2875, 1814, 2565]
+    - [1222, 2141, 1222, 2451]
+    - [1645, 2141, 1645, 2451]
+    - [4316, 2875, 4316, 2565]
+    - [4758, 2875, 4758, 2565]
+    - [5180, 2875, 5180, 2565]
+    - [4147, 2141, 4147, 2451]
+    - [4570, 2141, 4570, 2451]
+    - [4993, 2141, 4993, 2451]
+
+# Colour-coded offloading bays along the top wall (560 deep, RULEBOOK), left -> right.
+# PHOTO 23-29: a 400 mm high deck covers the bays, with one V-notch per bay to drop items through.
+# The 2D LiDAR (~0.19 m) scans underneath the deck and sees the bay dividers.
+offloading_bays:
+  depth: 560
+  x_edges: [2680, 3394, 4109, 4842]
+  colours: [blue, white, black]          # GUESS order - bays were still bare plywood
+  divider_height: 400
+  deck: {height: 400, notch_width: 230, notch_depth: 180}
+
+# Loading station: bar with three slots in Figure 1. GUESS - not built yet in the photos.
+loading_station:
+  centre: [3761, 1075]
+  size: [150, 1250]
+  height: 400
+  slots: [plastic, metal, organic]
+
+# Ramps (PHOTO 6, 7, 14, 15, 16, 20): 3-part ramps (incline, plateau, decline) ~580 wide.
+# yaw in degrees (0 = runs along x). Positions are GUESSES consistent with the photos:
+#   soil/gravel ramp ends at a dead end against the outer wall (photo 14);
+#   bare-wood ramp is the second ramp; doorway between them (photos 6, 7).
+ramps:
+  - {name: ramp_soil, centre: [352, 760],  length: 1300, width: 580, height: 70, surface: soil, yaw: 90}
+  - {name: ramp_wood, centre: [2900, 2508], length: 1150, width: 580, height: 80, surface: wood, yaw: 0}
+
+# Flat terrain (PHOTO 1, 8, 22, 23): artificial grass 1220 x 580 along an outer wall. Position GUESS.
+patches:
+  - {name: grass, centre: [6346, 2900], size: [580, 1220], height: 12, surface: grass}
+
+# Time-based barrier closing Path 2 (flat route). GUESS - not built yet.
+gate:
+  from: [5265, 2875]
+  to:   [5989, 2875]
+  height: 400
+  open_s: 20             # GUESS - "standard waiting time" not published yet
+  closed_s: 20
+
+# Judges' cylinders (moved between rounds). GUESS - none in the photos yet.
+cylinders:
+  diameter: 110
+  height: 200
+  positions:
+    - [1600, 3240]
+    - [3300, 3240]
+    - [4400, 4050]
+
+# Display screen showing the waste type (detection task). GUESS - not installed yet.
+display_screen:
+  centre: [6346, 4848]
+  size: [500, 20, 300]   # width, depth, height
+
+# Start / finish pad (Figure 1 bottom-right). GUESS - not marked yet.
+start:
+  pose: [6346, 400, 90]  # x, y, yaw in degrees
+  pad_size: [400, 400]
+
+# Extra dimension lines on the 2D plan (draw_plan.py): [x0, y0, x1, y1, offset_px]
+plan_dims:
+  - [0, 2141, 0, 2875, -14]
+  - [0, 2875, 0, 3599, -14]
+  - [5989, 1200, 6703.56, 1200, 0]
+  - [0, 1750, 705, 1750, 0]

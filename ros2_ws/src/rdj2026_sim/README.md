@@ -16,25 +16,27 @@ For Nav2 the matching 2D occupancy map is `maps/rdj2026_truth.yaml`.
 
 ## What's in the field
 
-| Feature (rulebook) | In the simulation |
-|---|---|
-| 6703.56 × 4868 mm field, corridors (Fig. 1) | `field_walls`, **40 cm** high (pencil-marked panels in the field photos) |
-| Slalom baffles (Fig. 1 ticks, photos) | ten 31 cm boards staggered across the middle corridor |
-| Colour-coded offloading zones — blue/white/black | three 560 mm bays on the top wall under a 40 cm **deck with one V-notch per bay** (photos) |
-| Loading zone (3 stations) | green table + plastic/metal/organic slots |
-| Ramp + sand/gravel, grass | soil ramp (7 cm) at a dead end, bare-wood ramp (8 cm), 1220 × 580 artificial-grass strip |
-| Time-based dynamic barrier (Path 2 gate) | yellow `gate`, opened/closed at random by `gate_controller.py` |
-| Cylinders placed by judges | three 110 mm cylinders |
-| Display screen (waste detection) | dark panel, top-right |
-| Start position | red pad, bottom-right |
+The course follows the rulebook's **course drawing (Figure 2)**, converted to a floor plan with a calibrated
+inverse isometric projection and checked by overlaying a render from the same camera on Figure 2
+(`arena/figure2_overlay.png`). Field **4868 x 2440 mm**; walls 400 mm (from the field photos).
+Rulebook Figure 1 (6703 x 4868) is a different, older design - kept in `arena/alternatives/`.
 
-Everything comes from **`arena/arena_layout.yaml`** (millimetres). Each item is tagged `RULEBOOK`,
-`PHOTO` (checked against 29 photos of the real field under construction, 15 Oct 2026) or `GUESS`
-(not built yet when photographed: gate, cylinders, screen, start pad, loading station, bay colours) — correct them after inspecting the real
-field and regenerate:
+| Figure 2 feature | In the simulation |
+|---|---|
+| 1 Ramp + sand | 70 mm ramp in the lane along the front wall |
+| Ramp + gravel | 80 mm ramp in the middle corridor (closed at its left end) |
+| 2 Random time-based dynamic obstacle | `gate` across the back corridor, cycled by `gate_controller.py` |
+| 3 Cylinders placed by judges | three 110 mm cylinders in the open room at the left end |
+| 4 Loading zone | green board with plastic / metal / organic slots, raised over a slot |
+| 5 Colour-coded offloading zones | three bays on the back wall under a V-notched deck (black / white / blue) |
+| 6 Start | start box in the back-right corner |
+
+Edit `arena/arena_layout.yaml` (mm) and regenerate:
 
 ```bash
-python3 arena/generate_arena.py     # rewrites worlds/, maps/rdj2026_truth.*, arena/preview.png
+python3 arena/generate_arena.py   # Gazebo world + maps/rdj2026_truth.* (Nav2) + preview
+python3 arena/draw_plan.py        # 2D plan (svg + png)
+python3 arena/render_iso.py       # 3D view from the same camera as Figure 2
 ```
 
 ## The simulated robot

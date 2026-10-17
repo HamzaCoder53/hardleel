@@ -1,109 +1,69 @@
-# Robotics Dojo 2026 game field - editable layout (all lengths in millimetres).
+# Robotics Dojo 2026 course - from the rulebook's course drawing (Figure 2, isometric, features 1-6),
+# converted to a floor plan with a calibrated inverse isometric projection, and checked by overlaying
+# a render from the same camera on Figure 2 (arena/render_iso.py). Field 4868 x 2440 mm (Figure 2 is 2:1).
+# Photos of the real build (15 Oct 2026) give the wall height (pencil-marked "40 x ..." panels) and the
+# V-notched deck over the bays. Rulebook Figure 1 (6703 x 4868) is a different, older design.
 #
-# Sources:
-#   RuleBook_RDJ_2026_V0.9, Figure 1 (top view) + Figure 2 (isometric) - overall plan and labelled dims
-#   29 photos of the real field under construction, 15 Oct 2026 (Drive "Competition Course"),
-#   cross-checked by Claude and Gemini. Photo numbers below refer to that folder in name order.
-# PHOTO = confirmed in the photos, RULEBOOK = from the drawing, GUESS = not built/visible yet.
-# Edit here, then run:  python3 arena/generate_arena.py
-#
-# Frame: origin = bottom-left outer corner of Figure 1, x along the 6703.56 side, y up the page.
+# Frame: origin = left (cylinder-end) front corner; x along the front long wall, y towards the back wall.
+# Edit, then:  python3 arena/generate_arena.py && python3 arena/draw_plan.py && python3 arena/render_iso.py
 
 field:
-  length: 6703.56          # RULEBOOK (= ~5.5 plywood sheet widths)
-  width: 4868.0            # RULEBOOK (= 2 x 2440 plywood sheets)
-  wall_height: 400         # PHOTO: panels pencil-marked "40 x ..." cm (photos 5, 10-13), ~2x robot height
-  wall_thickness: 18       # PHOTO: 18 mm pine plywood
+  length: 4868
+  width: 2440
+  wall_height: 400          # PHOTO
+  wall_thickness: 18        # PHOTO
 
-# Internal walls: [x1, y1, x2, y2] centre-lines (RULEBOOK Figure 1)
 walls:
-  - [5989, 2154, 5989, 4868]   # right corridor wall (2714 from top)
-  - [705, 3599, 5989, 3599]    # upper corridor wall
-  - [705, 3599, 705, 4022]     # stub at its left end (420)
-  - [1429, 4448, 1429, 4868]   # stub on the top wall (420)
-  - [0, 2875, 5265, 2875]      # middle wall (5249.56 from the left)
-  - [705, 2141, 5989, 2141]    # lower corridor wall (5287.56)
-  - [705, 0, 705, 1450]        # left room wall, lower part
-  - [705, 2050, 705, 2141]     # left room wall, upper part - 600 doorway between (PHOTO 6, 7: doorway between the ramps)
-  - [2614, 0, 2614, 2141]      # divider between the lower rooms
-  - [3084, 1417, 4842, 1417]   # loading-zone guide wall (1746.78)  GUESS: not built yet
-  - [3084, 731, 4842, 731]     # loading-zone guide wall (1746.78)  GUESS: not built yet
+  - [600, 1335, 2260, 1335]     # gravel-ramp corridor, front wall
+  - [600, 1865, 2265, 1865]     # gravel-ramp corridor, back wall (front of the gate corridor)
+  - [600, 1335, 600, 1865]      # gravel-ramp corridor closed at its left end
+  - [2300, 510, 2300, 1335]     # partition: cylinder room | middle area
+  - [2300, 535, 3414, 535]      # sand-ramp lane, inner wall (lane y 0..535 along the front wall)
+  - [2880, 1121, 2880, 1890]    # middle partition
+  - [2930, 1890, 2930, 2440]    # offloading bays, left wall
+  - [2930, 1890, 3890, 1890]    # offloading bays, front edge
+  - [3890, 1890, 3890, 2440]    # bays | start box
+  - [3890, 1890, 4400, 1890]    # start box front wall (opening on the right)
+  - [3400, 564, 3400, 1330]     # loading area, left wall
+  - [3400, 1400, 4233, 1400]    # wall in front of the bays / start area
+  - [3780, 0, 3780, 650]        # support wall under the loading board (slot)
+  - [4030, 0, 4030, 650]        # support wall under the loading board (slot)
 
-# Slalom baffles: the short ticks in Figure 1 are 400 mm upright boards standing out from the
-# corridor walls (PHOTO 8, 15, 16, 21), staggered so the robot weaves between them.
-baffles:
-  height: 400
-  boards:                      # [x1, y1, x2, y2]
-    - [1390, 2875, 1390, 2565]
-    - [1814, 2875, 1814, 2565]
-    - [1222, 2141, 1222, 2451]
-    - [1645, 2141, 1645, 2451]
-    - [4316, 2875, 4316, 2565]
-    - [4758, 2875, 4758, 2565]
-    - [5180, 2875, 5180, 2565]
-    - [4147, 2141, 4147, 2451]
-    - [4570, 2141, 4570, 2451]
-    - [4993, 2141, 4993, 2451]
+baffles: {height: 400, boards: []}     # Figure 2 has none (the photos show T-stands - add here if used)
 
-# Colour-coded offloading bays along the top wall (560 deep, RULEBOOK), left -> right.
-# PHOTO 23-29: a 400 mm high deck covers the bays, with one V-notch per bay to drop items through.
-# The 2D LiDAR (~0.19 m) scans underneath the deck and sees the bay dividers.
-offloading_bays:
-  depth: 560
-  x_edges: [2680, 3394, 4109, 4842]
-  colours: [blue, white, black]          # GUESS order - bays were still bare plywood
+offloading_bays:                         # feature 5, against the back wall
+  depth: 550
+  x_edges: [2930, 3250, 3570, 3890]
+  colours: [black, white, blue]          # rulebook text: black = metal, white = organic, blue = plastic
+                                         # (Figure 2 draws dark grey + red; check on the real field)
   divider_height: 400
-  deck: {height: 400, notch_width: 230, notch_depth: 180}
+  deck: {height: 400, notch_width: 230, notch_depth: 180}   # PHOTO 23-29
 
-# Loading station: bar with three slots in Figure 1. GUESS - not built yet in the photos.
-loading_station:
-  centre: [3761, 1075]
-  size: [150, 1250]
-  height: 400
+loading_station:                         # feature 4: green board with 3 holes, raised over the slot
+  centre: [3905, 900]
+  size: [250, 1200]
+  height: 300
   slots: [plastic, metal, organic]
 
-# Ramps (PHOTO 6, 7, 14, 15, 16, 20): 3-part ramps (incline, plateau, decline) ~580 wide.
-# yaw in degrees (0 = runs along x). Positions are GUESSES consistent with the photos:
-#   soil/gravel ramp ends at a dead end against the outer wall (photo 14);
-#   bare-wood ramp is the second ramp; doorway between them (photos 6, 7).
-ramps:
-  - {name: ramp_soil, centre: [352, 760],  length: 1300, width: 580, height: 70, surface: soil, yaw: 90}
-  - {name: ramp_wood, centre: [2900, 2508], length: 1150, width: 580, height: 80, surface: wood, yaw: 0}
+ramps:                                   # feature 1 (sand, front lane) and ramp + gravel (middle corridor)
+  - {name: ramp_sand,   centre: [2870, 268],  length: 1140, width: 500, height: 70, surface: sand,   yaw: 0}
+  - {name: ramp_gravel, centre: [1750, 1600], length: 1300, width: 500, height: 80, surface: gravel, yaw: 0}
 
-# Flat terrain (PHOTO 1, 8, 22, 23): artificial grass 1220 x 580 along an outer wall. Position GUESS.
-patches:
-  - {name: grass, centre: [6346, 2900], size: [580, 1220], height: 12, surface: grass}
+patches: []                              # the photos show an artificial-grass strip - add here once placed
 
-# Time-based barrier closing Path 2 (flat route). GUESS - not built yet.
-gate:
-  from: [5265, 2875]
-  to:   [5989, 2875]
-  height: 400
-  open_s: 20             # GUESS - "standard waiting time" not published yet
-  closed_s: 20
+gate: {from: [980, 1865], to: [980, 2440], height: 400, open_s: 20, closed_s: 20}   # feature 2
 
-# Judges' cylinders (moved between rounds). GUESS - none in the photos yet.
-cylinders:
+cylinders:                               # feature 3, placed by judges (positions as drawn in Figure 2)
   diameter: 110
   height: 200
-  positions:
-    - [1600, 3240]
-    - [3300, 3240]
-    - [4400, 4050]
+  positions: [[806, 622], [1387, 445], [1589, 1092]]
 
-# Display screen showing the waste type (detection task). GUESS - not installed yet.
-display_screen:
-  centre: [6346, 4848]
-  size: [500, 20, 300]   # width, depth, height
+display_screen: {centre: [0, 0], size: [1, 1, 1], hide: true}   # not shown in Figure 2
 
-# Start / finish pad (Figure 1 bottom-right). GUESS - not marked yet.
-start:
-  pose: [6346, 400, 90]  # x, y, yaw in degrees
-  pad_size: [400, 400]
+start: {pose: [4138, 2152, 0], pad_size: [300, 300]}            # feature 6, start box, facing +x (towards its opening)
 
-# Extra dimension lines on the 2D plan (draw_plan.py): [x0, y0, x1, y1, offset_px]
-plan_dims:
-  - [0, 2141, 0, 2875, -14]
-  - [0, 2875, 0, 3599, -14]
-  - [5989, 1200, 6703.56, 1200, 0]
-  - [0, 1750, 705, 1750, 0]
+plan_dims:                               # dimension lines on the 2D plan
+  - [820, 1335, 820, 1865, 0]
+  - [1400, 1865, 1400, 2440, 0]
+  - [2380, 0, 2380, 535, 0]
+  - [3780, 300, 4030, 300, 0]

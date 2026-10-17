@@ -85,8 +85,8 @@ bays = L['offloading_bays']
 xe = bays['x_edges']
 for i, c in enumerate(bays['colours']):
     rect(xe[i], FW, xe[i + 1], FW - bays['depth'], COL[c], '#555', dashed=False)
-    waste = {'blue': 'PLASTIC', 'white': 'ORGANIC', 'black': 'METAL'}[c]
-    text((xe[i] + xe[i + 1]) / 2, FW - bays['depth'] / 2 - 60, waste, 12,
+    waste = {'blue': 'PLASTIC', 'white': 'ORGANIC', 'black': 'METAL'}.get(c, c.upper())
+    text((xe[i] + xe[i + 1]) / 2, FW - bays['depth'] / 2 - 60, waste, 9,
          '#ffffff' if c in ('blue', 'black') else '#222', bold=True)
 deck = bays.get('deck')
 if deck:
