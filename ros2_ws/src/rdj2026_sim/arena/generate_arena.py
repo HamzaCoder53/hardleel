@@ -60,6 +60,7 @@ def material(c):
 
 
 def box_link(name, x, y, z, yaw, sx, sy, sz, colour, collide=True, pitch=0.0):
+    sx, sy, sz = max(sx, 0.002), max(sy, 0.002), max(sz, 0.002)    # Gazebo aborts on zero/negative sizes
     geo = f'<geometry><box><size>{sx:.4f} {sy:.4f} {sz:.4f}</size></box></geometry>'
     col = f'<collision name="c">{geo}</collision>' if collide else ''
     return (f'<link name="{name}"><pose>{x:.4f} {y:.4f} {z:.4f} 0 {pitch:.4f} {yaw:.4f}</pose>'
@@ -86,7 +87,7 @@ def build_world():
     xe = bays['x_edges']
     for i, colour in enumerate(bays['colours']):
         w, d = (xe[i + 1] - xe[i]) * MM, bays['depth'] * MM
-        marks.append(box_link(f'bay_{colour}', (xe[i] + xe[i + 1]) / 2 * MM, FW - d / 2, 0.001, 0,
+        marks.append(box_link(f'bay_{i}_{colour}', (xe[i] + xe[i + 1]) / 2 * MM, FW - d / 2, 0.001, 0,
                               w - WT, d - WT, 0.002, colour, collide=False))
     sx, sy, _ = L['start']['pose']
     px, py = L['start']['pad_size']
@@ -126,7 +127,7 @@ def build_world():
     slot_cols = {'plastic': 'blue', 'organic': 'white', 'metal': 'black'}
     for i, slot in enumerate(ls['slots']):
         oy = (ly - lsy / 2 + lsy * (i + 0.5) / len(ls['slots'])) * MM
-        links.append(box_link(f'slot_{slot}', lx * MM, oy, lh + 0.02, 0, 0.08, 0.08, 0.04,
+        links.append(box_link(f'slot_{i}_{slot}', lx * MM, oy, lh + 0.02, 0, 0.08, 0.08, 0.04,
                               slot_cols.get(slot, 'gate'), collide=False))
     models.append(static_model('loading_station', links))
 
@@ -151,10 +152,11 @@ def build_world():
 
     # display screen
     ds = L['display_screen']
-    dx, dy = ds['centre']
-    dw, dd, dh = ds['size']
-    models.append(static_model('display_screen', [
-        box_link('panel', dx * MM, dy * MM, 0.05 + dh * MM / 2, 0, dw * MM, dd * MM, dh * MM, 'screen')]))
+    if not ds.get('hide'):
+        dx, dy = ds['centre']
+        dw, dd, dh = ds['size']
+        models.append(static_model('display_screen', [
+            box_link('panel', dx * MM, dy * MM, 0.05 + dh * MM / 2, 0, dw * MM, dd * MM, dh * MM, 'screen')]))
 
     # cylinders (judges move these between rounds)
     c = L['cylinders']
@@ -168,12 +170,13 @@ def build_world():
 
     # gate (moved up/down by rdj2026_sim/gate_controller)
     g = L['gate']
-    (gx1, gy1), (gx2, gy2) = g['from'], g['to']
-    cx, cy, yaw, length = box_from_segment(gx1 * MM, gy1 * MM, gx2 * MM, gy2 * MM)
-    gh = g['height'] * MM
-    models.append(
-        f'<model name="gate"><static>true</static><pose>{cx:.4f} {cy:.4f} {gh / 2:.4f} 0 0 {yaw:.4f}</pose>'
-        + box_link('bar', 0, 0, 0, 0, length - 2 * WT, WT * 2, gh, 'gate')[0:] + '</model>')
+    if not g.get('hide'):
+        (gx1, gy1), (gx2, gy2) = g['from'], g['to']
+        cx, cy, yaw, length = box_from_segment(gx1 * MM, gy1 * MM, gx2 * MM, gy2 * MM)
+        gh = g['height'] * MM
+        models.append(
+            f'<model name="gate"><static>true</static><pose>{cx:.4f} {cy:.4f} {gh / 2:.4f} 0 0 {yaw:.4f}</pose>'
+            + box_link('bar', 0, 0, 0, 0, length - 2 * WT, WT * 2, gh, 'gate')[0:] + '</model>')
 
     start_x, start_y, start_yaw = L['start']['pose']
     return f'''<?xml version="1.0"?>
@@ -260,7 +263,8 @@ def build_map():
     ls = L['loading_station']
     fill_rect_rot(ls['centre'][0] * MM, ls['centre'][1] * MM, 0, ls['size'][0] * MM, ls['size'][1] * MM)
     ds = L['display_screen']
-    fill_rect_rot(ds['centre'][0] * MM, ds['centre'][1] * MM, 0, ds['size'][0] * MM, ds['size'][1] * MM)
+    if not ds.get('hide'):
+        fill_rect_rot(ds['centre'][0] * MM, ds['centre'][1] * MM, 0, ds['size'][0] * MM, ds['size'][1] * MM)
 
     os.makedirs(os.path.join(PKG, 'maps'), exist_ok=True)
     with open(os.path.join(PKG, 'maps', 'rdj2026_truth.pgm'), 'wb') as f:
@@ -321,17 +325,19 @@ def build_preview():
     for (x1, y1, x2, y2, _) in segment_boxes():
         d.line([P(x1, y1), P(x2, y2)], fill=rgb('wall'), width=max(3, int(WT * S)))
     g = L['gate']
-    d.line([P(*(v * MM for v in g['from'])), P(*(v * MM for v in g['to']))], fill=rgb('gate'), width=6)
-    gx = (g['from'][0] + g['to'][0]) / 2 * MM
-    d.text(P(gx - 0.2, g['from'][1] * MM - 0.08), 'GATE', fill=(120, 90, 0))
+    if not g.get('hide'):
+        d.line([P(*(v * MM for v in g['from'])), P(*(v * MM for v in g['to']))], fill=rgb('gate'), width=6)
+        gx = (g['from'][0] + g['to'][0]) / 2 * MM
+        d.text(P(gx - 0.2, g['from'][1] * MM - 0.08), 'GATE', fill=(120, 90, 0))
     c = L['cylinders']
     for x, y in c['positions']:
         r = c['diameter'] * MM / 2
         d.ellipse([P(x * MM - r, y * MM + r), P(x * MM + r, y * MM - r)], fill=rgb('cyl'), outline=(0, 0, 0))
     ds = L['display_screen']
-    d.rectangle([P((ds['centre'][0] - ds['size'][0] / 2) * MM, ds['centre'][1] * MM + 0.03),
+    if not ds.get('hide'):
+      d.rectangle([P((ds['centre'][0] - ds['size'][0] / 2) * MM, ds['centre'][1] * MM + 0.03),
                  P((ds['centre'][0] + ds['size'][0] / 2) * MM, ds['centre'][1] * MM - 0.03)], fill=rgb('screen'))
-    d.text(P(ds['centre'][0] * MM - 0.25, ds['centre'][1] * MM - 0.08), 'SCREEN', fill=(0, 0, 0))
+      d.text(P(ds['centre'][0] * MM - 0.25, ds['centre'][1] * MM - 0.08), 'SCREEN', fill=(0, 0, 0))
     for gxm in range(0, int(FL) + 1):
         d.text(P(gxm, 0), f'{gxm}m', fill=(60, 60, 60))
     for gym in range(1, int(FW) + 1):

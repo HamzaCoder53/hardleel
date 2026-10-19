@@ -1,0 +1,70 @@
+# ALTERNATIVE: course traced from rulebook Figure 2 (isometric), 4868 x 2440. Replaced on 19 Oct 2026 by the exact Figure 1 copy.
+# Robotics Dojo 2026 course - from the rulebook's course drawing (Figure 2, isometric, features 1-6),
+# converted to a floor plan with a calibrated inverse isometric projection, and checked by overlaying
+# a render from the same camera on Figure 2 (arena/render_iso.py). Field 4868 x 2440 mm (Figure 2 is 2:1).
+# Photos of the real build (15 Oct 2026) give the wall height (pencil-marked "40 x ..." panels) and the
+# V-notched deck over the bays. Rulebook Figure 1 (6703 x 4868) is a different, older design.
+#
+# Frame: origin = left (cylinder-end) front corner; x along the front long wall, y towards the back wall.
+# Edit, then:  python3 arena/generate_arena.py && python3 arena/draw_plan.py && python3 arena/render_iso.py
+
+field:
+  length: 4868
+  width: 2440
+  wall_height: 400          # PHOTO
+  wall_thickness: 18        # PHOTO
+
+walls:
+  - [600, 1335, 2260, 1335]     # gravel-ramp corridor, front wall
+  - [600, 1865, 2265, 1865]     # gravel-ramp corridor, back wall (front of the gate corridor)
+  - [600, 1335, 600, 1865]      # gravel-ramp corridor closed at its left end
+  - [2300, 510, 2300, 1335]     # partition: cylinder room | middle area
+  - [2300, 535, 3414, 535]      # sand-ramp lane, inner wall (lane y 0..535 along the front wall)
+  - [2880, 1121, 2880, 1890]    # middle partition
+  - [2930, 1890, 2930, 2440]    # offloading bays, left wall
+  - [2930, 1890, 3890, 1890]    # offloading bays, front edge
+  - [3890, 1890, 3890, 2440]    # bays | start box
+  - [3890, 1890, 4400, 1890]    # start box front wall (opening on the right)
+  - [3400, 564, 3400, 1330]     # loading area, left wall
+  - [3400, 1400, 4233, 1400]    # wall in front of the bays / start area
+  - [3780, 0, 3780, 650]        # support wall under the loading board (slot)
+  - [4030, 0, 4030, 650]        # support wall under the loading board (slot)
+
+baffles: {height: 400, boards: []}     # Figure 2 has none (the photos show T-stands - add here if used)
+
+offloading_bays:                         # feature 5, against the back wall
+  depth: 550
+  x_edges: [2930, 3250, 3570, 3890]
+  colours: [black, white, blue]          # rulebook text: black = metal, white = organic, blue = plastic
+                                         # (Figure 2 draws dark grey + red; check on the real field)
+  divider_height: 400
+  deck: {height: 400, notch_width: 230, notch_depth: 180}   # PHOTO 23-29
+
+loading_station:                         # feature 4: green board with 3 holes, raised over the slot
+  centre: [3905, 900]
+  size: [250, 1200]
+  height: 300
+  slots: [plastic, metal, organic]
+
+ramps:                                   # feature 1 (sand, front lane) and ramp + gravel (middle corridor)
+  - {name: ramp_sand,   centre: [2870, 268],  length: 1140, width: 500, height: 70, surface: sand,   yaw: 0}
+  - {name: ramp_gravel, centre: [1750, 1600], length: 1300, width: 500, height: 80, surface: gravel, yaw: 0}
+
+patches: []                              # the photos show an artificial-grass strip - add here once placed
+
+gate: {from: [980, 1865], to: [980, 2440], height: 400, open_s: 20, closed_s: 20}   # feature 2
+
+cylinders:                               # feature 3, placed by judges (positions as drawn in Figure 2)
+  diameter: 110
+  height: 200
+  positions: [[806, 622], [1387, 445], [1589, 1092]]
+
+display_screen: {centre: [0, 0], size: [1, 1, 1], hide: true}   # not shown in Figure 2
+
+start: {pose: [4138, 2152, 0], pad_size: [300, 300]}            # feature 6, start box, facing +x (towards its opening)
+
+plan_dims:                               # dimension lines on the 2D plan
+  - [820, 1335, 820, 1865, 0]
+  - [1400, 1865, 1400, 2440, 0]
+  - [2380, 0, 2380, 535, 0]
+  - [3780, 300, 4030, 300, 0]

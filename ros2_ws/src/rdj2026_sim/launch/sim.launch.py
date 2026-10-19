@@ -28,7 +28,8 @@ def generate_launch_description():
     gui = LaunchConfiguration('gui')
     return LaunchDescription([
         DeclareLaunchArgument('gui', default_value='true', description='Show the Gazebo window'),
-        DeclareLaunchArgument('gate', default_value='true', description='Run the time-based gate'),
+        DeclareLaunchArgument('gate', default_value='false' if gate.get('hide') else 'true',
+                              description='Run the time-based gate (off when the layout has no gate)'),
         SetEnvironmentVariable('IGN_GAZEBO_RESOURCE_PATH', pkg),
 
         ExecuteProcess(

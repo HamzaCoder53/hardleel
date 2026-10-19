@@ -85,7 +85,7 @@ bays = L['offloading_bays']
 xe = bays['x_edges']
 for i, c in enumerate(bays['colours']):
     rect(xe[i], FW, xe[i + 1], FW - bays['depth'], COL[c], '#555', dashed=False)
-    waste = {'blue': 'PLASTIC', 'white': 'ORGANIC', 'black': 'METAL'}.get(c, c.upper())
+    waste = {'blue': 'PLASTIC', 'white': 'ORGANIC', 'black': 'METAL', 'floor': ''}.get(c, c.upper())
     text((xe[i] + xe[i + 1]) / 2, FW - bays['depth'] / 2 - 60, waste, 9,
          '#ffffff' if c in ('blue', 'black') else '#222', bold=True)
 deck = bays.get('deck')
@@ -113,7 +113,7 @@ if not L['loading_station'].get('hide'):
     for i, slot in enumerate(ls['slots']):
         sy_ = ly - lsy / 2 + lsy * (i + 0.5) / len(ls['slots'])
         text(lx + lsx / 2 + 25, sy_ - 5, slot, 10, '#1a5a1a', anchor='start')
-    text(lx, ly - lsy / 2 - 90, 'LOADING STATION', 12, '#1a5a1a', bold=True)
+    text(lx, ly - lsy / 2 - 90, 'LOADING', 12, '#1a5a1a', bold=True)
 
 if not L['start'].get('hide'):
     sx, sy, syaw = L['start']['pose']
@@ -165,7 +165,7 @@ for gx in range(0, int(FL) + 1, 1000):
 ty = M + FW * S + 75
 text(M, ty, 'Robotics Dojo 2026 game field - 2D plan (from arena_layout.yaml)', 16, '#111', anchor='start', px=True, bold=True)
 text(M, ty + 22, f"Walls {L['field']['wall_height']} mm high, {L['field']['wall_thickness']} mm plywood. "
-     "Solid = rulebook / photo-confirmed.  Dashed = guess (not built when photographed, 15 Oct 2026).",
+     "Exact copy of rulebook Figure 1 (top view) - nothing added.",
      12, '#333', anchor='start', px=True)
 text(M, ty + 42, 'Dimensions in mm. Origin = bottom-left corner. Same layout as the Gazebo world and maps/rdj2026_truth.yaml.',
      12, '#333', anchor='start', px=True)
