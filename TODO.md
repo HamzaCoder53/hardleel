@@ -94,3 +94,20 @@ Mini Competition: **26 Oct 2026** · Final: **25 Nov 2026**. Last updated 22 Oct
 - [ ] The wall-follow explorer (`wall_follow_explorer_node.py`) and the guardian's built-in `autonomous_explore` both
       circled a ~1 m pocket in the sim and never left the start area → do not run autonomous mapping on the robot.
 - [ ] Sim on WSL: needs `LIBGL_ALWAYS_SOFTWARE=1` and one `wsl` session kept open for the whole run.
+
+## Added 22 Oct (night) — laptop brain (organisers allow off-board processing)
+Pi = drivers only, laptop (WSL, Humble) = everything else, both on `ROS_DOMAIN_ID=7`.
+- Pi: `~/robot_hw.sh` (tmux `hw`: `lidar_supervisor.sh` + `robot_hw.launch.py`: IMU, motors, camera 10 fps).
+- Laptop: `scripts/laptop/brain.sh mapping` · `scripts/laptop/teleop.sh` · `scripts/laptop/brain.sh mission <map>.pbstream [run_mission:=true]`
+  · `scripts/laptop/lidar_view.sh` (lidar only). Workspace `~/hardleel_ws` (symlinks to the repo), bags in `~/hardleel_bags`.
+- [ ] **Run once on the Pi:** `sudo bash ~/setup_chrony.sh` (Pi serves time to the laptop; venue may have no internet).
+- [ ] **Plug the Arduino IMU back in** — not on USB at 21:00 (`lsusb`); `/imu/*` silent.
+- [ ] **Lidar power** — still stops replying after a restart; `lidar_supervisor.sh` retries (Boost → Express → Standard).
+- [ ] Bench test `scripts/laptop/bench_test.sh` (fake sensors, domain 42): mapping run saved a .pbstream but Cartographer
+      received no scans — find out why (QoS / fake scan) and finish the mission half (Nav2 active, goal reached).
+      The PC has 8 GB: close Chrome etc. before running the brain (background jobs were killed for low memory).
+- [ ] Competition waypoints (`config/competition_course.yaml`) are ASSUMED (screen, doorway, gate, bays, finish):
+      Figure 1 has no opening from the start room. Measure the real field and fix the yaml.
+- [ ] Ask organisers: may the mission be started from the laptop (`/mission/start`) or must it auto-start?
+- [ ] Sim mode (`brain.launch.py sim:=true`) is untested: the sim publishes its own odom->base_link, which clashes
+      with Cartographer's.

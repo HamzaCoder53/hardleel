@@ -1,0 +1,60 @@
+# Competition course for competition_mission.py.
+#
+# FRAME CONVENTION. Cartographer's map origin is the robot's START pose: map x = the direction the robot faces at
+# the start, map y = to its left, yaw 0 = along map x, metres. Arena coordinates (rulebook Figure 1, mm, origin =
+# bottom-left outer corner, x along the 6704 side, y up) were converted with
+#     d = arena - start_xy;  map_x = d . forward;  map_y = d . left;  map_yaw = arena_yaw - start_yaw
+# For the start below (facing +y) that is map_x = (Y-300)/1000, map_y = -(X-6215)/1000.
+# Each waypoint keeps its arena pose in `arena: [X_mm, Y_mm, yaw_deg]`; run
+#   python3 -m robot_slam.competition_core course.yaml   to compare stored x/y/yaw against values re-derived from arena + start_arena.
+#
+# SOURCE: rdj2026_sim/arena/arena_layout.yaml (exact Figure 1 copy). Figure 1 has NO screen, gate, ramps,
+# cylinders, bay colours, finish or opening between the start room and the corridors; those are ASSUMPTIONS
+# marked ASSUMED / PLACEHOLDER and must be re-measured on the real field. In the map as drawn the start room is
+# disconnected from the corridors (checked by flood fill); the doorway at (6002, 2500) is assumed.
+# Corridor-centre waypoints keep ~210 mm clearance each side for the 260 x 220 mm robot.
+course:
+  start_arena: {x_mm: 6215, y_mm: 300, yaw_deg: 90}
+  waypoints:
+    screen_view: {stage: screen, x: 0.8, y: -0.137, yaw: -1.571, arena: [6352, 1100, 0]}   # ASSUMED: screen on the east wall (Figure 1 does not show it)
+    loading_approach: {stage: loading, x: 0.768, y: 0.715, yaw: 1.571, arena: [5500, 1068, 180]}   # enter the loading channel (y 716..1423) from the east
+    loading_dock: {stage: loading, x: 0.768, y: 2.065, yaw: 1.571, arena: [4150, 1068, 180]}   # bar centre x=3761, half width 80; robot front ~100 mm off it
+    loading_exit: {stage: loading, x: 0.768, y: 0.615, yaw: 0.0, arena: [5600, 1068, 90]}   # back out of the channel
+    terrain_1: {stage: terrain, x: 1.2, y: -0.137, yaw: 0.0, arena: [6352, 1500, 90]}   # right corridor centre (x 6002..6703)
+    terrain_2: {stage: terrain, x: 1.95, y: -0.137, yaw: 0.0, arena: [6352, 2250, 90]}   # right corridor centre
+    door_in: {stage: obstacles, x: 2.2, y: -0.137, yaw: 1.571, arena: [6352, 2500, 180]}   # ASSUMED doorway in the x=6002 wall at y~2500 (Figure 1 has no opening)
+    door_out: {stage: obstacles, x: 2.2, y: 0.565, yaw: 1.571, arena: [5650, 2500, 180]}   # inside the junction pocket x 5250..6002
+    judges_zone: {stage: obstacles, x: 2.6, y: 0.565, yaw: 0.0, arena: [5650, 2900, 90]}   # cylinders / dynamic obstacles are expected near here
+    junction: {stage: junction, x: 2.92, y: 0.565, yaw: 1.571, arena: [5650, 3220, 180]}   # turn west into the upper corridor (y 2847..3592, centre 3220)
+    gate_check: {stage: junction, x: 2.92, y: 1.065, yaw: 1.571, arena: [5150, 3220, 180]}   # stop here, face west, look at the gate region in /scan
+    p2_1: {stage: gate_path2, x: 2.92, y: 1.915, yaw: 1.571, arena: [4300, 3220, 180]}   # upper corridor centre, flat
+    p2_2: {stage: gate_path2, x: 2.92, y: 3.615, yaw: 1.571, arena: [2600, 3220, 180]}
+    p2_3: {stage: gate_path2, x: 2.92, y: 5.115, yaw: 1.571, arena: [1100, 3220, 180]}
+    p2_4: {stage: gate_path2, x: 3.05, y: 5.865, yaw: 0.0, arena: [350, 3350, 90]}   # west end, left strip x 0..705
+    p2_5: {stage: gate_path2, x: 3.9, y: 5.865, yaw: -1.571, arena: [350, 4200, 0]}   # above the x=705 stub (ends y 4005)
+    p2_6: {stage: gate_path2, x: 3.8, y: 5.065, yaw: -1.571, arena: [1150, 4100, 0]}   # below the x=1428 stub (starts y 4449)
+    p2_7: {stage: gate_path2, x: 3.576, y: 3.915, yaw: -1.571, arena: [2300, 3876, 0]}   # top-room lane y 3592..4161, centre 3876
+    p1_1: {stage: path1_detour, x: 2.82, y: 1.915, yaw: 1.571, arena: [4300, 3120, 180]}   # PLACEHOLDER: Path 1 is not in Figure 1; reuses the upper corridor 100 mm south
+    p1_2: {stage: path1_detour, x: 2.82, y: 3.615, yaw: 1.571, arena: [2600, 3120, 180]}   # PLACEHOLDER
+    p1_3: {stage: path1_detour, x: 2.82, y: 5.115, yaw: 1.571, arena: [1100, 3120, 180]}   # PLACEHOLDER
+    p1_4: {stage: path1_detour, x: 3.05, y: 5.865, yaw: 0.0, arena: [350, 3350, 90]}   # PLACEHOLDER
+    p1_5: {stage: path1_detour, x: 3.9, y: 5.865, yaw: -1.571, arena: [350, 4200, 0]}   # PLACEHOLDER
+    p1_6: {stage: path1_detour, x: 3.8, y: 5.065, yaw: -1.571, arena: [1150, 4100, 0]}   # PLACEHOLDER
+    p1_7: {stage: path1_detour, x: 3.576, y: 3.915, yaw: -1.571, arena: [2300, 3876, 0]}   # PLACEHOLDER
+    bay_blue: {stage: bay_blue, x: 3.576, y: 3.186, yaw: 0.0, arena: [3029, 3876, 90]}   # ASSUMED bay order left to right = blue, white, black (Figure 1 gives no colours); bay x 2650..3408
+    bay_white: {stage: bay_white, x: 3.576, y: 2.446, yaw: 0.0, arena: [3769, 3876, 90]}   # bay x 3408..4130
+    bay_black: {stage: bay_black, x: 3.576, y: 1.723, yaw: 0.0, arena: [4492, 3876, 90]}   # bay x 4130..4855
+    finish: {stage: finish, x: 3.576, y: 0.715, yaw: -1.571, arena: [5500, 3876, 0]}   # ASSUMED finish: east end of the top room
+  # Ordered waypoint names per stage (the mission visits them in this order).
+  stages:
+    screen: [screen_view]
+    loading: [loading_approach, loading_dock, loading_exit]
+    terrain: [terrain_1, terrain_2]
+    obstacles: [door_in, door_out, judges_zone]
+    junction: [junction, gate_check]
+    gate_path2: [p2_1, p2_2, p2_3, p2_4, p2_5, p2_6, p2_7]
+    path1_detour: [p1_1, p1_2, p1_3, p1_4, p1_5, p1_6, p1_7]
+    bay_blue: [bay_blue]
+    bay_white: [bay_white]
+    bay_black: [bay_black]
+    finish: [finish]

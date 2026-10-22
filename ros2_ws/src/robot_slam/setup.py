@@ -12,7 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
-        (os.path.join('share', package_name, 'config'), glob('config/*.yaml') + glob('config/*.lua')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml') + glob('config/*.lua') + glob('config/*.rviz')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -27,6 +27,7 @@ setup(
             'wall_follow_explorer_node = robot_slam.wall_follow_explorer_node:main',
             'sensor_prep = robot_slam.sensor_prep:main',
             'coverage_mission = robot_slam.coverage_mission:main',
+            'competition_mission = robot_slam.competition_mission:main',
         ]
     },
 )

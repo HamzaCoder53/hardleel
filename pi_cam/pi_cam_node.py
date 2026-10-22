@@ -13,18 +13,21 @@ PIPELINE = (
 class PiCam(Node):
     def __init__(self):
         super().__init__("pi_cam")
+        # frames sent per second; 10 is plenty for the classifier and keeps Wi-Fi free for the lidar
+        fps = float(self.declare_parameter("fps", 30.0).value)
+        self.quality = int(self.declare_parameter("jpeg_quality", 80).value)
         self.pub = self.create_publisher(
             CompressedImage, "/camera/image_raw/compressed", QoSProfile(depth=1))
         self.cap = cv2.VideoCapture(PIPELINE, cv2.CAP_GSTREAMER)
         if not self.cap.isOpened():
             raise RuntimeError("Could not open GStreamer pipeline")
-        self.timer = self.create_timer(1 / 30.0, self.tick)
+        self.timer = self.create_timer(1 / fps, self.tick)
 
     def tick(self):
         ok, frame = self.cap.read()
         if not ok:
             return
-        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self.quality])
         if not ok:
             return
         msg = CompressedImage()

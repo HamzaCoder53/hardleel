@@ -1,0 +1,27 @@
+# competition_mission parameters. Waypoints come from competition_course.yaml (map frame, origin = start pose).
+competition_mission:
+  ros__parameters:
+    auto_start: false          # false: wait for std_msgs/Empty on /mission/start
+    course_file: ''            # '' = <share>/config/competition_course.yaml
+    mission_time_limit_s: 175.0   # hard global deadline; rulebook limit is 180 s
+    finish_grace_s: 10.0       # extra time for the finish goal after the deadline
+    goal_timeout_s: 45.0       # per Nav2 goal
+    max_retries: 1             # retries per goal after ClearEntireCostmap, then skip the waypoint
+    classify_retries: 2        # extra /classify attempts (with a small yaw wiggle in between)
+    classify_timeout_s: 8.0
+    reposition_yaw_deg: 8.0
+    default_class: plastic     # fallback when the classifier stays 'unknown'
+    bay_plastic: blue          # class -> bay colour (rulebook brief; Figure 6 may differ - verify)
+    bay_organic: white
+    bay_metal: black
+    load_wait_s: 6.0           # PLACEHOLDER: organisers' loading protocol unknown; or send /loading/done
+    deposit_wait_s: 3.0        # PLACEHOLDER: deposit actuator; /deposit/trigger is published
+    gate_wait_s: 15.0          # PLACEHOLDER: rulebook "standard waiting time" unknown
+    gate_stable_s: 0.8         # gate region must stay clear this long to count as open
+    gate_max_range_m: 0.9      # /scan returns closer than this inside the cone mean 'closed'
+    gate_half_angle_deg: 20.0
+    mission_speed: 0.30        # Nav2 /speed_limit, m/s
+    terrain_speed: 0.15
+    terrain_surface: ''        # e.g. SAND, published on /surface_override during TERRAIN; '' = off
+    cmd_vel_topic: /cmd_vel
+    log_dir: ~/logs
