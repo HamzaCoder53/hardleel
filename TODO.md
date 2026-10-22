@@ -60,7 +60,17 @@ Mini Competition: **26 Oct 2026** · Final: **25 Nov 2026**. Last updated 16 Oct
       (max speed, min PWM, acceleration ramp) + switch profile by map zone (Nav2 speed filter mask from
       `arena_layout.yaml`) or by detected tilt (IMU pitch on ramps). Values tuned after the new motors are fitted.
 
+## Added 22 Oct — better mapping runs
+- [ ] **Wall-safe mapping**: LiDAR safety layer between teleop/autonomy and the motors (slow down < 30 cm,
+      stop < 15 cm in the direction of travel) so the robot can't hit the walls and ruin the map.
+- [ ] **Self-driving mapping** (if the organisers allow it — the rulebook says teams drive manually in the
+      mapping phase): frontier exploration / wall-following on Cartographer's live map, slow and smooth.
+- [ ] **Ramp handling (dirt + gravel)**: detect tilt/vibration with the IMU → slow to ~0.1 m/s, pause map
+      insertion while pitched or shaking, resume on flat floor; soft-mount the LiDAR; gentle accel ramps.
+- [ ] Rehearse the mapping route in the sim (same route, same speeds) before the real run.
+
 ## Ask the organisers (roboticsdojo@jkuat.ac.ke)
+- [ ] May the robot map **autonomously** in the mapping phase, or must it be driven by hand?
 - [ ] Which class does **fabric** belong to?
 - [ ] Is **off-board (laptop) processing** allowed during the mapping phase?
 - [ ] The gate's "standard waiting time", and the judges' data/communication protocol.
