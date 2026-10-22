@@ -18,7 +18,12 @@ setup(
     zip_safe=True,
     maintainer='you',
     maintainer_email='you@example.com',
-    description='LiDAR-only SLAM bringup (RPLIDAR A1 + SLAM Toolbox)',
+    description='LiDAR-only SLAM bringup with Guardian tilt-gating & APF bumper',
     license='Apache-2.0',
-    entry_points={'console_scripts': ['imu_serial_node = robot_slam.imu_serial_node:main']},
+    entry_points={
+        'console_scripts': [
+            'imu_serial_node = robot_slam.imu_serial_node:main',
+            'hardleel_guardian_node = robot_slam.hardleel_guardian_node:main',
+        ]
+    },
 )

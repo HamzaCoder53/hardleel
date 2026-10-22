@@ -8,8 +8,6 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 # Where the Nano sits relative to base_link (metres) and how it is rotated (radians).
-# Board flat with components up: leave the angles at 0.
-# Board upside down (components down): IMU_ROLL = 3.14159
 IMU_X, IMU_Y, IMU_Z = 0.0, 0.0, 0.05
 IMU_ROLL, IMU_PITCH, IMU_YAW = 0.0, 0.0, 0.0
 
@@ -25,7 +23,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('imu_port', default_value=find_nano()),
 
-        # Nano IMU -> /imu/data_raw
+        # Nano IMU -> /imu/data_raw (100 Hz)
         Node(
             package='robot_slam',
             executable='imu_serial_node',
@@ -36,6 +34,24 @@ def generate_launch_description():
                 'frame_id': 'imu_link',
                 'gyro_calib_s': 5.0,
             }],
+        ),
+
+        # Madgwick filter: /imu/data_raw -> /imu/data (fused quaternion orientation)
+        Node(
+            package='imu_filter_madgwick',
+            executable='imu_filter_madgwick_node',
+            name='imu_filter_madgwick_node',
+            output='screen',
+            parameters=[{
+                'use_mag': False,
+                'publish_tf': False,
+                'world_frame': 'enu',
+                'gain': 0.02, # Low gain protects against high-frequency gravel vibrations
+            }],
+            remappings=[
+                ('imu/data_raw', '/imu/data_raw'),
+                ('imu/data', '/imu/data'),
+            ],
         ),
 
         # base_link -> imu_link

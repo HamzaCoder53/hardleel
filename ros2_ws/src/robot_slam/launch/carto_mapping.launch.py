@@ -17,8 +17,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('lidar_port', default_value='/dev/ttyUSB0'),
+        DeclareLaunchArgument('autonomous_explore', default_value='true'),
 
-        # LiDAR driver (if you added scan_mode to slam.launch.py, add it here too)
+        # LiDAR driver
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(sllidar_pkg, 'launch', 'sllidar_a1_launch.py')),
@@ -35,17 +36,29 @@ def generate_launch_description():
                         '--yaw', str(LASER_YAW), '--pitch', '0', '--roll', '0',
                         '--frame-id', 'base_link', '--child-frame-id', 'laser']),
 
-        # Cartographer: SLAM (publishes map -> odom)
+        # Guardian Node: IMU pitch tilt gating + APF safety bumper + autonomous exploration
+        Node(package='robot_slam', executable='hardleel_guardian_node',
+             name='hardleel_guardian_node', output='screen',
+             parameters=[{
+                 'autonomous_explore': LaunchConfiguration('autonomous_explore'),
+                 'safe_dist_m': 0.50,
+                 'crit_dist_m': 0.28,
+                 'max_lin_vel': 0.18,
+                 'max_ang_vel': 0.35,
+                 'yaw_kp': 0.75,
+             }]),
+
+        # Cartographer: SLAM subscribed to /scan_filtered to prevent ramp corruption
         Node(package='cartographer_ros', executable='cartographer_node',
              name='cartographer_node', output='screen',
              parameters=[{'use_sim_time': False}],
              arguments=['-configuration_directory', os.path.join(pkg, 'config'),
                         '-configuration_basename', 'cartographer_2d.lua'],
-             remappings=[('scan', '/scan'), ('imu', '/imu/data_raw')]),
+             remappings=[('scan', '/scan_filtered'), ('imu', '/imu/data')]),
 
         # Cartographer's submaps -> /map occupancy grid
         Node(package='cartographer_ros', executable='cartographer_occupancy_grid_node',
              name='occupancy_grid_node', output='screen',
              parameters=[{'use_sim_time': False}],
-             arguments=['-resolution', '0.05', '-publish_period_sec', '1.0']),
+             arguments=['-resolution', '0.03', '-publish_period_sec', '0.5']),
     ])
