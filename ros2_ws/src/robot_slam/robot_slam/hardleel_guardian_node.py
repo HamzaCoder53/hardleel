@@ -31,6 +31,8 @@ class HardleelGuardianNode(Node):
         self.declare_parameter('max_lin_vel', 0.18)
         self.declare_parameter('max_ang_vel', 0.35)
         self.declare_parameter('yaw_kp', 0.75)
+        self.declare_parameter('cmd_timeout_s', 0.5)   # operator command older than this counts as stopped
+        self.declare_parameter('publish_cmd_vel', True)  # False: only filter the scan, never publish motor commands
 
         sensor_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -43,6 +45,7 @@ class HardleelGuardianNode(Node):
         self.pitch_deg = 0.0
         self.gyro_z = 0.0
         self.latest_raw_cmd = Twist()
+        self.raw_stamp = None        # when /cmd_vel_raw last arrived; an old command counts as zero
         self.latest_scan = None
 
         # Subscribers & Publishers
@@ -65,6 +68,7 @@ class HardleelGuardianNode(Node):
 
     def cmd_cb(self, msg: Twist):
         self.latest_raw_cmd = msg
+        self.raw_stamp = self.get_clock().now()
 
     def scan_cb(self, msg: LaserScan):
         self.latest_scan = msg
@@ -107,6 +111,14 @@ class HardleelGuardianNode(Node):
             return
 
         auto_mode = self.get_parameter('autonomous_explore').value
+        if not self.get_parameter('publish_cmd_vel').value:
+            return                                   # scan filtering runs in scan_cb; no motor commands from here
+        raw = self.latest_raw_cmd
+        fresh = (self.raw_stamp is not None and
+                 (self.get_clock().now() - self.raw_stamp).nanoseconds * 1e-9 < self.get_parameter('cmd_timeout_s').value)
+        if not auto_mode and not (fresh and (abs(raw.linear.x) > 1e-3 or abs(raw.angular.z) > 1e-3)):
+            self.pub_cmd_safe.publish(Twist())       # manual mode, no fresh operator command: never move
+            return
         safe_d = self.get_parameter('safe_dist_m').value
         crit_d = self.get_parameter('crit_dist_m').value
         max_v = self.get_parameter('max_lin_vel').value
@@ -153,14 +165,15 @@ class HardleelGuardianNode(Node):
             avg_right = right_clearance / right_count
             cmd.angular.z = 0.45 * (avg_left - avg_right) + 1.2 * rep_y
         else:
-            cmd.linear.x = max(0.0, self.latest_raw_cmd.linear.x + rep_x)
-            cmd.angular.z = self.latest_raw_cmd.angular.z + 1.2 * rep_y
+            cmd.linear.x = max(0.0, raw.linear.x + rep_x)
+            cmd.angular.z = raw.angular.z + 1.2 * rep_y
 
         # Critical Emergency Bumper: Zero forward velocity & pivot toward open space
         if min_front_dist < crit_d:
-            cmd.linear.x = 0.0
-            turn_dir = 1.0 if (left_clearance / left_count) >= (right_clearance / right_count) else -1.0
-            cmd.angular.z = turn_dir * (0.85 * max_w)
+            cmd.linear.x = 0.0                       # never drive into something
+            if auto_mode:                            # only an autonomous run turns the robot by itself
+                turn_dir = 1.0 if (left_clearance / left_count) >= (right_clearance / right_count) else -1.0
+                cmd.angular.z = turn_dir * (0.85 * max_w)
 
         # Ramp Grade Assist & Descent Braking via IMU Pitch
         if self.pitch_deg > 4.0 and cmd.linear.x > 0.02:
@@ -173,7 +186,10 @@ class HardleelGuardianNode(Node):
         target_w = max(-max_w, min(max_w, cmd.angular.z))
 
         # Closed-loop IMU Gyro Yaw-Rate Damping (prevents sand/gravel slip spinout)
-        cmd.angular.z = max(-max_w, min(max_w, target_w + yaw_kp * (target_w - self.gyro_z)))
+        if abs(target_w) > 0.02:
+            cmd.angular.z = max(-max_w, min(max_w, target_w + yaw_kp * (target_w - self.gyro_z)))
+        else:
+            cmd.angular.z = 0.0                      # no commanded turn: do not turn on gyro noise
 
         self.pub_cmd_safe.publish(cmd)
 

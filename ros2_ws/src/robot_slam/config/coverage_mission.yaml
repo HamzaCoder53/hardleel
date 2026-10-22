@@ -1,0 +1,23 @@
+# coverage_mission parameters (map frame, metres; the map origin is where mapping started).
+# CHECK arena_width / arena_height: 4.9 x 2.4 is the rulebook Figure 2 size. The simulator's active course is
+# Figure 1 (about 6.7 x 4.9 m). Set the real field size, or list explicit waypoints.
+coverage_mission:
+  ros__parameters:
+    regime: mapping            # mapping (0.18 m/s) | mission (0.30 m/s)
+    mapping_speed: 0.18
+    mission_speed: 0.30
+    arena_width: 4.9
+    arena_height: 2.4
+    arena_origin_x: 0.0
+    arena_origin_y: 0.0
+    lane_spacing: 0.6
+    margin: 0.5                # keep lane ends this far inside the walls
+    standoff: 0.5              # around the keepout boxes; stays above the inflation radius (0.35 / 0.45)
+    # Explicit waypoints override the generated sweep: [x1, y1, x2, y2, ...]. [0.0] = not set.
+    waypoints: [0.0]
+    # Ramps and the gate as [xmin, ymin, xmax, ymax, ...]; waypoints within `standoff` of them are dropped.
+    # [0.0] = not set. Fill these in from arena_layout.yaml once the field is measured.
+    keepout: [0.0]
+    max_retries: 2
+    goal_timeout_s: 120.0
+    log_dir: ~/logs

@@ -18,6 +18,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('lidar_port', default_value='/dev/ttyUSB0'),
         DeclareLaunchArgument('autonomous_explore', default_value='true'),
+        DeclareLaunchArgument('guardian_cmd', default_value='true'),   # false: the guardian only filters the scan
 
         # LiDAR driver
         IncludeLaunchDescription(
@@ -41,6 +42,7 @@ def generate_launch_description():
              name='hardleel_guardian_node', output='screen',
              parameters=[{
                  'autonomous_explore': LaunchConfiguration('autonomous_explore'),
+                 'publish_cmd_vel': LaunchConfiguration('guardian_cmd'),
                  'safe_dist_m': 0.50,
                  'crit_dist_m': 0.28,
                  'max_lin_vel': 0.18,
@@ -60,5 +62,5 @@ def generate_launch_description():
         Node(package='cartographer_ros', executable='cartographer_occupancy_grid_node',
              name='occupancy_grid_node', output='screen',
              parameters=[{'use_sim_time': False}],
-             arguments=['-resolution', '0.03', '-publish_period_sec', '0.5']),
+             arguments=['-resolution', '0.05', '-publish_period_sec', '0.5']),
     ])

@@ -13,6 +13,7 @@ def generate_launch_description():
              output='screen',
              parameters=[{
                  'port': LaunchConfiguration('port'),
+                 'send_rate': 10.0,   # the old rate; 50 Hz used 70 % of a Pi core and starved Cartographer
                  'max_pwm': ParameterValue(LaunchConfiguration('max_pwm'), value_type=int),
              }]),
     ])

@@ -24,6 +24,9 @@ setup(
         'console_scripts': [
             'imu_serial_node = robot_slam.imu_serial_node:main',
             'hardleel_guardian_node = robot_slam.hardleel_guardian_node:main',
+            'wall_follow_explorer_node = robot_slam.wall_follow_explorer_node:main',
+            'sensor_prep = robot_slam.sensor_prep:main',
+            'coverage_mission = robot_slam.coverage_mission:main',
         ]
     },
 )

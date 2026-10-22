@@ -1,6 +1,6 @@
 # hardleel — to-do list
 
-Mini Competition: **26 Oct 2026** · Final: **25 Nov 2026**. Last updated 16 Oct 2026.
+Mini Competition: **26 Oct 2026** · Final: **25 Nov 2026**. Last updated 22 Oct 2026.
 
 ## When the new wheels & motors are fitted (hardware)
 - [ ] **Gyro scale calibration** — robot flat on a table against an edge, turn it by hand exactly 4 full turns,
@@ -80,3 +80,17 @@ Mini Competition: **26 Oct 2026** · Final: **25 Nov 2026**. Last updated 16 Oct
 - [x] Virtual arena (Gazebo Fortress + ROS 2 Humble in WSL), updated from field photos; 2D plan.
 - [x] Waste classifier: rejects unsure answers ("unknown"), reports bay colour, launch file fixed.
 - [x] Sim tools: drifting-odometry mode, ground truth, route driver, localization error logger.
+
+## Added 22 Oct (evening) — power, lidar, terrain stack
+- [ ] **Fix the LiDAR / Pi power** (blocks all mapping): wall adapter gave undervoltage every 30–60 s; power bank is steady
+      at idle. With the lidar motor on (DTR cleared) the lidar stops replying, with no USB disconnect in the kernel log
+      → its 5 V sags at motor start. Try: short thick USB cable, different Pi port, powered USB hub or a separate 5 V
+      supply for the lidar, a USB power meter inline (A1 needs ≥ 5 V / 0.5 A). Then re-run `~/start_mapping.sh`.
+- [ ] Put a **power check** at the start of `map_track.sh`: warn if `vcgencmd get_throttled` != 0x0 or undervoltage in `journalctl -k -b`.
+- [ ] `lidar_reset.py` now retries (6×) and exits 1 on failure (done on the Pi, 22 Oct) — copy it into the repo.
+- [ ] **Terrain stack** (`TERRAIN_STACK.md`): code is in the repo and copied to the Pi; still to do on the robot: build check,
+      `/scan` ≥ 1300 pts/rev, gyro-bias check, tilt gate, collision-monitor stop/slow zones, feedforward sign (`pitch_up_sign`),
+      bag recording, mission dry run. Confirm the real arena size and the lidar mounting yaw (`LASER_YAW`).
+- [ ] The wall-follow explorer (`wall_follow_explorer_node.py`) and the guardian's built-in `autonomous_explore` both
+      circled a ~1 m pocket in the sim and never left the start area → do not run autonomous mapping on the robot.
+- [ ] Sim on WSL: needs `LIBGL_ALWAYS_SOFTWARE=1` and one `wsl` session kept open for the whole run.
