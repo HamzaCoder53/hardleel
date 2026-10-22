@@ -145,8 +145,10 @@ class SLlidarNode : public rclcpp::Node
 
             }
         } else {
-            RCLCPP_ERROR(this->get_logger(),"Error, cannot retrieve SLLidar health code: %x", op_result);
-            return false;
+            // hardleel: since 22 Oct our A1 often ignores GET_HEALTH while answering everything else;
+            // a missing reply is not a bad status, so try to scan anyway (an error status is still refused).
+            RCLCPP_WARN(this->get_logger(),"Cannot retrieve SLLidar health code: %x - continuing", op_result);
+            return true;
         }
     }
 
