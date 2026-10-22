@@ -32,8 +32,8 @@ class MotorBridge(Node):
         self.declare_parameter('max_speed', 1.0)     # Twist value (m/s) that maps to max_pwm
         self.declare_parameter('turn_gain', 0.5)     # wheel speed per rad/s of angular.z
         self.declare_parameter('max_pwm', 255)       # hard cap, 0..255
-        self.declare_parameter('min_pwm', 70)         # lift small non-zero commands above stall
-        self.declare_parameter('min_turn', 1.2)      # rad/s: smallest in-place spin that actually turns the robot
+        self.declare_parameter('min_pwm', 0)         # lift small non-zero commands above stall (0 = allow full fine control down to 0)
+        self.declare_parameter('min_turn', 0.0)      # rad/s: smallest in-place spin threshold (0 = no forced floor)
         self.declare_parameter('invert_left', False)
         self.declare_parameter('invert_right', False)
         self.declare_parameter('invert_linear', True)   # flips forward/backward only; turning is unchanged
