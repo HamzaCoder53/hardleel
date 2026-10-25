@@ -27,6 +27,7 @@ def setup(context):
     simp = {'use_sim_time': sim}
     # sim: the simulator's /odom (twist only, its TF is off with sim odom_tf:=false) stands in for rf2o + EKF
     actions = ([] if sim else sc.odom_for_nav2(sim)) + sc.nav2_nodes(nav2_params, sim)
+    # (the mission node itself switches the collision monitor from the mapping stop box to the mission one)
     actions.append(Node(package='robot_slam', executable='event_logger', name='event_logger', output='screen',
                         parameters=[os.path.join(cfg, 'event_logger.yaml'), simp]))
     stub = '' if lc['classifier'] == 'clip' else lc['stub_class']

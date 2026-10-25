@@ -112,6 +112,30 @@ Living handoff file. A fresh Claude Code session should read this first, then `T
 - Drop: service `/dump` (std_srvs/Trigger) on the Pi; the mission calls it only if `has_drop_bin: true`.
 - Gate: `robot_slam/gate_check.py` pure helpers (sector median, poller) used by the mission.
 
+## Phase B plan (user, 14:45): build order, commit + PROGRESS after each
+1. M1 leftovers tested e2e in the sim (obstacle event, localization fallback, sim on Jazzy if cheap)
+2. Course waypoints from track_20261022_1644 (start spot NOT confirmed -> per-point confidence) + click tool
+3. Collision monitor: ramp-as-wall check in the sim; smaller stop zone in mapping mode
+4. Cold start: one command per machine (laptop: Windows script incl. portproxy refresh; Pi: robot_hw)
+5. Motor deadband compensation in motor_bridge (config) + calibration script
+6. New design, every switch OFF by default: mapping_mode auto (frontier, stops < 3 min), turn calibration
+   (gyro), forward speed calibration (Cartographer pose: manual = fit from mapping data, auto = wall drive,
+   per-run table + last-good fallback), feedback (gyro yaw-rate PI on the Pi, speed scale from pose on the
+   laptop). Commanded PWM is NOT fed to localization (Cartographer use_odometry stays false).
+Then TEST_TONIGHT.md (safest -> riskiest, expected/fail, required/optional, duration).
+
+## motor_bridge interface (Phase B)
+- Params (all live-settable with `ros2 param set /motor_bridge ...`): min_pwm_left, min_pwm_right (deadband
+  OFFSET: |pwm| -> min + |pwm| * (max_pwm - min) / max_pwm, 0 = off), min_turn_pwm (in-place spin floor,
+  0 = off), max_speed (m/s at max_pwm), allow_pwm_test (false), yaw_feedback (false), yaw_kp, yaw_ki,
+  speed_scale_enabled (false). calib_file (~/hardleel_ws/motor_calib.yaml, loaded at start if present;
+  keys min_pwm_left, min_pwm_right, min_turn_pwm, max_speed).
+- /motor/pwm_test (std_msgs/Int32MultiArray [left, right], -255..255, + = forward for that side AFTER the
+  invert params): raw PWM, used only while allow_pwm_test is true; same cmd_timeout watchdog; cmd_vel wins
+  if newer. /motor/pwm_state (Int32MultiArray [left, right] actually sent, + = forward) at send_rate.
+- /motor/speed_scale (std_msgs/Float32, 0.5..2.0): multiplies linear PWM when speed_scale_enabled.
+- Gyro: /imu/data_raw angular_velocity.z (rad/s, bias already removed by imu_serial_node, + = CCW).
+
 ## Open questions for the user
 - Robot ID; camera rotation/cable status; saved course scans (path, format, start spot?); servo pins.
 

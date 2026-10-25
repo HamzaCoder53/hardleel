@@ -21,6 +21,9 @@ setup(
     entry_points={
         'console_scripts': [
             'motor_bridge = motor_teleop.motor_bridge:main',
+            'deadband_calibrate = motor_teleop.deadband_calibrate:main',
+            'motor_calibrator = motor_teleop.motor_calibrator:main',
+            'fit_speed_from_bag = motor_teleop.fit_speed_from_bag:main',
         ],
     },
 )

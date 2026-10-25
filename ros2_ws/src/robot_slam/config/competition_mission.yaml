@@ -43,3 +43,4 @@ competition_mission:
     terrain_surface: ''        # e.g. SAND, published on /surface_override during TERRAIN; '' = off
     cmd_vel_topic: /cmd_vel
     log_dir: ~/logs
+    collision_monitor: /collision_monitor   # switched from the mapping stop box to the mission one at start-up

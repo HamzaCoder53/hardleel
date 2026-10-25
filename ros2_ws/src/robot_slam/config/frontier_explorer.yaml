@@ -1,0 +1,16 @@
+# frontier_explorer parameters (mapping_mode:=auto). Must finish by itself before the 3 min mapping phase ends.
+frontier_explorer:
+  ros__parameters:
+    time_limit_s: 165.0        # stop (cancel goal, zero cmd_vel) this long after start
+    goal_timeout_s: 20.0       # per goal; timeout/failure -> blacklist the goal point
+    min_frontier_size_cells: 8 # smaller clusters are noise
+    replan_period_s: 3.0       # check for a better / vanished frontier this often
+    return_to_start: false     # after exploring (time left), drive back to the map origin
+    start_delay_s: 2.0
+    min_goal_dist_m: 0.5
+    clearance_m: 0.25          # goal at least this far from occupied cells
+    blacklist_radius_m: 0.4
+    switch_margin: 25.0        # replan switches goal only if the new one scores this much better
+    done_confirm_n: 3          # consecutive empty frontier checks before "done"
+    cmd_vel_topic: /cmd_vel_nav
+    robot_frame: base_link

@@ -23,17 +23,40 @@ Surface state: FLAT, or ramp_surface (default GRAVEL) while the relative pitch f
 Gravity feedforward: while armed and both wheels drive the same physical way, the PWM magnitude is raised
 by gravity_ff * sin(uphill slope) (lowered when going downhill), clamped to +/-gravity_ff_max, never
 reversing a wheel and never applied at standstill.
+
+Deadband (25 Oct): min_pwm_left / min_pwm_right are an OFFSET, |pwm| -> min + |pwm| * (max_pwm - min) / max_pwm,
+so small commands still move the wheel and the scale stays continuous (0 = off). min_turn_pwm is a floor for
+in-place spins. Values come from calib_file (written by deadband_calibrate / motor_calibrator) and can be set live.
+Test/calibration input: /motor/pwm_test (Int32MultiArray [left, right], + = forward) is obeyed only while
+allow_pwm_test is true. /motor/pwm_state publishes what was sent ([left, right], + = forward).
+Feedback (all OFF by default): yaw_feedback corrects the turn rate with the gyro (/imu/data_raw z, PI);
+speed_scale_enabled multiplies linear speed by /motor/speed_scale (from the laptop's speed_governor).
 """
 import math
+import os
 import threading
 
 import serial
 import rclpy
+import yaml
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import Imu
-from std_msgs.msg import Int32MultiArray, String
+from std_msgs.msg import Float32, Int32MultiArray, String
+
+LIVE = ('min_pwm_left', 'min_pwm_right', 'min_turn_pwm', 'max_speed', 'allow_pwm_test', 'yaw_feedback', 'yaw_kp',
+        'yaw_ki', 'speed_scale_enabled')
+CALIB_KEYS = ('min_pwm_left', 'min_pwm_right', 'min_turn_pwm', 'max_speed')
+
+
+def deadband(p, min_pwm, max_pwm):
+    """Deadband offset on a signed PWM: 0 stays 0, otherwise min + |p| * (max - min) / max."""
+    if p == 0 or min_pwm <= 0:
+        return p
+    mag = min_pwm + abs(p) * (max_pwm - min_pwm) / float(max_pwm)
+    return int(round(math.copysign(min(mag, max_pwm), p)))
 
 SURFACES = ('FLAT', 'SAND', 'GRAVEL')
 
@@ -69,12 +92,34 @@ class MotorBridge(Node):
         self.declare_parameter('vibration_enabled', False)
         self.declare_parameter('vibration_gyro_std', 0.25)  # rad/s std of roll/pitch rate over 1 s that counts as gravel
         self.declare_parameter('ramp_decel', 1500.0) # PWM units/s when slowing down (0 = no limit)
+        # deadband / calibration (see module docstring); calib_file overrides the defaults when it exists
+        self.declare_parameter('min_pwm_left', -1)     # -1 = use min_pwm (legacy) for this side
+        self.declare_parameter('min_pwm_right', -1)
+        self.declare_parameter('min_turn_pwm', 0)      # in-place spin floor per wheel, 0 = off
+        self.declare_parameter('calib_file', '~/hardleel_ws/motor_calib.yaml')
+        self.declare_parameter('allow_pwm_test', False)
+        # feedback, OFF by default (only what was tested on the robot gets switched on)
+        self.declare_parameter('yaw_feedback', False)
+        self.declare_parameter('yaw_kp', 0.6)          # extra rad/s command per rad/s of yaw-rate error
+        self.declare_parameter('yaw_ki', 0.8)
+        self.declare_parameter('yaw_i_max', 0.6)       # rad/s clamp on the integral term
+        self.declare_parameter('gyro_topic', '/imu/data_raw')
+        self.declare_parameter('speed_scale_enabled', False)
 
         g = lambda n: self.get_parameter(n).value
         self.max_speed = float(g('max_speed'))
         self.turn_gain = float(g('turn_gain'))
         self.max_pwm = max(0, min(255, int(g('max_pwm'))))
         self.min_pwm = max(0, min(255, int(g('min_pwm'))))
+        legacy = self.min_pwm
+        self.min_l = int(g('min_pwm_left')) if int(g('min_pwm_left')) >= 0 else legacy
+        self.min_r = int(g('min_pwm_right')) if int(g('min_pwm_right')) >= 0 else legacy
+        self.min_turn_pwm = int(g('min_turn_pwm'))
+        self.allow_pwm_test = bool(g('allow_pwm_test'))
+        self.yaw_feedback = bool(g('yaw_feedback'))
+        self.yaw_kp, self.yaw_ki, self.yaw_i_max = float(g('yaw_kp')), float(g('yaw_ki')), float(g('yaw_i_max'))
+        self.speed_scale_enabled = bool(g('speed_scale_enabled'))
+        self.load_calib(os.path.expanduser(str(g('calib_file'))))
         self.invert_left = bool(g('invert_left'))
         self.min_turn = float(g('min_turn'))
         self.invert_right = bool(g('invert_right'))
@@ -124,9 +169,21 @@ class MotorBridge(Node):
         self.ramp_armed = False
         self.last_imu = None
         self.vib_buf = []
+        self.cmd_lin = self.cmd_ang = 0.0   # last cmd_vel (wheel PWM is computed in tick so feedback can act)
+        self.pwm_test = None                # (left, right, stamp) from /motor/pwm_test
+        self.gyro_z, self.last_gyro = 0.0, None
+        self.yaw_i = 0.0
+        self.speed_scale = 1.0
 
         self.enc_pub = self.create_publisher(Int32MultiArray, 'encoders', 10)
+        self.pwm_pub = self.create_publisher(Int32MultiArray, '/motor/pwm_state', 10)
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd_vel, 10)
+        self.create_subscription(Int32MultiArray, '/motor/pwm_test', self.on_pwm_test, 10)
+        self.create_subscription(Float32, '/motor/speed_scale', self.on_speed_scale, 10)
+        self.create_subscription(Imu, g('gyro_topic'), self.on_gyro,
+                                 QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
+                                            history=HistoryPolicy.KEEP_LAST, depth=5))
+        self.add_on_set_parameters_callback(self.on_params)
         imu_qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=5)
         self.create_subscription(Imu, g('imu_topic'), self.on_imu, imu_qos)
         self.create_subscription(String, 'surface_override', self.on_override, 10)
@@ -137,15 +194,63 @@ class MotorBridge(Node):
         self.thread.start()
         self.get_logger().info(
             f'Connected to {port}. max_pwm={self.max_pwm}, cmd_timeout={self.cmd_timeout}s, '
-            f'profiles={self.profiles}, ramp_decel={self.ramp_decel}, send_rate={send_rate}Hz')
+            f'profiles={self.profiles}, ramp_decel={self.ramp_decel}, send_rate={send_rate}Hz, '
+            f'deadband L/R={self.min_l}/{self.min_r}, min_turn_pwm={self.min_turn_pwm}, max_speed={self.max_speed}, '
+            f'yaw_feedback={self.yaw_feedback}, speed_scale={self.speed_scale_enabled}')
+
+    # ------------------------------------------------------------- calibration / live params
+    def load_calib(self, path):
+        if not os.path.isfile(path):
+            self.get_logger().info(f'no calib file {path}: using params')
+            return
+        try:
+            c = yaml.safe_load(open(path)) or {}
+            c = c.get('calib', c)
+            v = lambda k: c[k]['value'] if isinstance(c.get(k), dict) else c.get(k)
+            if v('min_pwm_left') is not None:
+                self.min_l = int(v('min_pwm_left'))
+            if v('min_pwm_right') is not None:
+                self.min_r = int(v('min_pwm_right'))
+            if v('min_turn_pwm') is not None:
+                self.min_turn_pwm = int(v('min_turn_pwm'))
+            if v('max_speed') is not None:
+                self.max_speed = float(v('max_speed'))
+            self.get_logger().info(f'calib {path}: L/R {self.min_l}/{self.min_r}, turn {self.min_turn_pwm}, '
+                                   f'max_speed {self.max_speed}')
+        except Exception as e:                       # a broken file must never stop the motors working
+            self.get_logger().error(f'calib file {path} unreadable ({e}): using params')
+
+    def on_params(self, params):
+        for p in params:
+            if p.name == 'min_pwm_left':
+                self.min_l = max(0, min(200, int(p.value)))
+            elif p.name == 'min_pwm_right':
+                self.min_r = max(0, min(200, int(p.value)))
+            elif p.name == 'min_turn_pwm':
+                self.min_turn_pwm = max(0, min(255, int(p.value)))
+            elif p.name == 'max_speed' and float(p.value) > 0.05:
+                self.max_speed = float(p.value)
+            elif p.name == 'allow_pwm_test':
+                self.allow_pwm_test = bool(p.value)
+                self.pwm_test = None
+            elif p.name == 'yaw_feedback':
+                self.yaw_feedback, self.yaw_i = bool(p.value), 0.0
+            elif p.name == 'yaw_kp':
+                self.yaw_kp = float(p.value)
+            elif p.name == 'yaw_ki':
+                self.yaw_ki = float(p.value)
+            elif p.name == 'speed_scale_enabled':
+                self.speed_scale_enabled, self.speed_scale = bool(p.value), 1.0
+            else:
+                continue
+            self.get_logger().info(f'param {p.name} = {p.value}')
+        return SetParametersResult(successful=True)
 
     # ------------------------------------------------------------- conversions
-    def to_pwm(self, v, invert):
+    def to_pwm(self, v, invert, min_pwm=0):
         p = v / self.max_speed * self.max_pwm
         p = max(-self.max_pwm, min(self.max_pwm, p))
-        p = int(round(p))
-        if p != 0 and abs(p) < self.min_pwm:
-            p = int(math.copysign(self.min_pwm, p))
+        p = deadband(int(round(p)), min_pwm, self.max_pwm)
         return -p if invert else p
 
     def ramp(self, cur, target):
@@ -160,19 +265,65 @@ class MotorBridge(Node):
         return cur + max(-step, min(step, target - cur))
 
     def on_cmd_vel(self, m):
-        lin, ang = m.linear.x, m.angular.z
+        self.cmd_lin, self.cmd_ang = m.linear.x, m.angular.z
+        self.last_cmd = self.get_clock().now()
+        self.pwm_test = None                    # a real command always wins over a test PWM
+
+    def on_pwm_test(self, m):
+        if not self.allow_pwm_test or len(m.data) != 2:
+            return
+        l, r = (max(-self.max_pwm, min(self.max_pwm, int(v))) for v in m.data)
+        self.pwm_test = (l, r, self.get_clock().now())
+
+    def on_speed_scale(self, m):
+        self.speed_scale = max(0.5, min(2.0, float(m.data)))
+
+    def on_gyro(self, m):
+        self.gyro_z, self.last_gyro = m.angular_velocity.z, self.get_clock().now()
+
+    def gyro_fresh(self):
+        return self.last_gyro is not None and \
+            (self.get_clock().now() - self.last_gyro).nanoseconds * 1e-9 < self.imu_timeout
+
+    def wheel_targets(self):
+        """cmd_vel -> signed PWM targets (left, right) as sent to the Pico; sets dir_l/dir_r (+1 fwd)."""
+        lin, ang = self.cmd_lin, self.cmd_ang
+        if self.speed_scale_enabled:
+            lin *= self.speed_scale
         if abs(lin) < 0.03 and 0.05 < abs(ang) < self.min_turn:   # in-place spin below the turning threshold
             ang = math.copysign(self.min_turn, ang)
+        if self.yaw_feedback and self.gyro_fresh() and (abs(ang) > 0.02 or abs(lin) > 0.03):
+            err = ang - self.gyro_z                                 # + = turning too slowly to the left
+            self.yaw_i = max(-self.yaw_i_max, min(self.yaw_i_max, self.yaw_i + self.yaw_ki * err * self.dt))
+            ang += self.yaw_kp * err + self.yaw_i
+        else:
+            self.yaw_i = 0.0
         pl, pr = lin - ang * self.turn_gain, lin + ang * self.turn_gain     # physical wheel speeds, + = forward
         self.dir_l = (pl > 1e-6) - (pl < -1e-6)
         self.dir_r = (pr > 1e-6) - (pr < -1e-6)
-        if self.invert_linear:
-            lin = -lin
-        left = lin - ang * self.turn_gain       # +angular.z = turn left (CCW)
-        right = lin + ang * self.turn_gain
-        self.left_pwm = self.to_pwm(left, self.invert_left)
-        self.right_pwm = self.to_pwm(right, self.invert_right)
-        self.last_cmd = self.get_clock().now()
+        lp = self.to_pwm(pl, False, self.min_l)        # deadband per PHYSICAL side (what calibration measures)
+        rp = self.to_pwm(pr, False, self.min_r)
+        if self.min_turn_pwm > 0 and abs(self.cmd_lin) < 0.03 and abs(self.cmd_ang) > 0.05:
+            lp = int(math.copysign(max(abs(lp), self.min_turn_pwm), lp)) if lp else 0
+            rp = int(math.copysign(max(abs(rp), self.min_turn_pwm), rp)) if rp else 0
+        return self.to_sent(lp, rp)
+
+    def to_sent(self, pl, pr):
+        """Physical PWM (+ = forward) -> Pico channels. Same as the original mapping: invert_linear flipped only
+        the linear part, i.e. the channels are the swapped, negated physical sides; then per-side inverts."""
+        sl, sr = (-pr, -pl) if self.invert_linear else (pl, pr)
+        return (-sl if self.invert_left else sl), (-sr if self.invert_right else sr)
+
+    def physical(self, sl, sr):
+        """Inverse of to_sent, for /motor/pwm_state ([left, right], + = forward)."""
+        sl, sr = (-sl if self.invert_left else sl), (-sr if self.invert_right else sr)
+        return [-sr, -sl] if self.invert_linear else [sl, sr]
+
+    def test_targets(self):
+        """/motor/pwm_test [left, right] (+ = forward, raw, no deadband) -> Pico channels."""
+        l, r, _ = self.pwm_test
+        self.dir_l, self.dir_r = (l > 0) - (l < 0), (r > 0) - (r < 0)
+        return self.to_sent(l, r)
 
     # ------------------------------------------------------- surface and slope
     def on_override(self, m):
@@ -253,10 +404,16 @@ class MotorBridge(Node):
 
     def tick(self):
         self.update_surface()
-        age = (self.get_clock().now() - self.last_cmd).nanoseconds * 1e-9
-        if age > self.cmd_timeout:
+        now = self.get_clock().now()
+        age = (now - self.last_cmd).nanoseconds * 1e-9
+        if self.pwm_test is not None and self.allow_pwm_test and \
+                (now - self.pwm_test[2]).nanoseconds * 1e-9 <= self.cmd_timeout:
+            tl, tr = self.test_targets()             # calibration: raw PWM, no feedforward/cap/feedback
+        elif age > self.cmd_timeout:
             tl = tr = 0
+            self.yaw_i = 0.0
         else:
+            self.left_pwm, self.right_pwm = self.wheel_targets()
             ff = self.feedforward()
             cap = self.profiles[self.surface][0]
             tl, tr = self.shape(self.left_pwm, ff, cap), self.shape(self.right_pwm, ff, cap)
@@ -272,6 +429,7 @@ class MotorBridge(Node):
 
         # STBY is resent every tick so a rebooted Pico recovers by itself
         self.write(f'STBY,0,1\nM,0,{l}\nM,1,{l}\nM,2,{r}\nM,3,{r}\n')
+        self.pwm_pub.publish(Int32MultiArray(data=self.physical(l, r)))
 
     def read_loop(self):
         while self.running and rclpy.ok():

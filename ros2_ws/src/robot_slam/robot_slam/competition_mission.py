@@ -103,6 +103,7 @@ class CompetitionMission(Node):
         p('terrain_surface', '')
         p('cmd_vel_topic', '/cmd_vel')
         p('log_dir', '~/logs')
+        p('collision_monitor', '/collision_monitor')   # node whose stop box is switched to the mission one
         g = lambda n: self.get_parameter(n).value
         self.g = g
 
@@ -175,9 +176,34 @@ class CompetitionMission(Node):
         self.abort_req = True
 
     def on_map(self, m):
+        # Obstacle detection compares the scan with the map AS IT WAS AT THE START of the run: in SLAM mode
+        # Cartographer draws a standing worker into the live map within seconds (seen in the sim, 25 Oct).
+        if self.deadline is not None and self.grid is not None:
+            return
         self.grid = {'data': np.asarray(m.data, dtype=np.int16).reshape(m.info.height, m.info.width),
                      'resolution': m.info.resolution,
                      'origin_x': m.info.origin.position.x, 'origin_y': m.info.origin.position.y}
+
+    def set_monitor_profile(self, mission=True):
+        """Collision monitor: mapping stop box -> mission stop box (or back). Logged, never fatal."""
+        from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
+        from rcl_interfaces.srv import SetParameters
+        cli = self.create_client(SetParameters, str(self.g('collision_monitor')) + '/set_parameters')
+        req = SetParameters.Request()
+        for name, on in (('StopBox.enabled', mission), ('StopBoxMapping.enabled', not mission)):
+            req.parameters.append(Parameter(name=name, value=ParameterValue(type=ParameterType.PARAMETER_BOOL,
+                                                                            bool_value=on)))
+        for _ in range(3):
+            if cli.wait_for_service(timeout_sec=3.0):
+                fut = cli.call_async(req)
+                end = self.now() + 3.0
+                while not fut.done() and self.now() < end:
+                    rclpy.spin_once(self, timeout_sec=0.05)
+                if fut.done() and fut.result() and all(r.successful for r in fut.result().results):
+                    self.get_logger().info(f'collision monitor: {"mission" if mission else "mapping"} stop box')
+                    return True
+        self.get_logger().error('collision monitor profile switch FAILED (mapping stop box stays active)')
+        return False
 
     def on_monitor(self, m):
         self.monitor_action = m.action_type
@@ -365,6 +391,7 @@ class CompetitionMission(Node):
     def do_wait_start(self):
         self.get_logger().info('Waiting for /mission/start' + (' (auto_start)' if self.g('auto_start') else ''))
         self.log_row('WAIT_START', 'waiting')
+        self.set_monitor_profile(mission=True)
         if not self.g('auto_start'):
             self.wait(lambda: self.start_req)
         self.deadline = core.Deadline(self.now(), float(self.g('mission_time_limit_s')))

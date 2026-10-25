@@ -127,7 +127,8 @@ def record_bag(bag_dir, name, topics=None):
     import time
     topics = topics or ['/scan', '/scan_filtered', '/imu/data_raw', '/imu/data', '/imu/data_lpf', '/imu/calib_status',
                         '/tf', '/tf_static', '/cmd_vel', '/cmd_vel_teleop', '/cmd_vel_nav', '/odom',
-                        '/mission/state', '/mission/event', '/collision_monitor_state', '/classifier/result']
+                        '/mission/state', '/mission/event', '/collision_monitor_state', '/classifier/result',
+                        '/motor/pwm_state', '/motor/speed_scale', '/exploration/state']   # pwm_state: speed fit
     from launch.actions import ExecuteProcess
     bag_dir = os.path.expanduser(bag_dir)
     os.makedirs(bag_dir, exist_ok=True)
@@ -173,6 +174,13 @@ def nav2_params_for_distro(path, use_sim_time=False):
             rp['use_sim_time'] = use_sim_time
             if distro == 'humble':                 # collision_monitor polygons: Humble wants a flat list
                 for v in rp.values():
+                    if isinstance(v, dict) and v.get('type') == 'velocity_polygon':   # no such type on Humble:
+                        first = v['velocity_polygons'][0]                            # use the forward box
+                        v['points'] = v[first]['points']
+                        v['type'] = 'polygon'
+                        for k in v.pop('velocity_polygons'):
+                            v.pop(k, None)
+                        v.pop('holonomic', None)
                     if isinstance(v, dict) and isinstance(v.get('points'), str):
                         v['points'] = [float(c) for pt in yaml.safe_load(v['points']) for c in pt]
     out = tempfile.NamedTemporaryFile('w', prefix=f'{os.path.basename(path)[:-5]}_{distro}_', suffix='.yaml',
