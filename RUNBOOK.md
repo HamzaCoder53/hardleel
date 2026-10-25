@@ -3,9 +3,34 @@
 > Drafted by Gemini 3.8 Flash from the team decisions, reviewed and corrected by Claude. Office test sequence at the end.
 
 **Mini-Competition:** 26 Oct 2026 | **Final:** 25 Nov 2026  
-**Setup:** WSL Ubuntu-24.04 (ROS 2 Jazzy). Repo root: `~/hardleel`. Domain ID: `7` (CycloneDDS).  
+**Setup:** WSL Ubuntu-24.04 (ROS 2 Jazzy). Repo root: `~/hardleel`. Domain ID: `7`. Middleware: **rmw_zenoh**
+(laptop router -> Windows port proxy :7447 -> Pi router), because WSL cannot reach the hotspot subnet with DDS.  
 **Pi 4:** `192.168.137.8` (`ssh hardleel@192.168.137.8`).  
 **Rules:** Phase 1 (3 min mapping, manual teleop). Phase 2 (3 min autonomous, NO human input, 1 start command). Exactly 1 restart per round allowed. Motors auto-stop 0.3 s after laptop commands stop.
+
+---
+
+## 0. Cold start (laptop rebooted and/or Pi power-cycled) - one command
+
+1. Windows: turn the **Mobile hotspot ON** (Settings > Network > Mobile hotspot). Power the robot; wait ~60 s
+   for the Pi to boot and join the hotspot. Put the robot on the start pad.
+2. Open **PowerShell as administrator**, then:
+   ```powershell
+   cd "$env:USERPROFILE\Documents\hardleel-pi-repo\.claude\worktrees\mission-m1"   # branch feat/mission-m1 (= WSL ~/hardleel)
+   powershell -ExecutionPolicy Bypass -File scripts\laptop\up.ps1
+   ```
+   It finds the Pi, re-points the port proxy (handles a new Pi IP or WSL IP), starts the Pi drivers over
+   ssh (type the Pi password when asked; **don't touch the robot for 5 s after that**), checks
+   the Pi topics from WSL and opens two windows: **A = laptop_mapping** (keep it open into phase 2) and
+   **B = teleop**. Good: step 5 prints `/scan ~6 Hz`, `/imu/data ~90 Hz`, camera `~5 Hz`.
+   - Pi already running? add `-NoPi`.
+   - Only the Pi was power-cycled? Same command (the Pi part restarts everything on the Pi).
+3. Every other WSL terminal: `wsl -d Ubuntu-24.04`, then `cd ~/hardleel && source scripts/laptop/ros_env.sh`.
+
+Optional, removes the password prompt (run it yourself once, in Git Bash or PowerShell):
+`ssh-keygen -t ed25519 -f $HOME/.ssh/hardleel_ed25519` then
+`type $HOME\.ssh\hardleel_ed25519.pub | ssh hardleel@192.168.137.8 "cat >> ~/.ssh/authorized_keys"` and add
+`-i $HOME\.ssh\hardleel_ed25519` to the ssh line in `up.ps1`.
 
 ---
 
@@ -195,3 +220,24 @@ Tick each line only when you have seen it work.
 10. [ ] **Fallback**: Ctrl-C terminal A, put the robot on the start pose,
     `ros2 launch robot_slam laptop_localization.launch.py pbstream:=~/hardleel_maps/office_1.pbstream`,
     then a short mission run.
+
+---
+
+## 7. Fallback: back to the Humble laptop distro (only if the Jazzy distro is broken)
+
+Tested 25 Oct: **zenoh does NOT work Humble <-> Jazzy** (the Humble laptop sees the Pi's topic names but
+receives no data: rmw_zenoh 0.1 vs 0.2 key formats). CycloneDDS does work across the two distros, but DDS
+cannot cross the Windows hotspot. So the Humble fallback needs a normal Wi-Fi router that both the laptop
+and the Pi join (no internet needed):
+1. Pi: add the router to `/etc/netplan/50-cloud-init.yaml` (next to the hotspot entry), `sudo netplan apply`;
+   note the Pi's new IP.
+2. Pi drivers on DDS: `ssh hardleel@<pi_ip> 'RMW=cyclone ./robot_hw.sh'`.
+3. `.wslconfig`: `networkingMode=mirrored`, then `wsl --shutdown` (WSL then sees the router network).
+4. Humble distro: `wsl -d Ubuntu-22.04`, then go to the worktree:
+   `cd "/mnt/c/Users/Aljamea Nairobi/Documents/hardleel-pi-repo/.claude/worktrees/mission-m1"`,
+   `source /opt/ros/humble/setup.bash && source ~/hardleel_m1_ws/install/setup.bash`,
+   `HARDLEEL_RMW=cyclone PI_IP=<pi_ip> source scripts/laptop/ros_env.sh`.
+5. The same launch files work on Humble (stack_common rewrites the Jazzy-only Nav2 / collision monitor bits;
+   the stop boxes become plain boxes, so in-place turns next to walls can be blocked - drive wider).
+6. Never run ROS on domain 7 in both distros at once: stop everything in Jazzy first (`wsl -t Ubuntu-24.04`).
+Switch back: `.wslconfig` -> `networkingMode=nat`, `wsl --shutdown`, Pi `./robot_hw.sh` (zenoh), Jazzy distro.

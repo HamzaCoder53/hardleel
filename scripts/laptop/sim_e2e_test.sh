@@ -27,7 +27,9 @@ ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag
 sleep 15
 if [ $LOC = 1 ]; then      # save the map, restart as pure localization from the start pose (robot is still there)
   ros2 service call /write_state cartographer_ros_msgs/srv/WriteState "{filename: '$L/sim.pbstream', include_unfinished_submaps: true}" >/dev/null
-  pkill -INT -f "laptop_mapping.launch.py"; sleep 5
+  pkill -INT -f "laptop_mapping.launch.py"
+  for i in $(seq 1 20); do pgrep -f "cartographer_node|sensor_prep|collision_monitor|velocity_smoother|twist_mux" >/dev/null || break; sleep 1; done
+  pkill -9 -f "cartographer_node|sensor_prep|collision_monitor|velocity_smoother|twist_mux|occupancy_grid"; sleep 1
   ros2 launch robot_slam laptop_localization.launch.py sim:=true rviz:=false record_bag:=false pbstream:=$L/sim.pbstream > $L/localization.log 2>&1 &
   sleep 15
 fi
