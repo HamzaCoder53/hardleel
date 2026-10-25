@@ -160,7 +160,8 @@ Step 1.
       Ramp SIDES are invisible to the lidar: click ramp waypoints so the robot meets ramps end-on.
       Also found: Nav2 lifecycle bring-up can time out under load -> every goal rejected; the mission now checks
       /lifecycle_manager_navigation/is_active before the start, retries STARTUP, logs NAV2 READY / NOT ACTIVE.
-- [~] B4 cold start: up.ps1 + RUNBOOK section 0 written, NOT run yet (needs a real cold start); Humble fallback
+- [x] B4 cold start: up.ps1 + RUNBOOK section 0; up.ps1 -NoPi -CheckOnly tested (16:08: Pi found, proxy, topics OK);
+      full reboot test = TEST_TONIGHT. Humble fallback
       tested: zenoh Humble<->Jazzy = names but no data -> fallback = CycloneDDS on a router Wi-Fi (RUNBOOK 7).
 - [~] B5 motor_bridge deadband offset + pwm_test + calib file + live params (27 tests pass); deadband_calibrate,
       motor_calibrator, fit_speed_from_bag written (Sonnet). Not deployed to the Pi; sim test via fake_pico next.

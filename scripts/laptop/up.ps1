@@ -5,7 +5,7 @@
 # Steps: 1 hotspot check  2 find the Pi  3 port proxy + firewall (re)pointed at the Pi  4 start the Pi drivers
 #        (robot must stand STILL for 5 s after this: IMU calibration)  5 WSL check  6 open the mapping + teleop
 #        windows (Jazzy distro). The Pi asks for its password unless an ssh key is set up (RUNBOOK).
-param([switch]$NoPi, [string]$Distro = "Ubuntu-24.04", [string]$PiUser = "hardleel")
+param([switch]$NoPi, [switch]$CheckOnly, [string]$Distro = "Ubuntu-24.04", [string]$PiUser = "hardleel")
 $ErrorActionPreference = "Stop"
 function Say($t) { Write-Host "== $t" -ForegroundColor Cyan }
 
@@ -47,6 +47,7 @@ if (-not $NoPi) {
 Say "5/6 checking Pi topics from WSL ($Distro)"
 wsl -d $Distro -- bash -lc "cd ~/hardleel && PI_IP=$PiIp source scripts/laptop/ros_env.sh && python3 scripts/laptop/topic_probe.py 5 /scan /imu/data /camera/image_raw/compressed 2>&1 | grep Hz"
 
+if ($CheckOnly) { Say "check only: not opening the mapping/teleop windows"; exit 0 }
 # 6. windows: A = mapping (Cartographer etc., keep it open into phase 2), B = teleop
 Say "6/6 opening terminal A (laptop_mapping) and terminal B (teleop)"
 Start-Process wsl.exe -ArgumentList "-d", $Distro, "--", "bash", "-lc", "cd ~/hardleel && PI_IP=$PiIp source scripts/laptop/ros_env.sh && ros2 launch robot_slam laptop_mapping.launch.py; exec bash"
