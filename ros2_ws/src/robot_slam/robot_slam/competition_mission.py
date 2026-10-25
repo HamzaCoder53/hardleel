@@ -106,6 +106,8 @@ class CompetitionMission(Node):
         p('collision_monitor', '/collision_monitor')   # node whose stop box is switched to the mission one
         p('turn_calibration', False)               # NEW, off: /motor/calibrate_turn right after the start
         p('turn_calibration_timeout_s', 40.0)
+        p('start_nudge_m', 0.15)                   # creep forward before the first goal: the robot starts with its
+        p('start_nudge_speed', 0.10)               # back ~0.13 m from the start-box wall (Nav2 sees it 'in' the wall)
         g = lambda n: self.get_parameter(n).value
         self.g = g
 
@@ -434,7 +436,33 @@ class CompetitionMission(Node):
             ok, msg = self.call_trigger(self.create_client(Trigger, '/motor/calibrate_turn'),
                                         float(self.g('turn_calibration_timeout_s')))
             self.log_row('TURN_CALIBRATION', 'ok' if ok else 'failed', str(msg).replace(',', ';'))
+        self.start_nudge()
         return 'started'
+
+    def start_nudge(self):
+        """Drive start_nudge_m straight ahead through twist_mux (navigation input) -> velocity smoother ->
+        collision monitor, so the stop box still protects it. Nav2 cannot plan while the footprint touches the
+        start-box wall behind the robot."""
+        dist, v = float(self.g('start_nudge_m')), float(self.g('start_nudge_speed'))
+        if dist <= 0 or v <= 0:
+            return
+        pub = self.create_publisher(Twist, '/cmd_vel_nav', 1)
+        start = self.pose_in_map()
+        end = self.now() + dist / v + 1.0                     # +1 s for the velocity smoother ramp
+        while self.now() < end:
+            p = self.pose_in_map()
+            if start and p and math.hypot(p[0] - start[0], p[1] - start[1]) >= dist:
+                break
+            t = Twist()
+            t.linear.x = v
+            pub.publish(t)
+            self.pause(0.1)
+        for _ in range(3):
+            pub.publish(Twist())
+            self.pause(0.05)
+        p = self.pose_in_map()
+        moved = math.hypot(p[0] - start[0], p[1] - start[1]) if start and p else float('nan')
+        self.log_row('START_NUDGE', 'done', f'moved {moved:.2f} m')
 
     def do_go_screen(self):
         self.set_speed(self.g('mission_speed'))

@@ -38,7 +38,9 @@ def for_distro(path, hardware=False):
 
 def generate_launch_description():
     pkg = get_package_share_directory('rdj2026_sim')
-    world = os.path.join(pkg, 'worlds', 'rdj2026.sdf')
+    # world:=rdj2026 (rulebook Figure 1) | course (the real course drawn by the team, start (0,0) facing east)
+    W = LaunchConfiguration('world')
+    world = [pkg, '/worlds/', W, '.sdf']
     urdf = open(for_distro(os.path.join(pkg, 'urdf', 'hardleel_sim.urdf'))).read()
     gz = ['gz', 'sim'] if HARMONIC else ['ign', 'gazebo']
     layout = yaml.safe_load(open(os.path.join(pkg, 'arena', 'arena_layout.yaml')))
@@ -50,6 +52,7 @@ def generate_launch_description():
     gui = LaunchConfiguration('gui')
     return LaunchDescription([
         DeclareLaunchArgument('gui', default_value='true', description='Show the Gazebo window'),
+        DeclareLaunchArgument('world', default_value='rdj2026', description='rdj2026 (Figure 1) | course (real course)'),
         DeclareLaunchArgument('hardware', default_value='false',
                               description='true: the REAL motor_bridge drives the robot through fake_pico (motor '
                                           'model with deadband / slow zone); implies no odom TF from the sim'),
@@ -104,8 +107,8 @@ def generate_launch_description():
         TimerAction(period=4.0, actions=[
             Node(package='ros_gz_sim', executable='create', output='screen',
                  arguments=['-world', 'rdj2026', '-name', 'hardleel', '-topic', 'robot_description',
-                            '-x', str(sx / 1000.0), '-y', str(sy / 1000.0), '-z', '0.04',
-                            '-Y', str(math.radians(syaw))]),
+                            '-x', PythonExpression(["'0.06' if '", W, f"' == 'course' else '{sx / 1000.0}'"]),   # course: 6 cm off the start-box wall (sim only)
+                            '-y', PythonExpression(["'0.0' if '", W, f"' == 'course' else '{sy / 1000.0}'"]), '-z', '0.04', '-Y', PythonExpression(["'0.0' if '", W, f"' == 'course' else '{math.radians(syaw)}'"])]),
         ]),
 
         TimerAction(period=8.0, actions=[

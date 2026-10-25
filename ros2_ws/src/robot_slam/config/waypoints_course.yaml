@@ -1,36 +1,29 @@
-# DRAFT course waypoints from rulebook Figure 1 (rdj2026_sim/arena/arena_layout.yaml). ALL LOW CONFIDENCE.
-# Map frame = start pose: map_x = (Y_arena-300)/1000, map_y = -(X_arena-6215)/1000, yaw_map = yaw_arena - 90 deg.
-# Figure 1 has no screen, gate, ramps, colours, finish; those are ASSUMED/PLACEHOLDER (see notes).
-# Re-record with click_waypoints (on the fresh map) or save_pose. Order = order the click tool asks.
+# REAL COURSE waypoints from the team map (Documents/hardleel map maullay made/course_reference.*, 25 Oct).
+# Frame = that map = mission frame: start (0,0), robot FACING EAST (the 3 m wall), x east, y north, yaw deg.
+# conf med = read off the map labels/route; low = assumption (screen, class->dock, bins, finish).
+# Re-click on the phase-1 map tomorrow (click_waypoints) - this is the starting point.
 frame: map
 poses:
-  screen: {x: 0.800, y: -0.137, yaw_deg: -90.0, conf: "low", note: "arena (6352, 1100, 0 deg): ASSUMED screen on the east wall (Figure 1 has no screen); old screen_view"}
-  loading_plastic: {x: 0.660, y: 2.065, yaw_deg: 90.0, conf: "low", note: "arena (4150, 960, 180 deg): slot 1 of 3 on the loading bar; PLACEHOLDER slot order; approach from the open east side facing the bar"}
-  loading_metal: {x: 0.768, y: 2.065, yaw_deg: 90.0, conf: "low", note: "arena (4150, 1068, 180 deg): slot 2 of 3 (bar centre y=1068); PLACEHOLDER slot order; old loading_dock"}
-  loading_organic: {x: 0.876, y: 2.065, yaw_deg: 90.0, conf: "low", note: "arena (4150, 1176, 180 deg): slot 3 of 3; PLACEHOLDER slot order; slots are 108 mm apart to keep 0.24 m from the fixture lines y=716/1423"}
-  terrain_1: {x: 1.200, y: -0.137, yaw_deg: 0.0, conf: "low", note: "arena (6352, 1500, 90 deg): right corridor centre (x 6002..6703); PLACEHOLDER: no ramps in Figure 1"}
-  terrain_2: {x: 1.950, y: -0.137, yaw_deg: 0.0, conf: "low", note: "arena (6352, 2250, 90 deg): right corridor centre; PLACEHOLDER: no ramps in Figure 1"}
-  junction: {x: 2.920, y: 0.565, yaw_deg: 90.0, conf: "low", note: "arena (5650, 3220, 180 deg): ASSUMED opening in the x=6002 wall near y~2500 (Figure 1 shows none); turn west into the upper corridor"}
-  gate_check: {x: 2.920, y: 1.065, yaw_deg: 90.0, conf: "low", note: "arena (5150, 3220, 180 deg): ASSUMED gate somewhere west in the upper corridor (Figure 1 has no gate); face west"}
-  path1_1: {x: 2.820, y: 1.915, yaw_deg: 90.0, conf: "low", note: "arena (4300, 3120, 180 deg): PLACEHOLDER: Path 1 is not in Figure 1; old p1_1 (upper corridor 100 mm south / same as path 2 after the corner)"}
-  path1_2: {x: 2.820, y: 3.615, yaw_deg: 90.0, conf: "low", note: "arena (2600, 3120, 180 deg): PLACEHOLDER: Path 1 is not in Figure 1; old p1_2 (upper corridor 100 mm south / same as path 2 after the corner)"}
-  path1_3: {x: 2.820, y: 5.115, yaw_deg: 90.0, conf: "low", note: "arena (1100, 3120, 180 deg): PLACEHOLDER: Path 1 is not in Figure 1; old p1_3 (upper corridor 100 mm south / same as path 2 after the corner)"}
-  path1_4: {x: 3.050, y: 5.865, yaw_deg: 0.0, conf: "low", note: "arena (350, 3350, 90 deg): PLACEHOLDER: Path 1 is not in Figure 1; old p1_4 (upper corridor 100 mm south / same as path 2 after the corner)"}
-  path1_5: {x: 3.900, y: 5.865, yaw_deg: -90.0, conf: "low", note: "arena (350, 4200, 0 deg): PLACEHOLDER: Path 1 is not in Figure 1; old p1_5 (upper corridor 100 mm south / same as path 2 after the corner)"}
-  path1_6: {x: 3.800, y: 5.065, yaw_deg: -90.0, conf: "low", note: "arena (1150, 4100, 0 deg): PLACEHOLDER: Path 1 is not in Figure 1; old p1_6 (upper corridor 100 mm south / same as path 2 after the corner)"}
-  path1_7: {x: 3.576, y: 3.915, yaw_deg: -90.0, conf: "low", note: "arena (2300, 3876, 0 deg): PLACEHOLDER: Path 1 is not in Figure 1; old p1_7 (upper corridor 100 mm south / same as path 2 after the corner)"}
-  path2_1: {x: 2.920, y: 1.915, yaw_deg: 90.0, conf: "low", note: "arena (4300, 3220, 180 deg): old p2_1; upper corridor / top room lane, flat (Figure 1 has no gate or ramps)"}
-  path2_2: {x: 2.920, y: 3.615, yaw_deg: 90.0, conf: "low", note: "arena (2600, 3220, 180 deg): old p2_2; upper corridor / top room lane, flat (Figure 1 has no gate or ramps)"}
-  path2_3: {x: 2.920, y: 5.115, yaw_deg: 90.0, conf: "low", note: "arena (1100, 3220, 180 deg): old p2_3; upper corridor / top room lane, flat (Figure 1 has no gate or ramps)"}
-  path2_4: {x: 3.050, y: 5.865, yaw_deg: 0.0, conf: "low", note: "arena (350, 3350, 90 deg): old p2_4; upper corridor / top room lane, flat (Figure 1 has no gate or ramps)"}
-  path2_5: {x: 3.900, y: 5.865, yaw_deg: -90.0, conf: "low", note: "arena (350, 4200, 0 deg): old p2_5; upper corridor / top room lane, flat (Figure 1 has no gate or ramps)"}
-  path2_6: {x: 3.800, y: 5.065, yaw_deg: -90.0, conf: "low", note: "arena (1150, 4100, 0 deg): old p2_6; upper corridor / top room lane, flat (Figure 1 has no gate or ramps)"}
-  path2_7: {x: 3.576, y: 3.915, yaw_deg: -90.0, conf: "low", note: "arena (2300, 3876, 0 deg): old p2_7; upper corridor / top room lane, flat (Figure 1 has no gate or ramps)"}
-  bin_plastic: {x: 3.576, y: 3.186, yaw_deg: 0.0, conf: "low", note: "arena (3029, 3876, 90 deg): top box facing +y, front edge y=4161; ASSUMED colour blue (Figure 1 gives no colours) and class mapping"}
-  bin_organic: {x: 3.576, y: 2.446, yaw_deg: 0.0, conf: "low", note: "arena (3769, 3876, 90 deg): top box facing +y, front edge y=4161; ASSUMED colour white (Figure 1 gives no colours) and class mapping"}
-  bin_metal: {x: 3.576, y: 1.723, yaw_deg: 0.0, conf: "low", note: "arena (4492, 3876, 90 deg): top box facing +y, front edge y=4161; ASSUMED colour black (Figure 1 gives no colours) and class mapping"}
-  finish: {x: 3.576, y: 0.715, yaw_deg: -90.0, conf: "low", note: "arena (5500, 3876, 0 deg): ASSUMED finish: east end of the top room (Figure 1 has no finish)"}
+  screen: {x: 0.150, y: 0.000, yaw_deg: 0.0, conf: "high", note: "CONFIRMED by the team: the screen is right in front of the start (east wall); start pose after the 0.15 m start nudge"}
+  loading_plastic: {x: 0.680, y: -0.950, yaw_deg: 90.0, conf: "low", note: "E2 dock (hollow green, estimated) approached from the south; class->dock PLACEHOLDER"}
+  loading_metal: {x: 0.700, y: -1.460, yaw_deg: 180.0, conf: "med", note: "E3 dock (green bar x 0.0-0.36, y -1.46), robot east of it facing west; class->dock PLACEHOLDER"}
+  loading_organic: {x: 0.700, y: -2.310, yaw_deg: 180.0, conf: "low", note: "E4 dock (hollow green, estimated) facing west; class->dock PLACEHOLDER"}
+  terrain_1: {x: 0.720, y: -2.070, yaw_deg: 180.0, conf: "med", note: "SE corner, start of the bottom corridor (purple route)"}
+  terrain_2: {x: -2.000, y: -2.070, yaw_deg: 180.0, conf: "med", note: "bottom corridor middle"}
+  terrain_3: {x: -4.250, y: -2.070, yaw_deg: 90.0, conf: "med", note: "SW corner, foot of the dirt ramp; meet the ramp end-on"}
+  terrain_4: {x: -4.250, y: -1.000, yaw_deg: 90.0, conf: "med", note: "on the dirt ramp (left column)"}
+  junction: {x: -4.250, y: -0.250, yaw_deg: 0.0, conf: "med", note: "top-left: gravel lane (path 1) east, gate lane (path 2) north-east"}
+  gate_check: {x: -3.900, y: 0.080, yaw_deg: 0.0, conf: "med", note: "top lane facing the gate (x -3.02): closed ~0.9 m, open > 2 m"}
+  path2_1: {x: -2.500, y: 0.080, yaw_deg: 0.0, conf: "med", note: "through the gate, top lane (flat, gated)"}
+  path2_2: {x: -1.600, y: 0.080, yaw_deg: 0.0, conf: "med", note: "top lane end -> pink area"}
+  path1_1: {x: -3.900, y: -0.530, yaw_deg: 0.0, conf: "med", note: "gravel lane (path 1, always open)"}
+  path1_2: {x: -2.500, y: -0.530, yaw_deg: 0.0, conf: "med", note: "gravel lane"}
+  path1_2b: {x: -1.600, y: -0.530, yaw_deg: 0.0, conf: "med", note: "gravel lane end -> pink area"}
+  bin_plastic: {x: -1.450, y: -1.450, yaw_deg: -90.0, conf: "low", note: "ASSUMED bins in the end room along its south wall (map: bins/finish?)"}
+  bin_organic: {x: -1.200, y: -1.450, yaw_deg: -90.0, conf: "low", note: "ASSUMED, see bin_plastic"}
+  bin_metal: {x: -0.950, y: -1.450, yaw_deg: -90.0, conf: "low", note: "ASSUMED, see bin_plastic"}
+  finish: {x: -1.200, y: -0.350, yaw_deg: 0.0, conf: "low", note: "ASSUMED finish in the pink area where the purple route ends"}
 sequences:
-  terrain: [terrain_1, terrain_2]
-  path1: [path1_1, path1_2, path1_3, path1_4, path1_5, path1_6, path1_7]
-  path2: [path2_1, path2_2, path2_3, path2_4, path2_5, path2_6, path2_7]
+  terrain: [terrain_1, terrain_2, terrain_3, terrain_4]
+  path2: [path2_1, path2_2]
+  path1: [path1_1, path1_2, path1_2b]

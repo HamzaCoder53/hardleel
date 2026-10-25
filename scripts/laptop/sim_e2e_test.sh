@@ -11,20 +11,37 @@ export ROS_DOMAIN_ID=42 RMW_IMPLEMENTATION=rmw_fastrtps_cpp LIBGL_ALWAYS_SOFTWAR
 unset CYCLONEDDS_URI ZENOH_CONFIG_OVERRIDE
 for d in jazzy humble; do [ -f /opt/ros/$d/setup.bash ] && { source /opt/ros/$d/setup.bash; break; }; done
 WS="${WS:-$HOME/hardleel_ws}"; source "$WS/install/setup.bash"
-WORKER=0; LOC=0; RAMP=0
-for a in "$@"; do [ "$a" = worker ] && WORKER=1; [ "$a" = localization ] && LOC=1; [ "${a%%=*}" = ramp ] && RAMP=${a#ramp=}; done
+WORKER=0; LOC=0; RAMP=0; COURSE=0; GATE=0; EXPLORE=0
+for a in "$@"; do [ "$a" = worker ] && WORKER=1; [ "$a" = localization ] && LOC=1; [ "${a%%=*}" = ramp ] && RAMP=${a#ramp=}
+  [ "$a" = course ] && COURSE=1; [ "$a" = gate_closed ] && GATE=1; [ "${a%%=*}" = explore ] && EXPLORE=${a#explore=}; done
+WORLD=rdj2026; [ $COURSE = 1 ] && WORLD=course
 WP="$WS/src/robot_slam/config/waypoints_sim.yaml"
+[ $COURSE = 1 ] && WP="$WS/src/robot_slam/config/waypoints_course.yaml"
+WXY="6.352 2.35"; [ $COURSE = 1 ] && WXY="-1.0 -2.07"     # worker: Figure-1 right corridor / course bottom corridor
 L=~/simtest_m1; rm -rf $L; mkdir -p $L
 GZ="gz"; MSG="gz.msgs"; [ "$ROS_DISTRO" = humble ] && { GZ="ign"; MSG="ignition.msgs"; }
 cleanup() { pkill -TERM -f "ros2 launch"; sleep 4; pkill -9 -f "gz sim|ign gazebo"; pkill -9 -f "ros2 bag|ros2 run"; }
 cleanup 2>/dev/null; sleep 1
-ros2 launch rdj2026_sim sim.launch.py gui:=false odom_tf:=false > $L/sim.log 2>&1 &
+ros2 launch rdj2026_sim sim.launch.py gui:=false odom_tf:=false world:=$WORLD > $L/sim.log 2>&1 &
 sleep 20
+if [ $GATE = 1 ]; then      # course only: the gate closed for the whole run (top lane at x -3.02) -> expect path1
+  ros2 run ros_gz_sim create -world rdj2026 -name gate -x -3.02 -y 0.07 -z 0.2 -string \
+    '<sdf version="1.6"><model name="gate"><static>true</static><link name="l"><collision name="c"><geometry><box><size>0.05 0.60 0.4</size></box></geometry></collision><visual name="v"><geometry><box><size>0.05 0.60 0.4</size></box></geometry></visual></link></model></sdf>' > $L/gate.log 2>&1
+fi
 if [ "$RAMP" != 0 ]; then   # ramp in the walled part of the right corridor, arena (6352, 3000) = map x 2.13-3.27, end-on
   ros2 run ros_gz_sim create -world rdj2026 -name ramp -x 6.352 -y 3.0 -z 0 -Y 1.5708 -string "$(python3 "$HERE/ramp_sdf.py" $RAMP)" > $L/ramp.log 2>&1
 fi
-ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=false > $L/mapping.log 2>&1 &
-sleep 15
+NAV2=true
+if [ "$EXPLORE" != 0 ]; then   # phase 1 rehearsal: auto mapping (Nav2 + frontier explorer, returns to start)
+  ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=false mapping_mode:=auto > $L/mapping.log 2>&1 &
+  NAV2=false
+  for i in $(seq 1 $((EXPLORE / 5))); do sleep 5; grep -q "exploration finished" $L/mapping.log && break; done
+  sleep 15                      # return-to-start goal
+  echo "--- phase 1: $(grep -m1 -oE 'exploration finished.*' $L/mapping.log) after $((i * 5)) s"
+else
+  ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=false > $L/mapping.log 2>&1 &
+  sleep 15
+fi
 if [ $LOC = 1 ]; then      # save the map, restart as pure localization from the start pose (robot is still there)
   ros2 service call /write_state cartographer_ros_msgs/srv/WriteState "{filename: '$L/sim.pbstream', include_unfinished_submaps: true}" >/dev/null
   pkill -TERM -f "laptop_mapping.launch.py"   # TERM: background jobs of a script ignore SIGINT
@@ -34,12 +51,13 @@ if [ $LOC = 1 ]; then      # save the map, restart as pure localization from the
   ros2 launch robot_slam laptop_localization.launch.py sim:=true rviz:=false record_bag:=false pbstream:=$L/sim.pbstream > $L/localization.log 2>&1 &
   sleep 15
 fi
-ros2 launch robot_slam laptop_mission.launch.py sim:=true classifier:=stub stub_class:=metal waypoints:=$WP > $L/mission.log 2>&1 &
+ros2 launch robot_slam laptop_mission.launch.py sim:=true classifier:=stub stub_class:=metal waypoints:=$WP nav2:=$NAV2 > $L/mission.log 2>&1 &
 sleep 40
 echo "--- topics"; python3 "$HERE/topic_probe.py" 4 /scan /scan_filtered /map /odom 2>&1 | grep Hz
 echo "--- GO $(date +%T)"; ros2 topic pub --once -w 1 /mission/start std_msgs/msg/Empty "{}" >/dev/null
 if [ $WORKER = 1 ]; then   # arena (6352, 2350) = map (2.05, -0.14): between terrain_1 and terrain_2; spawned at GO
-  ros2 run ros_gz_sim create -world rdj2026 -name worker -x 6.352 -y 2.35 -z 0.2 -string \
+  set -- $WXY
+  ros2 run ros_gz_sim create -world rdj2026 -name worker -x $1 -y $2 -z 0.2 -string \
     '<sdf version="1.6"><model name="worker"><static>true</static><link name="l"><collision name="c"><geometry><cylinder><radius>0.125</radius><length>0.4</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.125</radius><length>0.4</length></cylinder></geometry></visual></link></model></sdf>' > $L/worker.log 2>&1
   ( sleep 75; $GZ service -s /world/rdj2026/remove --reqtype $MSG.Entity --reptype $MSG.Boolean \
       --timeout 2000 --req 'name: "worker" type: MODEL' >> $L/worker.log 2>&1; echo "worker removed $(date +%T)" >> $L/worker.log ) &

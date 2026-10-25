@@ -28,7 +28,8 @@ competition_mission:
     gate_max_wait_s: 15.0      # PLACEHOLDER: rulebook "standard waiting time" not announced yet
     gate_center_deg: 0.0       # sector centre in the laser frame, 0 = straight ahead
     gate_half_width_deg: 10.0
-    gate_open_threshold_m: 1.0 # PLACEHOLDER: median range above this = open (measure: closed gate distance + margin)
+    gate_open_threshold_m: 1.5 # median range above this = open. Course map: gate_check ~0.9 m from the closed gate,
+                               # open lane ~3.7 m deep. PLACEHOLDER: re-check with the real gate
     gate_open_confirm_n: 3     # consecutive open polls needed
     gate_poll_hz: 5.0
     # obstacles
@@ -46,3 +47,5 @@ competition_mission:
     collision_monitor: /collision_monitor   # switched from the mapping stop box to the mission one at start-up
     turn_calibration: false    # NEW (off): spin test right after the start (set by laptop_mission turn_calibration:=true)
     turn_calibration_timeout_s: 40.0
+    start_nudge_m: 0.15        # creep forward before the first goal (back of the robot ~0.13 m from the start-box wall); 0 = off
+    start_nudge_speed: 0.10

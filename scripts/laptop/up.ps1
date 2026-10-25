@@ -46,7 +46,8 @@ if (-not $NoPi) {
 
 # 5. WSL: the laptop router is started by ros_env.sh; check that the Pi topics arrive
 Say "5/6 checking Pi topics from WSL ($Distro)"
-wsl -d $Distro -- bash -lc "cd ~/hardleel && PI_IP=$PiIp source scripts/laptop/ros_env.sh && python3 scripts/laptop/topic_probe.py 5 /scan /imu/data /camera/image_raw/compressed 2>&1 | grep Hz"
+# fresh laptop router: after a Pi reboot the old link still lists the topics but carries no data (25 Oct)
+wsl -d $Distro -- bash -lc "pkill -x rmw_zenohd; sleep 1; cd ~/hardleel && PI_IP=$PiIp source scripts/laptop/ros_env.sh && sleep 2 && python3 scripts/laptop/topic_probe.py 5 /scan /imu/data /camera/image_raw/compressed 2>&1 | grep Hz"
 
 if ($CheckOnly) { Say "check only: not opening the mapping/teleop windows"; exit 0 }
 # 6. windows: A = mapping (Cartographer etc., keep it open into phase 2), B = teleop
