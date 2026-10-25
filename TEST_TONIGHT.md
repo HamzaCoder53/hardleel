@@ -55,6 +55,7 @@ the motors also stop by themselves 0.3 s after commands stop.
 | 3e | `cat ~/logs/runs/$(ls -t ~/logs/runs | head -1)` | robot_id HARDLEEL and all 12 fields with times (obstacle ones only if 3d done) | MISSING fields other than obstacle |
 | 3f | Classifier: restart W3 without `classifier:=stub` (wait for `model ready`), W4: `ros2 run waste_classifier clip_monitor_test <folder of plastic_*.jpg metal_*.jpg organic_*.jpg>` with the robot camera 0.5-1 m from the laptop screen | accuracy line + latency (~1-1.5 s) | accuracy < 70 % (tune prompts/`min_conf` in `clip_classifier.yaml`) |
 | 3g | Drop bin (not mounted): `ros2 service call /dump std_srvs/srv/Trigger {}` | `no drop bin: skipped` | error |
+| 3h | Pico servos (no bin needed, flaps free): `ros2 run robot_slam servo_calibrate` (keys `]`/`[` +-10 deg, `+`/`-` 1 deg). Both servos move together; each move waits for the Pico's `SV,done` | servos move; no "no SV,done" message | "no SV,done from the Pico": motor_bridge not running / old Pico firmware |
 
 ## 4. Cold start from reboot using only RUNBOOK.md (15 min) — REQUIRED
 

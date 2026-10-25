@@ -3,7 +3,8 @@
 
 motor_bridge opens the pty this node creates (link: `port`, default /tmp/fake_pico) and sends its usual
 `STBY,0,1` / `M,<id>,<pwm>` lines. Each 20 ms the node turns the last PWMs into a body twist on
-`sim_cmd_vel` (the Gazebo diff-drive bridge in sim.launch.py hardware:=true) with a crude DC-motor model:
+`sim_cmd_vel` (the Gazebo diff-drive bridge in sim.launch.py hardware:=true) with a crude DC-motor model
+(and answers SV servo commands like the real firmware: SV,moving / SV,done after the slew):
 
     wheel speed = sign(pwm) * max(0, |pwm| - deadband) / (255 - deadband) * v_max * terrain_factor
     v = (vr + vl) / 2,  w = (vr - vl) / track
@@ -14,6 +15,7 @@ drive the physical RIGHT side reversed and 2/3 the LEFT side reversed. terrain_f
 feedback tests. Params: port, deadband_left, deadband_right, v_max, track, slow_zone, slow_factor, invert_linear.
 """
 import os
+import time
 import pty
 import tty
 
@@ -45,11 +47,39 @@ class FakePico(Node):
         self.pwm = [0, 0, 0, 0]
         self.buf = b''
         self.xy = None
+        self.sv_deg, self.sv_done_at = 90, None         # servos: firmware power-up angle 90 deg
         self.pub = self.create_publisher(Twist, 'sim_cmd_vel', 10)
         self.create_subscription(Odometry, '/ground_truth', self.on_truth, 10)
         self.create_timer(0.02, self.tick)
         self.get_logger().info(f'fake Pico on {self.link} -> {os.ttyname(slave)}; deadband L/R {self.db_l}/{self.db_r}, '
                                f'v_max {self.v_max}, slow zone {self.zone} x{self.slow}')
+
+    def reply(self, text):
+        try:
+            os.write(self.master, (text + '\n').encode())
+        except OSError:
+            pass
+
+    def servo_cmd(self, parts):
+        """Firmware behaviour: SV,<deg>[,<dps>] -> 'SV,moving,<deg>' then, after the slew + 150 ms settle,
+        'SV,done,<deg>'; already there and idle -> 'SV,done,<deg>' at once; bad values -> ERR."""
+        try:
+            deg = int(parts[1])
+            dps = int(parts[2]) if len(parts) == 3 else 240
+        except ValueError:
+            self.reply('ERR,' + ','.join(parts))
+            return
+        if not 0 <= deg <= 180 or dps < 0:
+            self.reply('ERR,' + ','.join(parts))
+            return
+        delta = abs(deg - self.sv_deg)
+        if self.sv_done_at is None and delta < 0.5:
+            self.reply(f'SV,done,{deg}')
+            return
+        slew = delta * 0.002 if dps == 0 else delta / dps
+        self.sv_deg = deg
+        self.sv_done_at = time.monotonic() + slew + 0.15
+        self.reply(f'SV,moving,{deg}')
 
     def on_truth(self, m):
         self.xy = (m.pose.pose.position.x, m.pose.pose.position.y)
@@ -79,6 +109,11 @@ class FakePico(Node):
                     pass
             elif parts[0] == 'STOP':
                 self.pwm = [0, 0, 0, 0]
+            elif parts[0] == 'SV' and len(parts) in (2, 3):
+                self.servo_cmd(parts)
+        if self.sv_done_at is not None and time.monotonic() >= self.sv_done_at:
+            self.sv_done_at = None
+            self.reply(f'SV,done,{self.sv_deg}')
         sl, sr = self.pwm[0], self.pwm[2]                # sent left / right channel
         if self.invert_linear:
             pr, pl = -sl, -sr                            # inverse of motor_bridge.to_sent

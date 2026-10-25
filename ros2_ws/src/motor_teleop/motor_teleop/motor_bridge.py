@@ -5,11 +5,16 @@ Subscribes : cmd_vel (geometry_msgs/Twist)   e.g. from teleop_twist_keyboard
 Publishes  : encoders (std_msgs/Int32MultiArray)
              data = [lf, lr, rf, rr, v_lf, v_lr, v_rf, v_rr]   (ticks, ticks/s)
 
-Pico protocol used (newline terminated):
+Pico protocol used (newline terminated; firmware "Motor + servo firmware", 25 Oct):
   STBY,0,1        enable both TB6612 drivers
   M,<id>,<pwm>    id 0=LF 1=LR 2=RF 3=RR, pwm -255..255
   STOP            all motors off
-Pico replies read here: ENC,... / STAT,... / ERR,... / WD,stopped
+  SV,<deg>,<dps>  both drop servos (Pico GP12 + GP13, same angle) to <deg>, slewing at <dps> (0 = jump)
+Pico replies read here: ENC,... / STAT,... / ERR,... / WD,stopped / SV,moving,<deg> / SV,done,<deg>
+The Pico's own command watchdog (default 200 ms) brakes the motors if this node stops sending (it sends
+every 1/send_rate = 100 ms). Servos: /motor/servo_cmd (Int32MultiArray [deg] or [deg, dps]) -> SV line;
+the Pico's SV replies are republished on /motor/servo_state (String "moving,<deg>" / "done,<deg>"). This
+node owns the serial port, so the drop_servo node (backend pico) goes through these two topics.
 
 Ramping: the PWM sent to the Pico changes at most <surface>_ramp (speeding up) or
 ramp_decel (slowing down) PWM units per second. A direction reversal passes
@@ -188,6 +193,8 @@ class MotorBridge(Node):
         self.create_subscription(Imu, g('imu_topic'), self.on_imu, imu_qos)
         self.create_subscription(String, 'surface_override', self.on_override, 10)
         self.surface_pub = self.create_publisher(String, 'surface_state', 1)
+        self.servo_pub = self.create_publisher(String, '/motor/servo_state', 10)
+        self.create_subscription(Int32MultiArray, '/motor/servo_cmd', self.on_servo_cmd, 10)
         self.create_timer(self.dt, self.tick)
 
         self.thread = threading.Thread(target=self.read_loop, daemon=True)
@@ -450,6 +457,17 @@ class MotorBridge(Node):
                 self.get_logger().warn(f'Pico: {line}', throttle_duration_sec=1.0)
             elif line.startswith('WD,'):
                 self.get_logger().warn('Pico watchdog stopped the motors', throttle_duration_sec=1.0)
+            elif line.startswith('SV,'):                 # SV,moving,<deg> / SV,done,<deg>
+                self.servo_pub.publish(String(data=line[3:]))
+
+    def on_servo_cmd(self, m):
+        """[deg] or [deg, dps] -> 'SV,<deg>[,<dps>]' (firmware: deg 0..180, dps >= 0, 0 = jump)."""
+        if not m.data:
+            return
+        deg = max(0, min(180, int(m.data[0])))
+        line = f'SV,{deg}' if len(m.data) < 2 or m.data[1] < 0 else f'SV,{deg},{int(m.data[1])}'
+        self.write(line + '\n')
+        self.get_logger().info(f'servo -> {line}')
 
     def shutdown(self):
         self.running = False

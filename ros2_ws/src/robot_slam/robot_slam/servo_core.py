@@ -7,7 +7,9 @@ from dataclasses import dataclass
 # Defaults = node params. All angles/pins are PLACEHOLDERS until calibrated/mounted.
 DEFAULTS = {
     'has_drop_bin': False,
-    'backend': 'pi_pwm',      # pi_pwm | lgpio | pico | null
+    'backend': 'pico',        # pico (servos on the Pico GP12/GP13, via motor_bridge) | pi_pwm | lgpio | null
+    'pico_dps': 240,          # SV slew speed, deg/s (firmware default 240; 0 = jump)
+    'pico_timeout_s': 3.0,    # wait for the Pico's SV,done
     'servo_a_gpio': 12,       # PLACEHOLDER
     'servo_b_gpio': 13,       # PLACEHOLDER
     'closed_deg_a': 0.0,      # PLACEHOLDER (calibrate)

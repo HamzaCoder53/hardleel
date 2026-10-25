@@ -210,8 +210,11 @@ Tick each line only when you have seen it work.
    `ros2 run waste_classifier clip_monitor_test <folder of plastic_*.jpg, metal_*.jpg, organic_*.jpg>` with the
    robot camera ~0.5-1 m from the laptop screen. Note the accuracy and the latency.
 8. [ ] **Drop**: with the bin NOT mounted, `ros2 service call /dump std_srvs/srv/Trigger` answers
-   "no drop bin: skipped". Once mounted: calibrate (`python3 -m robot_slam.servo_calibrate --gpio 12 --gpio-b 13`
-   on the Pi), set `has_drop_bin: true` in `drop_servo.yaml` AND `competition_mission.yaml`, check the robot
+   "no drop bin: skipped". The servos are on the PICO (GP12/GP13, one angle for both, firmware `SV` command).
+   Once mounted: calibrate with `ros2 run robot_slam servo_calibrate` (any W terminal, Pi drivers running:
+   o/c mark open/closed, t test, w writes `~/hardleel_ws/drop_servo_calibration.yaml`), copy `open_deg_a` /
+   `closed_deg_a` into `ros2_ws/src/robot_slam/config/drop_servo.yaml` and re-run `deploy_pi.sh`,
+   set `has_drop_bin: true` in `drop_servo.yaml` AND `competition_mission.yaml`, check the robot
    still fits 30 x 30 x 30 cm, the bin blocks neither the lidar's 360 deg view nor the camera, update the Nav2
    footprint (`robot_radius` in `nav2_params_mission.yaml`, `FootprintApproach` in `collision_monitor.yaml`),
    then one full office run with the bin on.

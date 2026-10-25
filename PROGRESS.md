@@ -183,3 +183,10 @@ Step 1.
 - [ ] OPEN 2: final regression sim run on rdj2026 world after the start-nudge change (course runs passed).
 - [ ] User to confirm: dock -> class (E2/E3/E4), bins and finish positions; gate waiting time from the organisers.
 Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now restarts the laptop router).
+- [x] 25 Oct ~17:45: matched to the user's CURRENT PICO FIRMWARE ("Motor + servo firmware"): motor commands
+      STBY/M/STOP unchanged and OK (bridge sends every 100 ms < firmware WD 200 ms; encoders disabled = no ENC).
+      Drop servos are on the PICO (GP12/GP13, one angle, SV,<deg>,<dps> -> SV,moving / SV,done): motor_bridge
+      now forwards /motor/servo_cmd and republishes /motor/servo_state; drop_servo backend 'pico' (default) waits
+      for SV,done; servo_calibrate --backend pico (default). fake_pico implements SV like the firmware.
+      Sim: close-on-start SV,30 + /dump SV,150 -> hold -> SV,30 = "dropped" in 3.2 s. NOT deployed (Pi off):
+      run deploy_pi.sh when the Pi is on (TEST_TONIGHT step 0).

@@ -1,18 +1,23 @@
-# drop_servo node. Pins and angles are PLACEHOLDERS until the bin is mounted; calibrate with
-# `python3 -m robot_slam.servo_calibrate` and paste the values.
+# drop_servo node. The two drop servos are on the PICO (firmware 25 Oct: GP12 + GP13, both at ONE angle,
+# 'SV,<deg>,<dps>', 0 deg = 500 us, 180 deg = 2500 us, power-up angle 90 deg). The node commands them through
+# motor_bridge (/motor/servo_cmd -> SV line, confirmed by /motor/servo_state "done,<deg>").
+# Angles are PLACEHOLDERS until the bin is mounted: calibrate with
+#   ros2 run robot_slam servo_calibrate --backend pico      (motor_bridge must be running)
 drop_servo:
   ros__parameters:
-    has_drop_bin: false     # false: /dump returns success "no drop bin: skipped"
-    backend: pi_pwm         # pi_pwm | lgpio | pico (not implemented) | null
-    servo_a_gpio: 12        # PLACEHOLDER (hardware PWM0)
-    servo_b_gpio: 13        # PLACEHOLDER (hardware PWM1)
-    closed_deg_a: 0.0       # PLACEHOLDER
-    closed_deg_b: 0.0       # PLACEHOLDER
-    open_deg_a: 90.0        # PLACEHOLDER
-    open_deg_b: 90.0        # PLACEHOLDER
-    min_us: 500
+    has_drop_bin: false     # false: /dump returns success "no drop bin: skipped" (bin not mounted yet)
+    backend: pico           # pico | pi_pwm | lgpio | null
+    pico_dps: 240           # slew speed (firmware default 240 deg/s; 0 = jump)
+    pico_timeout_s: 3.0     # wait this long for the Pico's SV,done (a 180 deg slew at 240 deg/s ~0.9 s)
+    servo_a_gpio: 12        # Pi backends only (Pico pins are fixed in its firmware)
+    servo_b_gpio: 13        # Pi backends only
+    closed_deg_a: 0.0       # PLACEHOLDER (calibrate). With the pico backend only *_a is used (one angle)
+    closed_deg_b: 0.0       # Pi backends only; a mirrored servo 2 on the Pico = SERVO2_INVERT in its firmware
+    open_deg_a: 90.0        # PLACEHOLDER (calibrate)
+    open_deg_b: 90.0        # Pi backends only
+    min_us: 500             # must match the firmware's SERVO_MIN_US / SERVO_MAX_US
     max_us: 2500
     range_deg: 180.0
     hold_s: 1.0             # flaps stay open
-    move_s: 0.4             # time to reach an angle before detaching
-    close_on_start: true
+    move_s: 0.4             # extra wait after each move (the pico backend already waits for SV,done)
+    close_on_start: true    # 2 s after start-up (needs motor_bridge running for the pico backend)

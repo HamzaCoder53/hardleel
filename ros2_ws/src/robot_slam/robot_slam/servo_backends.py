@@ -112,25 +112,65 @@ class LgpioBackend:
             pass
 
 
+def us_to_deg(us, min_us=500, max_us=2500, range_deg=180.0):
+    """Inverse of servo_core.angle_to_pulse_us (Pico firmware: SERVO_MIN_US 500 = 0 deg, SERVO_MAX_US 2500 = 180)."""
+    return max(0, min(180, int(round((us - min_us) * range_deg / float(max_us - min_us)))))
+
+
 class PicoBackend:
-    """PLACEHOLDER stub. Would send e.g. 'S,<id>,<us>' + newline over the existing motor_bridge
-    serial link ('S,<id>,0' = detach). Needs a Pico firmware change: only with the user's OK."""
+    """Servos on the Pico (firmware 25 Oct: GP12 + GP13, ONE angle for both, 'SV,<deg>,<dps>').
+    motor_bridge owns the serial port, so this goes through ROS: publish /motor/servo_cmd [deg, dps], then wait
+    for '/motor/servo_state' == 'done,<deg>' (the firmware's timed confirmation). n = 1 because both servos always
+    get the same angle; a mirror-mounted servo 2 needs SERVO2_INVERT in the firmware (not changed by us).
+    The node must spin in another thread (MultiThreadedExecutor) while set_pulse_us() waits."""
 
-    def __init__(self, *a, **k):
-        raise NotImplementedError('pico servo backend: firmware command not defined yet')
+    def __init__(self, node, min_us=500, max_us=2500, range_deg=180.0, dps=240, timeout_s=3.0):
+        import threading
+        from std_msgs.msg import Int32MultiArray, String
+        self.n, self.node = 1, node
+        self.min_us, self.max_us, self.range_deg = min_us, max_us, range_deg
+        self.dps, self.timeout_s = int(dps), float(timeout_s)
+        self._Msg = Int32MultiArray
+        self._done = threading.Event()
+        self._want = None
+        self.last_state = ''
+        self.pub = node.create_publisher(Int32MultiArray, '/motor/servo_cmd', 10)
+        node.create_subscription(String, '/motor/servo_state', self._on_state, 10)
+
+    def _on_state(self, m):
+        self.last_state = m.data
+        kind, _, deg = m.data.partition(',')
+        if kind == 'done' and self._want is not None and deg.strip() == str(self._want):
+            self._done.set()
+
+    def set_pulse_us(self, idx, us):
+        deg = us_to_deg(us, self.min_us, self.max_us, self.range_deg)
+        self._want = deg
+        self._done.clear()
+        self.pub.publish(self._Msg(data=[deg, self.dps]))
+        if not self._done.wait(self.timeout_s):
+            raise RuntimeError(f'no SV,done,{deg} from the Pico within {self.timeout_s:.1f} s '
+                               f'(motor_bridge running? last state "{self.last_state}")')
+
+    def release(self, idx):
+        pass                                   # the Pico holds the angle (firmware has no detach)
+
+    def close(self):
+        pass
 
 
-def make_backend(name, gpios):
-    """Build a backend; pi_pwm falls back to lgpio, anything unavailable falls back to Null."""
+def make_backend(name, gpios, node=None, **pico):
+    """Build a backend; pi_pwm falls back to lgpio, anything unavailable falls back to Null.
+    pico needs the ROS node (talks to motor_bridge) and takes min_us/max_us/range_deg/dps/timeout_s."""
+    if name == 'pico':
+        if node is None:
+            log.warning('pico backend needs a ROS node: using null')
+            return NullBackend(len(gpios))
+        return PicoBackend(node, **pico)
     order = {'pi_pwm': ['pi_pwm', 'lgpio'], 'lgpio': ['lgpio']}.get(name, [])
     for n in order:
         try:
             return PiHardwarePwmBackend(gpios) if n == 'pi_pwm' else LgpioBackend(gpios)
         except BackendUnavailable as e:
             log.warning('backend %s unavailable: %s', n, e)
-    if name == 'pico':
-        try:
-            return PicoBackend()
-        except NotImplementedError as e:
-            log.warning('%s', e)
     return NullBackend(len(gpios))

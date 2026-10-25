@@ -32,6 +32,7 @@ setup(
             'save_pose = robot_slam.save_pose:main',
             'click_waypoints = robot_slam.click_waypoints:main',
             'drop_servo_node = robot_slam.drop_servo_node:main',
+            'servo_calibrate = robot_slam.servo_calibrate:main',
             'frontier_explorer = robot_slam.frontier_explorer:main',
             'speed_governor = robot_slam.speed_governor:main',
         ]

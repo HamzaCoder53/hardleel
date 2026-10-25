@@ -14,17 +14,18 @@ sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..')))
 from robot_slam import waypoints as W  # noqa: E402
 
 CFG = os.path.join(HERE, '..', 'config')
-COURSE = os.path.join(CFG, 'waypoints_course.yaml')
+COURSE = os.path.join(CFG, 'waypoints_course_fig1.yaml')     # Figure-1 draft (arena-conversion tests below)
+REAL_COURSE = os.path.join(CFG, 'waypoints_course.yaml')     # from the team's course map (25 Oct)
 OFFICE = os.path.join(CFG, 'waypoints_office.yaml')
 ARENA = os.path.join(HERE, '..', '..', 'rdj2026_sim', 'arena', 'arena_layout.yaml')
 CLEARANCE_M = 0.2
 
 
-@pytest.mark.parametrize('path', [COURSE, OFFICE])
+@pytest.mark.parametrize('path', [COURSE, OFFICE, REAL_COURSE])
 def test_shipped_files_are_valid(path):
     poses, seqs, meta = W.load_waypoints(path)
     assert W.check_waypoints(poses, seqs) == []
-    assert all(m.get('conf') == 'low' and m.get('note') for m in meta.values())
+    assert all(m.get('conf') in ('low', 'med', 'high') and m.get('note') for m in meta.values())
 
 
 def test_course_matches_arena_conversion():
