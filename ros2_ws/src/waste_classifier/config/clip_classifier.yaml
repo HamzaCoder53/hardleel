@@ -1,0 +1,65 @@
+# Zero-shot CLIP waste classifier (laptop). Nested dicts below become dotted ROS params
+# (prompts.plastic, label_map.fabric, colours.plastic); the node reads them by prefix, so groups can be added freely.
+# Run the node with: --ros-args --params-file <this file>.  The CLI clip_test_images.py reads the same file.
+clip_classifier:
+  ros__parameters:
+    model: ViT-B-32
+    pretrained: laion2b_s34b_b79k
+    cache_dir: ~/.cache/clip_weights   # fill with scripts/fetch_clip_weights.py
+    offline: true                      # HF_HUB_OFFLINE=1, fail clearly if weights are not cached
+    num_threads: 4
+    image_topic: /camera/image_raw/compressed
+    n_frames: 5                        # new frames voted per /classify
+    frame_timeout_s: 4.0               # use what arrived after this long
+    min_conf: 0.45                     # PLACEHOLDER: tune on real photos of the competition waste
+    rotate_deg: 0                      # PLACEHOLDER: 0/90/180/270, camera mounting
+    crop_frac: 1.0                     # 1.0 = no crop; <1 centre crop
+
+    colours:                           # final label -> bin colour in the service reply
+      plastic: blue
+      organic: white
+      metal: black
+
+    label_map:                         # prompt group -> final label (plastic/metal/organic/unknown)
+      plastic: plastic
+      metal: metal
+      organic: organic
+      fabric: organic                  # PLACEHOLDER: rulebook fabric category unclear, ask organisers
+      paper: organic                   # PLACEHOLDER
+      glass: unknown
+      empty: unknown
+
+    prompts:                           # several prompts per group; probs are summed per group
+      plastic:
+        - a photo of a plastic bottle
+        - a plastic bag
+        - plastic packaging
+        - a plastic container
+        - a crushed plastic cup
+      metal:
+        - a photo of a metal can
+        - an aluminium soda can
+        - a tin can
+        - metal scrap
+        - a crushed aluminium can
+      organic:
+        - a photo of food waste
+        - a banana peel
+        - fruit and vegetable scraps
+        - leaves
+        - an apple core
+      fabric:
+        - a piece of cloth
+        - old clothes
+        - fabric textile
+      paper:
+        - a sheet of paper
+        - a cardboard box
+        - crumpled paper
+      glass:
+        - a glass bottle
+        - a broken glass jar
+      empty:
+        - a blank screen
+        - an empty wall
+        - a computer monitor showing nothing

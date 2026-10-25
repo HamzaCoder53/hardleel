@@ -25,7 +25,8 @@ def setup(context):
     cfg = os.path.join(sc.pkg_share(), 'config')
     nav2_params = sc.nav2_params_for_distro(os.path.join(cfg, 'nav2_params_mission.yaml'), sim)
     simp = {'use_sim_time': sim}
-    actions = sc.odom_for_nav2(sim) + sc.nav2_nodes(nav2_params, sim)
+    # sim: the simulator's /odom (twist only, its TF is off with sim odom_tf:=false) stands in for rf2o + EKF
+    actions = ([] if sim else sc.odom_for_nav2(sim)) + sc.nav2_nodes(nav2_params, sim)
     actions.append(Node(package='robot_slam', executable='event_logger', name='event_logger', output='screen',
                         parameters=[os.path.join(cfg, 'event_logger.yaml'), simp]))
     stub = '' if lc['classifier'] == 'clip' else lc['stub_class']

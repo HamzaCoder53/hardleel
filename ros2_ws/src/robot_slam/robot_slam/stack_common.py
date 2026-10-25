@@ -73,9 +73,17 @@ def imu_hw(imu_port):
 
 
 def sensor_prep(use_sim_time=False):
-    """/scan -> /scan_filtered (tilt gate), /imu/data_raw + /imu/data -> /imu/data_lpf."""
-    return [Node(package='robot_slam', executable='sensor_prep', name='sensor_prep', output='screen',
-                 parameters=[{'lidar_height': LASER_Z, 'use_sim_time': use_sim_time}])]
+    """/scan -> /scan_filtered (tilt gate), /imu/data_raw + /imu/data -> /imu/data_lpf.
+    In the sim there is no Pi, so the Madgwick filter that makes /imu/data runs here too."""
+    nodes = [Node(package='robot_slam', executable='sensor_prep', name='sensor_prep', output='screen',
+                  parameters=[{'lidar_height': LASER_Z, 'use_sim_time': use_sim_time}])]
+    if use_sim_time:
+        nodes.append(Node(package='imu_filter_madgwick', executable='imu_filter_madgwick_node',
+                          name='imu_filter_madgwick_node', output='log',
+                          parameters=[{'use_mag': False, 'publish_tf': False, 'world_frame': 'enu', 'gain': 0.02,
+                                       'use_sim_time': True}],
+                          remappings=[('imu/data_raw', '/imu/data_raw'), ('imu/data', '/imu/data')]))
+    return nodes
 
 
 def imu_and_prep(imu_port):

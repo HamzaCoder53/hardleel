@@ -12,6 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/models', glob('models/*')),
         ('share/' + package_name + '/launch', glob('launch/*.py')),
+        ('share/' + package_name + '/config', glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -23,6 +24,9 @@ setup(
         'console_scripts': [
             'classify_service = waste_classifier.classify_service:main',
             'test_photos = waste_classifier.test_photos:main',
+            'clip_classifier = waste_classifier.clip_classifier_node:main',
+            'clip_test_images = waste_classifier.clip_test_images:main',
+            'clip_monitor_test = waste_classifier.clip_monitor_test:main',
         ],
     },
 )
