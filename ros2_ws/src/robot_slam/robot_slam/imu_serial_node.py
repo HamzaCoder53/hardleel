@@ -1,15 +1,60 @@
 #!/usr/bin/env python3
-"""Read the Nano 33 BLE Sense IMU over USB serial and publish ROS 2 messages."""
+"""Read the Nano 33 BLE Sense IMU over USB serial and publish ROS 2 messages.
+
+Startup gyro calibration: the gyro is averaged for gyro_calib_s while the robot stands still and the mean is
+subtracted. If the gyro or accelerometer spread shows the robot moved, the node logs a loud error and starts
+again (up to calib_max_attempts, then it keeps the stillest attempt). /imu/recalibrate (std_srvs/Trigger)
+reruns it on demand; /imu/calib_status (String, latched) reports the result.
+"""
 import math
 import time
 
 import rclpy
 import serial
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import Imu, MagneticField
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 G = 9.80665
 DEG2RAD = math.pi / 180.0
+
+
+class CalibStats:
+    """Running mean/std of the three gyro axes (deg/s) and of the accel norm (g)."""
+
+    def __init__(self):
+        self.n = 0
+        self.g_sum = [0.0] * 3
+        self.g_sq = [0.0] * 3
+        self.a_sum = 0.0
+        self.a_sq = 0.0
+
+    def add(self, ax, ay, az, gx, gy, gz):
+        self.n += 1
+        for i, v in enumerate((gx, gy, gz)):
+            self.g_sum[i] += v
+            self.g_sq[i] += v * v
+        a = math.sqrt(ax * ax + ay * ay + az * az)
+        self.a_sum += a
+        self.a_sq += a * a
+
+    @staticmethod
+    def _std(s, sq, n):
+        return math.sqrt(max(sq / n - (s / n) ** 2, 0.0))
+
+    def bias(self):
+        return [s / self.n for s in self.g_sum]
+
+    def gyro_std(self):
+        return max(self._std(s, q, self.n) for s, q in zip(self.g_sum, self.g_sq))
+
+    def accel_std(self):
+        return self._std(self.a_sum, self.a_sq, self.n)
+
+    def moved(self, gyro_std_max, accel_std_max):
+        return self.gyro_std() > gyro_std_max or self.accel_std() > accel_std_max
 
 
 class ImuSerialNode(Node):
@@ -20,6 +65,10 @@ class ImuSerialNode(Node):
         self.declare_parameter('frame_id', 'imu_link')
         self.declare_parameter('gyro_calib_s', 3.0)   # keep the robot still this long at startup
         self.declare_parameter('gyro_deadband_dps', 0.3)  # ignore yaw rates smaller than this
+        # still robot measured 22 Oct: gyro std ~0.02 deg/s; limits are generous PLACEHOLDERs
+        self.declare_parameter('calib_gyro_std_max_dps', 0.3)
+        self.declare_parameter('calib_accel_std_max_g', 0.02)
+        self.declare_parameter('calib_max_attempts', 5)
 
         self.frame_id = self.get_parameter('frame_id').value
         self.ser = serial.Serial(self.get_parameter('port').value,
@@ -28,16 +77,58 @@ class ImuSerialNode(Node):
 
         self.imu_pub = self.create_publisher(Imu, 'imu/data_raw', 20)
         self.mag_pub = self.create_publisher(MagneticField, 'imu/mag', 10)
+        latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.status_pub = self.create_publisher(String, 'imu/calib_status', latched)
+        self.create_service(Trigger, 'imu/recalibrate', self.on_recalibrate)
 
         self.calib_s = self.get_parameter('gyro_calib_s').value
         self.deadband = self.get_parameter('gyro_deadband_dps').value
-        self.calib_start = time.monotonic()
-        self.bias_sum = [0.0, 0.0, 0.0]
-        self.bias_n = 0
+        self.gyro_std_max = float(self.get_parameter('calib_gyro_std_max_dps').value)
+        self.accel_std_max = float(self.get_parameter('calib_accel_std_max_g').value)
+        self.max_attempts = int(self.get_parameter('calib_max_attempts').value)
         self.bias = None
-        self.get_logger().info(f'Calibrating gyro for {self.calib_s:.0f} s: keep the robot still')
+        self.start_calibration()
 
         self.create_timer(0.005, self.poll)
+
+    def start_calibration(self, attempt=1, best=None):
+        self.calib_start = time.monotonic()
+        self.stats = CalibStats()
+        self.attempt = attempt
+        self.best = best                          # stillest finished attempt so far
+        self.calibrating = True                   # a recalibration keeps publishing with the old bias
+        self.publish_status(f'CALIBRATING attempt {attempt}')
+        self.get_logger().info(f'Calibrating gyro for {self.calib_s:.0f} s (attempt {attempt}): keep the robot still')
+
+    def publish_status(self, text):
+        self.status_pub.publish(String(data=text))
+
+    def on_recalibrate(self, _req, res):
+        self.start_calibration()
+        res.success, res.message = True, f'recalibrating for {self.calib_s:.0f} s: keep the robot still'
+        return res
+
+    def finish_calibration(self):
+        st = self.stats
+        detail = f'gyro std {st.gyro_std():.3f} deg/s, accel std {st.accel_std():.4f} g, n={st.n}'
+        if st.moved(self.gyro_std_max, self.accel_std_max):
+            if self.best is None or st.gyro_std() < self.best.gyro_std():
+                self.best = st
+            self.get_logger().error('!' * 60)
+            self.get_logger().error(f'ROBOT MOVED DURING GYRO CALIBRATION ({detail}). Hold it still!')
+            self.get_logger().error('!' * 60)
+            if self.attempt < self.max_attempts:
+                self.start_calibration(self.attempt + 1, self.best)
+                return
+            st = self.best
+            self.publish_status(f'WARN moved: using stillest of {self.attempt} attempts ({detail})')
+            self.get_logger().error(f'Giving up after {self.attempt} attempts; using the stillest one.')
+        else:
+            self.publish_status(f'OK {detail}')
+        self.bias = st.bias()
+        self.calibrating = False
+        self.get_logger().info(
+            f'Gyro bias (deg/s): {self.bias[0]:.3f}, {self.bias[1]:.3f}, {self.bias[2]:.3f} ({detail}). Publishing.')
 
     def poll(self):
         try:
@@ -62,15 +153,11 @@ class ImuSerialNode(Node):
             pass  # partial line at startup, ignore
 
     def handle_imu(self, ax, ay, az, gx, gy, gz):
+        if self.calibrating:
+            self.stats.add(ax, ay, az, gx, gy, gz)
+            if time.monotonic() - self.calib_start >= self.calib_s and self.stats.n > 1:
+                self.finish_calibration()
         if self.bias is None:
-            self.bias_sum[0] += gx
-            self.bias_sum[1] += gy
-            self.bias_sum[2] += gz
-            self.bias_n += 1
-            if time.monotonic() - self.calib_start >= self.calib_s and self.bias_n > 0:
-                self.bias = [s / self.bias_n for s in self.bias_sum]
-                self.get_logger().info(
-                    f'Gyro bias (deg/s): {self.bias[0]:.3f}, {self.bias[1]:.3f}, {self.bias[2]:.3f}. Publishing.')
             return
 
         msg = Imu()

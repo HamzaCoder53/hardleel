@@ -1,0 +1,24 @@
+# Office test template: compact ~3 x 3 m loop near the start (map frame: x forward, y left, yaw in degrees).
+# PLACEHOLDER positions; re-record in the office with save_pose or click_waypoints.
+frame: map
+poses:
+  screen: {x: 1.500, y: 0.000, yaw_deg: 0.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  loading_plastic: {x: 2.200, y: 0.500, yaw_deg: 90.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  loading_metal: {x: 2.200, y: 1.000, yaw_deg: 90.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  loading_organic: {x: 2.200, y: 1.500, yaw_deg: 90.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  terrain_1: {x: 2.500, y: 2.000, yaw_deg: 90.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  terrain_2: {x: 2.500, y: 2.600, yaw_deg: 90.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  junction: {x: 2.200, y: 3.000, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  gate_check: {x: 1.800, y: 3.000, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  path1_1: {x: 1.200, y: 3.000, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  path1_2: {x: 0.600, y: 3.000, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  path2_1: {x: 1.200, y: 2.500, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  path2_2: {x: 0.600, y: 2.500, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  bin_plastic: {x: 0.500, y: 1.800, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  bin_organic: {x: 0.500, y: 1.300, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  bin_metal: {x: 0.500, y: 0.800, yaw_deg: 180.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+  finish: {x: 0.500, y: 0.200, yaw_deg: -90.0, conf: "low", note: "re-record with save_pose or click_waypoints in the office"}
+sequences:
+  terrain: [terrain_1, terrain_2]
+  path1: [path1_1, path1_2]
+  path2: [path2_1, path2_2]

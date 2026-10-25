@@ -1,0 +1,18 @@
+# drop_servo node. Pins and angles are PLACEHOLDERS until the bin is mounted; calibrate with
+# `python3 -m robot_slam.servo_calibrate` and paste the values.
+drop_servo:
+  ros__parameters:
+    has_drop_bin: false     # false: /dump returns success "no drop bin: skipped"
+    backend: pi_pwm         # pi_pwm | lgpio | pico (not implemented) | null
+    servo_a_gpio: 12        # PLACEHOLDER (hardware PWM0)
+    servo_b_gpio: 13        # PLACEHOLDER (hardware PWM1)
+    closed_deg_a: 0.0       # PLACEHOLDER
+    closed_deg_b: 0.0       # PLACEHOLDER
+    open_deg_a: 90.0        # PLACEHOLDER
+    open_deg_b: 90.0        # PLACEHOLDER
+    min_us: 500
+    max_us: 2500
+    range_deg: 180.0
+    hold_s: 1.0             # flaps stay open
+    move_s: 0.4             # time to reach an angle before detaching
+    close_on_start: true

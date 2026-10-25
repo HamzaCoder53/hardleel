@@ -28,6 +28,10 @@ setup(
             'sensor_prep = robot_slam.sensor_prep:main',
             'coverage_mission = robot_slam.coverage_mission:main',
             'competition_mission = robot_slam.competition_mission:main',
+            'event_logger = robot_slam.event_logger:main',
+            'save_pose = robot_slam.save_pose:main',
+            'click_waypoints = robot_slam.click_waypoints:main',
+            'drop_servo_node = robot_slam.drop_servo_node:main',
         ]
     },
 )
