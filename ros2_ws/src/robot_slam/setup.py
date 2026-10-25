@@ -12,7 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
-        (os.path.join('share', package_name, 'config'), glob('config/*.yaml') + glob('config/*.lua') + glob('config/*.rviz')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml') + glob('config/*.lua') + glob('config/*.rviz') + glob('config/*.xml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -35,6 +35,7 @@ setup(
             'servo_calibrate = robot_slam.servo_calibrate:main',
             'frontier_explorer = robot_slam.frontier_explorer:main',
             'speed_governor = robot_slam.speed_governor:main',
+            'map_freezer = robot_slam.map_freezer:main',
         ]
     },
 )

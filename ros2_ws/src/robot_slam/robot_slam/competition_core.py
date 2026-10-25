@@ -54,6 +54,13 @@ def soft_deadline_due(state, remaining_s, reserve_s):
     return state not in TERMINAL and STATES.index(state) < STATES.index('DEPOSIT') and remaining_s <= reserve_s
 
 
+def path_switch_possible(state, current_path=''):
+    """Blocked by an obstacle: is there another way? Yes on the way to the junction / gate check (take path1
+    instead of waiting for the gate lane) and on path2 (path1 is always open). Elsewhere the only way is ahead:
+    wait (the soft deadline still sends the robot to deposit when time runs short)."""
+    return state in ('JUNCTION', 'GATE_DECISION') or (state == 'GO_PATH' and current_path == 'path2')
+
+
 def gate_wait_budget(remaining_s, max_wait_s, reserve_s):
     """Seconds the gate may still be waited for: the configured max, but never eating into reserve_s (what the
     path, deposit and finish need after the decision). 0 = decide on the current reading: take whatever is

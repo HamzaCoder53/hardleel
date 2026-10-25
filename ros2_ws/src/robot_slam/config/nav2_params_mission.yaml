@@ -77,8 +77,8 @@ controller_server:
     use_realtime_priority: false
     progress_checker:
       plugin: nav2_controller::SimpleProgressChecker
-      required_movement_radius: 0.5
-      movement_time_allowance: 10.0
+      required_movement_radius: 0.25   # stuck detection -> BT wait-and-recheck loop sooner
+      movement_time_allowance: 6.0
     general_goal_checker:
       stateful: true
       plugin: nav2_controller::SimpleGoalChecker
@@ -118,14 +118,17 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      robot_radius: 0.17
+      # rectangle, not the old 0.34 m circle: passes a worker in a 0.7 m corridor with ~5 cm a side
+      # (0.28 x 0.27 m = sim robot incl. wheels; PLACEHOLDER: re-measure the real robot + drop bin)
+      footprint: "[[0.14, 0.135], [0.14, -0.135], [-0.14, -0.135], [-0.14, 0.135]]"
+      footprint_padding: 0.01
       plugins:
       - obstacle_layer
       - inflation_layer
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.35   # corridors ~0.70 m: walls ~0.35 m from the centre line
+        cost_scaling_factor: 6.0   # steep: prefer the middle, but a 5 cm gap stays passable
+        inflation_radius: 0.30   # corridors ~0.70 m: walls ~0.35 m from the centre line
       static_layer:
         plugin: nav2_costmap_2d::StaticLayer
         map_subscribe_transient_local: false   # Cartographer republishes /map every 0.5 s; volatile matches any publisher QoS
@@ -141,18 +144,21 @@ local_costmap:
           clearing: true
           marking: true
           data_type: LaserScan
-          raytrace_max_range: 3.0
+          raytrace_max_range: 4.0   # free beams clear a worker that walked away
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 3.0
           obstacle_min_range: 0.0
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
+      update_frequency: 2.0   # workers move: refresh the planning costmap twice a second
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      robot_radius: 0.17
+      # rectangle, not the old 0.34 m circle: passes a worker in a 0.7 m corridor with ~5 cm a side
+      # (0.28 x 0.27 m = sim robot incl. wheels; PLACEHOLDER: re-measure the real robot + drop bin)
+      footprint: "[[0.14, 0.135], [0.14, -0.135], [-0.14, -0.135], [-0.14, 0.135]]"
+      footprint_padding: 0.01
       resolution: 0.05
       track_unknown_space: true
       plugins:
@@ -170,17 +176,21 @@ global_costmap:
           clearing: true
           marking: true
           data_type: LaserScan
-          raytrace_max_range: 3.0
+          raytrace_max_range: 4.0   # free beams clear a worker that walked away
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 3.0
           obstacle_min_range: 0.0
       static_layer:
         plugin: nav2_costmap_2d::StaticLayer
-        map_subscribe_transient_local: false   # Cartographer republishes /map every 0.5 s; volatile matches any publisher QoS
+        # map_freezer: live copy of /map until /mission/start, then FROZEN. Cartographer keeps mapping during the
+        # run and would draw a standing worker into /map; a frozen base map leaves no ghost after it walks away
+        # (live obstacles come from the obstacle layer, which clears itself).
+        map_topic: /map_nav
+        map_subscribe_transient_local: true
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.35   # corridors ~0.70 m: walls ~0.35 m from the centre line
+        cost_scaling_factor: 6.0   # steep: prefer the middle, but a 5 cm gap stays passable
+        inflation_radius: 0.30   # corridors ~0.70 m: walls ~0.35 m from the centre line
       always_send_full_costmap: true
 map_saver:
   ros__parameters:

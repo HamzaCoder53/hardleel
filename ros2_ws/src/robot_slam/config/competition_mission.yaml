@@ -46,7 +46,9 @@ competition_mission:
     obstacle_route_len_m: 2.5  # route detector: first metres of /plan ...
     obstacle_route_tol_m: 0.30 # ... points within this distance of it ...
     obstacle_route_max_range_m: 4.0   # ... and within this lidar range
-    obstacle_max_wait_s: 10.0  # obstacle in view + no progress this long -> skip the waypoint (path2 -> path1)
+    obstacle_max_wait_s: 10.0  # obstacle in view + no progress this long -> path1 if an alternative exists
+                               # (to the junction/gate check, or on path2), otherwise keep waiting + re-checking
+    obstacle_switch_path: true
     obstacle_min_move_m: 0.10
     obstacle_clear_s: 3.0      # no detection this long = the episode is over (next one is logged again)
     # speeds

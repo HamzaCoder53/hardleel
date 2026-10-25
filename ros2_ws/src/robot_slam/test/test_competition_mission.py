@@ -221,3 +221,12 @@ def test_obstacle_episodes():
     assert e.update(2.0, False) is None                           # brief gap: same episode
     assert e.update(4.5, False) == 'cleared'
     assert e.update(6.0, True) == 'start'                         # a new worker: logged again
+
+
+def test_path_switch_only_where_an_alternative_exists():
+    assert core.path_switch_possible('JUNCTION')
+    assert core.path_switch_possible('GATE_DECISION')
+    assert core.path_switch_possible('GO_PATH', 'path2')
+    assert not core.path_switch_possible('GO_PATH', 'path1')        # already on the open path: wait
+    assert not core.path_switch_possible('TERRAIN')                 # only way is ahead: wait
+    assert not core.path_switch_possible('DEPOSIT')

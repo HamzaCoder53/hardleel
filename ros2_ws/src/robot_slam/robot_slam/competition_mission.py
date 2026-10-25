@@ -39,7 +39,7 @@ from nav_msgs.msg import OccupancyGrid
 from nav_msgs.msg import Path as NavPath
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Empty, String
 from std_srvs.srv import Trigger
@@ -68,6 +68,10 @@ class DeadlineHit(Exception):
 
 class SkipToDeposit(Exception):
     """Soft deadline: less than deposit_reserve_s left before DEPOSIT -> go and deposit now."""
+
+
+class SwitchToPath1(Exception):
+    """Blocked by an obstacle where an alternative exists (to the junction/gate check, or on path2)."""
 
 
 class CompetitionMission(Node):
@@ -108,9 +112,11 @@ class CompetitionMission(Node):
         p('obstacle_route_len_m', 2.5)             # route detector: unexpected points near the first metres of
         p('obstacle_route_tol_m', 0.30)            # Nav2's plan (/plan) ...
         p('obstacle_route_max_range_m', 4.0)       # ... up to this lidar range
-        p('obstacle_max_wait_s', 10.0)             # obstacle seen + no progress this long -> give the waypoint up
-        p('obstacle_min_move_m', 0.10)             # (path2: switch to path1)
+        p('obstacle_max_wait_s', 10.0)             # obstacle seen + no progress this long -> switch path or wait on
+        p('obstacle_min_move_m', 0.10)
         p('obstacle_clear_s', 3.0)                 # this long without detections ends an obstacle episode
+        p('obstacle_map_topic', '/map_nav')        # walls-only map frozen at the start (map_freezer)
+        p('obstacle_switch_path', True)            # blocked to the junction/gate check or on path2 -> path1
         p('mission_speed', 0.30)
         p('terrain_speed', 0.15)
         p('terrain_surface', '')
@@ -151,7 +157,8 @@ class CompetitionMission(Node):
         self.create_subscription(Empty, '/mission/start', lambda m: setattr(self, 'start_req', True), 1)
         self.create_subscription(Empty, '/mission/abort', self.on_abort, 10)
         self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
-        self.create_subscription(OccupancyGrid, '/map', self.on_map, 1)
+        self.create_subscription(OccupancyGrid, str(g('obstacle_map_topic')), self.on_map,
+                                 QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.create_subscription(NavPath, '/plan', self.on_plan, 1)
         self.create_subscription(CollisionMonitorState, '/collision_monitor_state', self.on_monitor, 10)
         self.create_timer(1.0, lambda: self.publish_state())
@@ -172,7 +179,7 @@ class CompetitionMission(Node):
         self.episodes = core.ObstacleEpisodes(float(g('obstacle_clear_s')))
         self.obst_seen_t = None                    # last time either detector saw something
         self.plan_xy = []                          # current Nav2 plan (map frame)
-        self.obstacle_skips = 0                    # waypoints given up because of an obstacle
+        self.current_path = ''                     # path1 / path2 while GO_PATH runs
         self.skipped_to_deposit = False
 
         log_dir = os.path.expanduser(str(g('log_dir')))
@@ -198,10 +205,8 @@ class CompetitionMission(Node):
         self.abort_req = True
 
     def on_map(self, m):
-        # Obstacle detection compares the scan with the map AS IT WAS AT THE START of the run: in SLAM mode
-        # Cartographer draws a standing worker into the live map within seconds (seen in the sim, 25 Oct).
-        if self.deadline is not None and self.grid is not None:
-            return
+        # Obstacle detection compares the scan with /map_nav: the map frozen at the start with free-standing blobs
+        # (workers/cylinders from the scan) removed by map_freezer - walls only, so any worker counts as unexpected.
         self.grid = {'data': np.asarray(m.data, dtype=np.int16).reshape(m.info.height, m.info.width),
                      'resolution': m.info.resolution,
                      'origin_x': m.info.origin.position.x, 'origin_y': m.info.origin.position.y}
@@ -446,12 +451,15 @@ class CompetitionMission(Node):
         replans = 0
         while True:
             res = self.send_goal(pose, timeout)
-            if res == 'obstacle':                                   # waited obstacle_max_wait_s: give it up
-                self.obstacle_skips += 1
-                self.obstacle_response('wait_then_skip')
-                self.log_row(f'wp:{label}', 'obstacle', f'blocked {self.g("obstacle_max_wait_s")} s without '
-                                                         f'progress: skipping this waypoint')
-                return 'skipped'                     # (costmaps NOT cleared: they still hold the obstacle)
+            if res == 'obstacle' or (res in ('timeout', 'failed') and self.obstacle_seen_recently(5.0)):
+                # blocked for obstacle_max_wait_s (or the goal ran out while an obstacle was in the way)
+                if self.can_switch_path():
+                    self.obstacle_response('switch_to_path1')
+                    self.log_row(f'wp:{label}', 'obstacle', 'blocked: switching to path1 (alternative available)')
+                    raise SwitchToPath1()
+                self.obstacle_response('wait')
+                self.log_row(f'wp:{label}', 'obstacle', 'blocked, no alternative here: waiting and re-checking')
+                continue                             # keep waiting (soft deadline -> deposit if time runs out)
             if res == 'blocked' and replans < int(self.g('max_replans')):
                 replans += 1
                 self.stop_since = None
@@ -465,6 +473,12 @@ class CompetitionMission(Node):
             if action == 'skip':
                 return 'skipped'
             self.clear_costmaps()
+
+    def can_switch_path(self):
+        """An alternative route exists: still on the way to the junction / gate check, or on path2."""
+        if not self.g('obstacle_switch_path'):
+            return False
+        return core.path_switch_possible(self.state, self.current_path)
 
     def run_names(self, names, timeout=None):
         results = []
@@ -602,13 +616,11 @@ class CompetitionMission(Node):
 
     def do_go_path(self):
         first = 'path2' if self.gate_decision == 'path2' else 'path1'
-        skips = self.obstacle_skips
+        self.current_path = first
         r = self.run_names(self.seqs.get(first, []))
-        if first == 'path2' and (r == 'skipped' or self.obstacle_skips > skips):
-            # Path 2 unusable (failed, or blocked by an obstacle for obstacle_max_wait_s): take Path 1 (always open)
-            self.log_row('GO_PATH', 'path2 blocked/failed, switching to path1')
-            if self.obstacle_skips > skips:
-                self.event('obstacle_response', action='switch_to_path1')
+        if first == 'path2' and r == 'skipped':                     # Path 2 unusable: take Path 1 (always open)
+            self.log_row('GO_PATH', 'path2 failed, switching to path1')
+            self.current_path = 'path1'
             r = self.run_names(self.seqs.get('path1', []))
             return f'path2->path1:{r}'
         return f'{first}:{r}'
@@ -655,6 +667,12 @@ class CompetitionMission(Node):
                 except DeadlineHit:
                     self.log_row(state, 'deadline', f'limit {self.g("mission_time_limit_s")}s')
                     state = core.state_after_deadline(state)
+                except SwitchToPath1:
+                    if state in ('JUNCTION', 'GATE_DECISION') and not self.gate_decision:
+                        self.event('gate_decision', decision='path1', wait_s=0.0, reason='obstacle before the gate')
+                    self.gate_decision = 'path1'
+                    self.log_row(state, 'switch_to_path1', 'obstacle')
+                    state = 'GO_PATH'
                 except SkipToDeposit:
                     left = self.deadline.remaining(self.now())
                     self.log_row(state, 'skip_to_deposit', f'{left:.0f} s left < deposit_reserve_s '

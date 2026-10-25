@@ -208,3 +208,16 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
       Fixed: /etc/chrony/conf.d/hardleel.conf += `makestep 1 -1` and NTP by IP (162.159.200.1/.123) -> synced;
       up.ps1 now sends the laptop time in the same ssh session right after login (works offline, ~0.1-0.2 s).
       (Enabling the Windows NTP server was blocked by the permission system - not done.)
+- [x] 25 Oct ~21:10 obstacle passing (code; sim tests pending/in background):
+      Log analysis of the gate-closed run (no bag had been recorded): the 40 s stall = planner OK through inflated
+      cells, RPP "collision ahead" (0.17 m circle too fat) + progress-checker/BT clears + the 30 s goal timeout;
+      the collision monitor only slowed down; cells cleared right after the worker left.
+      Changes: mission BT without spin (clear + wait 1 s + recheck, replan 2 Hz); footprint 0.28 x 0.27 rectangle,
+      inflation 0.30 / scaling 6, global costmap 2 Hz, raytrace 4 m; progress checker 0.25 m / 6 s;
+      map_freezer -> /map_nav: frozen at /mission/start with FREE-STANDING BLOBS REMOVED (workers are moved between
+      scans - a worker from the phase-1 scan must not become a wall; the mission's obstacle check uses /map_nav too);
+      obstacle policy: blocked 10 s -> path1 only where an alternative exists (to the junction/gate check, on path2),
+      otherwise keep waiting + re-checking (soft deadline still sends it to deposit).
+      SAFETY FIX: sim scripts used `pkill -f "ros2 launch"` (would kill the real robot stack in the same distro) and
+      hw_sim_suite deleted ~/hardleel_bags/mapping_* (it deleted the 14:35 real static-check bag). Now: kill only
+      ROS_DOMAIN_ID=42 processes (kill_domain.sh), sim bags in ~/hardleel_bags_sim, nice 19.

@@ -108,6 +108,9 @@ def cartographer(localization=False, pbstream='', use_sim_time=False, initial_po
         Node(package='cartographer_ros', executable='cartographer_occupancy_grid_node',
              name='occupancy_grid_node', output='screen', parameters=[{'use_sim_time': use_sim_time}],
              arguments=['-resolution', '0.05', '-publish_period_sec', '0.5']),
+        # /map -> /map_nav for Nav2's global costmap, frozen at /mission/start (no ghost obstacles)
+        Node(package='robot_slam', executable='map_freezer', name='map_freezer', output='log',
+             parameters=[{'use_sim_time': use_sim_time}]),
     ]
     if localization:
         import math
@@ -221,7 +224,11 @@ def nav2_nodes(nav2_params, use_sim_time=False):
             'planner_server': 'nav2_planner', 'behavior_server': 'nav2_behaviors',
             'bt_navigator': 'nav2_bt_navigator', 'waypoint_follower': 'nav2_waypoint_follower'}
     sim = {'use_sim_time': use_sim_time}
-    nodes = [Node(package=pkgs[n], executable=n, name=n, output='screen', parameters=[nav2_params, sim],
+    extra = {n: {} for n in nav_names}
+    if os.environ.get('ROS_DISTRO', 'jazzy') != 'humble':      # BT.CPP v4 tree; Humble keeps the default one
+        extra['bt_navigator'] = {'default_nav_to_pose_bt_xml':
+                                 os.path.join(pkg_share(), 'config', 'bt_mission_nav_to_pose.xml')}
+    nodes = [Node(package=pkgs[n], executable=n, name=n, output='screen', parameters=[nav2_params, sim, extra[n]],
                   remappings=TF_REMAP + remaps.get(n, [])) for n in nav_names]
     nodes.append(Node(package='nav2_lifecycle_manager', executable='lifecycle_manager',
                       name='lifecycle_manager_navigation', output='screen',
