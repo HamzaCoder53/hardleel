@@ -66,7 +66,7 @@ class ImuSerialNode(Node):
         self.declare_parameter('gyro_calib_s', 3.0)   # keep the robot still this long at startup
         self.declare_parameter('gyro_deadband_dps', 0.3)  # ignore yaw rates smaller than this
         # still robot measured 22 Oct: gyro std ~0.02 deg/s; limits are generous PLACEHOLDERs
-        self.declare_parameter('calib_gyro_std_max_dps', 0.3)
+        self.declare_parameter('calib_gyro_std_max_dps', 1.0)   # still robot 25 Oct (lidar spinning): 0.39
         self.declare_parameter('calib_accel_std_max_g', 0.02)
         self.declare_parameter('calib_max_attempts', 5)
 
