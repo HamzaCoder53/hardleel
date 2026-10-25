@@ -1,7 +1,8 @@
 # COLD START, laptop side - the ONE command after a laptop reboot and/or a Pi power-cycle.
-# Run in an ADMIN PowerShell from the repo folder (Documents\hardleel-pi-repo):
+# Run in an ADMIN PowerShell from the repo folder (Documents\hardleel-pi-repo\.claude\worktrees\mission-m1):
 #     powershell -ExecutionPolicy Bypass -File scripts\laptop\up.ps1            # phase 1 (mapping) windows
 #     powershell -ExecutionPolicy Bypass -File scripts\laptop\up.ps1 -NoPi       # Pi already running
+#     ... -NoPi -CheckOnly    steps 1-5 only, no windows (tested 25 Oct 16:08: Pi found, proxy, topics OK)
 # Steps: 1 hotspot check  2 find the Pi  3 port proxy + firewall (re)pointed at the Pi  4 start the Pi drivers
 #        (robot must stand STILL for 5 s after this: IMU calibration)  5 WSL check  6 open the mapping + teleop
 #        windows (Jazzy distro). The Pi asks for its password unless an ssh key is set up (RUNBOOK).

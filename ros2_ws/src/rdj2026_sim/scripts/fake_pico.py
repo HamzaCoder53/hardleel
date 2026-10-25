@@ -30,7 +30,7 @@ class FakePico(Node):
         self.link = p('port', '/tmp/fake_pico').value
         self.db_l, self.db_r = float(p('deadband_left', 60.0).value), float(p('deadband_right', 70.0).value)
         self.v_max = float(p('v_max', 0.9).value)          # m/s at PWM 255
-        self.track = float(p('track', 0.20).value)
+        self.track = float(p('track', 0.50).value)          # EFFECTIVE track: skid steer turns much less than the 0.2 m geometry
         self.zone = list(p('slow_zone', [-1.0, -1.0, -1.0, -1.0]).value)   # world x0 y0 x1 y1 (sim frame)
         self.slow = float(p('slow_factor', 0.6).value)
         self.invert_linear = bool(p('invert_linear', True).value)

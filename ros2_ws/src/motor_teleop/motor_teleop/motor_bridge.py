@@ -100,9 +100,9 @@ class MotorBridge(Node):
         self.declare_parameter('allow_pwm_test', False)
         # feedback, OFF by default (only what was tested on the robot gets switched on)
         self.declare_parameter('yaw_feedback', False)
-        self.declare_parameter('yaw_kp', 0.6)          # extra rad/s command per rad/s of yaw-rate error
-        self.declare_parameter('yaw_ki', 0.8)
-        self.declare_parameter('yaw_i_max', 0.6)       # rad/s clamp on the integral term
+        self.declare_parameter('yaw_kp', 0.3)          # extra rad/s command per rad/s of yaw-rate error (sim-tuned)
+        self.declare_parameter('yaw_ki', 0.4)
+        self.declare_parameter('yaw_i_max', 1.5)       # rad/s clamp on the integral term
         self.declare_parameter('gyro_topic', '/imu/data_raw')
         self.declare_parameter('speed_scale_enabled', False)
 
