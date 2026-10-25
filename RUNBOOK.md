@@ -241,3 +241,18 @@ and the Pi join (no internet needed):
    the stop boxes become plain boxes, so in-place turns next to walls can be blocked - drive wider).
 6. Never run ROS on domain 7 in both distros at once: stop everything in Jazzy first (`wsl -t Ubuntu-24.04`).
 Switch back: `.wslconfig` -> `networkingMode=nat`, `wsl --shutdown`, Pi `./robot_hw.sh` (zenoh), Jazzy distro.
+
+---
+
+## 8. New features (all OFF by default — switch on only what passed TEST_TONIGHT step 6)
+
+| Feature | How to switch it on |
+|---|---|
+| Gyro yaw-rate feedback (Pi) | `~/robot_hw.sh yaw_feedback:=true` (or live: `ros2 param set /motor_bridge yaw_feedback true`) |
+| Speed feedback from the Cartographer pose | `laptop_mission.launch.py ... speed_feedback:=true` |
+| Turn calibration at the start of the run | `laptop_mission.launch.py ... turn_calibration:=true` |
+| Autonomous mapping (frontier, stops < 165 s) | `laptop_mapping.launch.py mapping_mode:=auto` [+ `auto_calibrate:=true`], then `laptop_mission.launch.py ... nav2:=false` |
+| Motor deadband compensation | `ros2 run motor_teleop deadband_calibrate` (wheels in the air), then copy `~/hardleel_ws/motor_calib.yaml` to the Pi (TEST_TONIGHT 1h). Values 0 = off. |
+| Speed fit from a mapping bag | `ros2 run motor_teleop fit_speed_from_bag ~/hardleel_bags/<mapping_...> --apply` |
+Commanded PWM is never used as odometry: Cartographer runs on lidar + IMU only.
+Ramps: their sides are invisible to the 15 cm lidar plane, so place waypoints so the robot meets a ramp end-on.
