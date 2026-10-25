@@ -167,3 +167,19 @@ Step 1.
       motor_calibrator, fit_speed_from_bag written (Sonnet). Not deployed to the Pi; sim test via fake_pico next.
 - [ ] B6 new design (switches off): frontier explorer written (8 tests) not wired/sim-tested; yaw feedback in
       motor_bridge (off); speed_governor not written yet.
+
+## 25 Oct ~17:25 status (session ended on the usage limit)
+- [x] Items 1-6 built, sim-tested, committed. TEST_TONIGHT.md + RUNBOOK sections 0/7/8 written.
+- [x] Pi deployed 16:48 with the final motor_bridge/pi_bringup (defaults: deadband 0, all new switches off).
+- [x] Lidar checked with the user's hand: NOT mirrored, no yaw offset.
+- [x] REAL COURSE from the team map (maps/course_reference.*, robot faces EAST = screen wall at the start):
+      sim world worlds/course.sdf; waypoints_course.yaml (also copied to ~/hardleel_ws/waypoints/).
+      Rehearsal (auto mapping 23 s, then mission): ALL stages OK, gate open -> path2, 139 s (docs/sim_runs/course3).
+- [ ] OPEN 1: gate_closed + worker run (docs/sim_runs/course4): worker blocked the bottom corridor ~60 s, robot
+      waited (no collision), terrain_4 skipped, deadline hit before the gate decision -> no deposit. Fine as a
+      worst case, but: obstacle_detected NOT logged on the course map (investigate obstacle_watch vs the course
+      map; possibly the worker cell is 'unknown' in the frozen map). Re-run gate_closed WITHOUT a worker to check
+      the 15 s wait -> path1 branch.
+- [ ] OPEN 2: final regression sim run on rdj2026 world after the start-nudge change (course runs passed).
+- [ ] User to confirm: dock -> class (E2/E3/E4), bins and finish positions; gate waiting time from the organisers.
+Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now restarts the laptop router).

@@ -82,7 +82,8 @@ Do these only after 0-5 pass. After each, switch it OFF again unless it clearly 
 | Auto speed calibration | `mapping_mode:=auto auto_calibrate:=true` | a short straight drive before exploring, `max_speed` saved |
 
 ## Decide for tomorrow (write it in PROGRESS.md)
-- Which waypoint draft: at the start pad facing the field, is the loading room on your LEFT
-  (`waypoints_course.yaml`) or RIGHT (`waypoints_course_mirror.yaml`)? Re-click on tomorrow's map anyway.
+- Course waypoints: `~/hardleel_ws/waypoints/waypoints_course.yaml` now comes from YOUR map (start facing the
+  screen wall). Still to confirm: which dock (E2/E3/E4) is plastic/metal/organic, where the bins and the finish
+  are. Re-click on tomorrow's phase-1 map anyway (`click_waypoints`, < 2 min).
 - Deadband values kept? Which optional features passed (default: none ON)?
 - Organisers: gate waiting time -> `gate_max_wait_s`; loading protocol; fabric class; robot ID; data format.
