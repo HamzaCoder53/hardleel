@@ -201,3 +201,10 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
         open now; any stage before DEPOSIT with < deposit_reserve_s (35 s) left -> skip to DEPOSIT + FINISH.
       4 gate_max_wait_s 5.0.
       112 unit tests pass. NEXT (after the user's robot test): sim course gate_closed with and without a worker.
+- [x] 25 Oct ~20:55: Pi back on the hotspot (laptop hotspot "burhan" was OFF; turned on via the tethering API).
+      Pi got a NEW IP 192.168.137.237 (up.ps1 finds it by name/MAC). Deployed latest code (Pico servo changes).
+      USB devices NOT plugged in (no /dev/serial/by-id) -> drivers not started.
+      Pi CLOCK was 13 days behind (no RTC, chrony found no sources: the hotspot gives the Pi NO DNS).
+      Fixed: /etc/chrony/conf.d/hardleel.conf += `makestep 1 -1` and NTP by IP (162.159.200.1/.123) -> synced;
+      up.ps1 now sends the laptop time in the same ssh session right after login (works offline, ~0.1-0.2 s).
+      (Enabling the Windows NTP server was blocked by the permission system - not done.)

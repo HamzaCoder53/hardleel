@@ -39,9 +39,33 @@ if (-not (Get-NetFirewallRule -DisplayName "hardleel zenoh from WSL" -ErrorActio
 if ((Get-Service iphlpsvc).Status -ne "Running") { Start-Service iphlpsvc }
 
 # 4. Pi drivers (zenoh router + lidar + pi_bringup in tmux "hw")
+#    The Pi has no RTC and the hotspot gives it no DNS: after a power-cycle its clock can be days off, which
+#    breaks every sensor timestamp. So the laptop's time is sent in the SAME ssh session, right after login
+#    (the Pi prints READY, we answer with the current epoch to the ms), then the drivers start.
+function Start-PiWithTime($target, $cmd) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = 'ssh'
+    $psi.Arguments = "-o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new $target `"$cmd`""
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $p = [System.Diagnostics.Process]::Start($psi)      # the password prompt still comes up in this console
+    while (-not $p.StandardOutput.EndOfStream) {
+        $line = $p.StandardOutput.ReadLine()
+        if ($line -eq 'READY') {
+            $ep = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0
+            # plain ASCII bytes: WriteLine() would add a BOM / CR that `date` rejects (tested 25 Oct)
+            $b = [Text.Encoding]::ASCII.GetBytes($ep.ToString([Globalization.CultureInfo]::InvariantCulture) + "`n")
+            $p.StandardInput.BaseStream.Write($b, 0, $b.Length)
+            $p.StandardInput.BaseStream.Flush()
+            $p.StandardInput.Close()
+        } else { Write-Host "  pi: $line" }
+    }
+    $p.WaitForExit()
+}
 if (-not $NoPi) {
-    Say "4/6 starting the Pi drivers - DO NOT TOUCH THE ROBOT for 5 s after this (IMU calibration)"
-    ssh -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new "$PiUser@$PiIp" "bash ~/robot_hw.sh"
+    Say "4/6 setting the Pi clock + starting the Pi drivers - DO NOT TOUCH THE ROBOT for 5 s after this (IMU calibration)"
+    Start-PiWithTime "$PiUser@$PiIp" 'echo READY; read EP; EP=$(printf %s \"$EP\" | tr -cd 0-9.); sudo -n date -u -s @$EP >/dev/null && echo clock set: $(date); bash ~/robot_hw.sh'
 } else { Say "4/6 Pi: skipped (-NoPi)" }
 
 # 5. WSL: the laptop router is started by ros_env.sh; check that the Pi topics arrive
