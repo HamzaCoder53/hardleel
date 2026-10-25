@@ -37,6 +37,17 @@ Living handoff file. A fresh Claude Code session should read this first, then `T
 - [ ] First end-to-end sim run (stub classifier)
 - [ ] Office test
 
+## Findings (25 Oct ~12:50)
+- Main checkout's uncommitted work: 22 of 26 files are byte-identical in feat/mission-m1; the other 4
+  (TODO.md, robot_slam/package.xml, setup.py, stack_common.py) are older versions that mission-m1 supersedes.
+  The Pi runs mission-m1's versions of everything except those 3 robot_slam files (it has main's older copies).
+  Nothing needed to be carried over. User made a full copy: `Documents\hardleel-pi-repo-backup-25oct`.
+- Course scans: NO rosbags of the course exist (repo `bags/` empty, none on the Pi). Only Cartographer pbstreams
+  on the Pi `~/maps/`: track_20261015_1232 (course-shaped, ~35 deg drift, doubled walls), track_20261022_1644
+  (~5 x 5 m, clean-ish), track_20261022_1648_final (fragments spread over 18 x 39 m, unusable). WSL
+  `~/map_rebuild/scans_bag` (16 Oct) holds thinned scans extracted from the 15 Oct pbstream (no IMU).
+  Each map's origin is wherever that run started; whether that was the official start spot is user knowledge.
+
 ## Open questions for the user
 - Robot ID; camera rotation/cable status; saved course scans (path, format, start spot?); servo pins.
 
