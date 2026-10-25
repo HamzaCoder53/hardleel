@@ -1,25 +1,43 @@
-# competition_mission parameters. Waypoints come from competition_course.yaml (map frame, origin = start pose).
+# competition_mission parameters. Waypoints come from `waypoints_file` (laptop_mission.launch.py waypoints:=...),
+# map frame, origin = start pose. Every unknown from the rulebook is here, marked PLACEHOLDER.
 competition_mission:
   ros__parameters:
-    auto_start: false          # false: wait for std_msgs/Empty on /mission/start
-    course_file: ''            # '' = <share>/config/competition_course.yaml
+    auto_start: false          # false: wait for std_msgs/Empty on /mission/start (scripts/laptop/go.sh)
     mission_time_limit_s: 175.0   # hard global deadline; rulebook limit is 180 s
     finish_grace_s: 10.0       # extra time for the finish goal after the deadline
     goal_timeout_s: 45.0       # per Nav2 goal
-    max_retries: 1             # retries per goal after ClearEntireCostmap, then skip the waypoint
+    max_retries: 1             # retries per goal after clearing costmaps, then skip the waypoint
+    # classification
     classify_retries: 2        # extra /classify attempts (with a small yaw wiggle in between)
     classify_timeout_s: 8.0
     reposition_yaw_deg: 8.0
     default_class: plastic     # fallback when the classifier stays 'unknown'
-    bay_plastic: blue          # class -> bay colour (rulebook brief; Figure 6 may differ - verify)
+    stub_class: ''             # set by laptop_mission classifier:=stub
+    bay_plastic: blue          # class -> bin colour (rulebook)
     bay_organic: white
     bay_metal: black
-    load_wait_s: 6.0           # PLACEHOLDER: organisers' loading protocol unknown; or send /loading/done
-    deposit_wait_s: 3.0        # PLACEHOLDER: deposit actuator; /deposit/trigger is published
-    gate_wait_s: 15.0          # PLACEHOLDER: rulebook "standard waiting time" unknown
-    gate_stable_s: 0.8         # gate region must stay clear this long to count as open
-    gate_max_range_m: 0.9      # /scan returns closer than this inside the cone mean 'closed'
-    gate_half_angle_deg: 20.0
+    # loading
+    loading_adapter: stub      # PLACEHOLDER: organisers' loading protocol unknown (see loading_adapters.py)
+    load_wait_s: 6.0           # stub: wait this long, or until /loading/done
+    # deposit
+    has_drop_bin: false        # the drop bin is not mounted yet; true -> call drop_service at the bin
+    drop_service: /dump
+    drop_timeout_s: 8.0
+    bin_pause_s: 2.0           # pause at the bin when has_drop_bin is false
+    # gate (robot stands at gate_check facing the gate)
+    gate_max_wait_s: 15.0      # PLACEHOLDER: rulebook "standard waiting time" not announced yet
+    gate_center_deg: 0.0       # sector centre in the laser frame, 0 = straight ahead
+    gate_half_width_deg: 10.0
+    gate_open_threshold_m: 1.0 # PLACEHOLDER: median range above this = open (measure: closed gate distance + margin)
+    gate_open_confirm_n: 3     # consecutive open polls needed
+    gate_poll_hz: 5.0
+    # obstacles
+    obstacle_wait_s: 3.0       # stopped by the collision monitor this long -> cancel + re-send the goal (replan)
+    max_replans: 2             # per goal, then it counts as a failure (retry/skip policy)
+    obstacle_range_m: 0.8      # unexpected-obstacle detection (lidar points not in /map) ahead within this range
+    obstacle_half_angle_deg: 35.0
+    obstacle_min_points: 4
+    # speeds
     mission_speed: 0.30        # Nav2 /speed_limit, m/s
     terrain_speed: 0.15
     terrain_surface: ''        # e.g. SAND, published on /surface_override during TERRAIN; '' = off

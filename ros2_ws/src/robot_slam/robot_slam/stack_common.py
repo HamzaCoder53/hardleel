@@ -83,14 +83,17 @@ def imu_and_prep(imu_port):
     return [*imu_hw(imu_port), *sensor_prep()]
 
 
-def cartographer(localization=False, pbstream='', use_sim_time=False):
-    """Cartographer on /scan_filtered + /imu/data. Localization mode loads a frozen .pbstream."""
-    args = ['-configuration_directory', os.path.join(pkg_share(), 'config'),
-            '-configuration_basename',
-            'cartographer_2d_localization.lua' if localization else 'cartographer_2d.lua']
+def cartographer(localization=False, pbstream='', use_sim_time=False, initial_pose=(0.0, 0.0, 0.0)):
+    """Cartographer on /scan_filtered + /imu/data. Localization mode loads a frozen .pbstream and starts the
+    live trajectory AT `initial_pose` (x, y, yaw in the saved map; the start pose is (0, 0, 0) because mapping
+    began there), so it does not have to search the whole map to find itself."""
+    cfg = os.path.join(pkg_share(), 'config')
+    basename = 'cartographer_2d_localization.lua' if localization else 'cartographer_2d.lua'
+    args = ['-configuration_directory', cfg, '-configuration_basename', basename]
     if localization:
-        args += ['-load_state_filename', pbstream, '-load_frozen_state=true']
-    return [
+        args += ['-load_state_filename', pbstream, '-load_frozen_state=true',
+                 '-start_trajectory_with_default_topics=false']
+    nodes = [
         Node(package='cartographer_ros', executable='cartographer_node', name='cartographer_node',
              output='screen', parameters=[{'use_sim_time': use_sim_time}], arguments=args,
              remappings=[('scan', '/scan_filtered'), ('imu', '/imu/data')]),
@@ -98,6 +101,30 @@ def cartographer(localization=False, pbstream='', use_sim_time=False):
              name='occupancy_grid_node', output='screen', parameters=[{'use_sim_time': use_sim_time}],
              arguments=['-resolution', '0.05', '-publish_period_sec', '0.5']),
     ]
+    if localization:
+        import math
+        from launch.actions import ExecuteProcess, TimerAction
+        x, y, yaw = initial_pose
+        req = (f"{{configuration_directory: '{cfg}', configuration_basename: '{basename}', use_initial_pose: true, "
+               f"initial_pose: {{position: {{x: {x}, y: {y}, z: 0.0}}, orientation: {{x: 0.0, y: 0.0, "
+               f"z: {math.sin(yaw / 2)}, w: {math.cos(yaw / 2)}}}}}, relative_to_trajectory_id: 0}}")
+        nodes.append(TimerAction(period=4.0, actions=[ExecuteProcess(
+            cmd=['ros2', 'service', 'call', '/start_trajectory', 'cartographer_ros_msgs/srv/StartTrajectory', req],
+            output='screen')]))
+    return nodes
+
+
+def record_bag(bag_dir, name, topics=None):
+    """ros2 bag record (mcap) of everything needed to rebuild the map / tune offline."""
+    import time
+    topics = topics or ['/scan', '/scan_filtered', '/imu/data_raw', '/imu/data', '/imu/data_lpf', '/imu/calib_status',
+                        '/tf', '/tf_static', '/cmd_vel', '/cmd_vel_teleop', '/cmd_vel_nav', '/odom',
+                        '/mission/state', '/mission/event', '/collision_monitor_state', '/classifier/result']
+    from launch.actions import ExecuteProcess
+    bag_dir = os.path.expanduser(bag_dir)
+    os.makedirs(bag_dir, exist_ok=True)
+    out = os.path.join(bag_dir, time.strftime(f'{name}_%Y%m%d_%H%M%S'))
+    return [ExecuteProcess(cmd=['ros2', 'bag', 'record', '-s', 'mcap', '-o', out] + topics, output='log')]
 
 
 # Nav2 plugin names that Humble (Nav2 1.1) still spells with '/'; Jazzy uses '::'.
@@ -134,7 +161,12 @@ def nav2_params_for_distro(path, use_sim_time=False):
     params = fix(params)
     for section in params.values():
         if isinstance(section, dict) and isinstance(section.get('ros__parameters'), dict):
-            section['ros__parameters']['use_sim_time'] = use_sim_time
+            rp = section['ros__parameters']
+            rp['use_sim_time'] = use_sim_time
+            if distro == 'humble':                 # collision_monitor polygons: Humble wants a flat list
+                for v in rp.values():
+                    if isinstance(v, dict) and isinstance(v.get('points'), str):
+                        v['points'] = [float(c) for pt in yaml.safe_load(v['points']) for c in pt]
     out = tempfile.NamedTemporaryFile('w', prefix=f'{os.path.basename(path)[:-5]}_{distro}_', suffix='.yaml',
                                       delete=False)
     yaml.safe_dump(params, out)
@@ -143,10 +175,12 @@ def nav2_params_for_distro(path, use_sim_time=False):
 
 
 def safety_chain(profile, nav2_params, use_sim_time=False):
-    """twist_mux -> velocity_smoother -> collision_monitor (profile: 'mapping' | 'mission')."""
+    """twist_mux -> velocity_smoother -> collision_monitor. One monitor config for mapping and mission
+    (`profile` is kept for the older launch files and ignored): the node outlives the mapping phase."""
     cfg = os.path.join(pkg_share(), 'config')
-    monitor = f'collision_monitor_{profile}'
+    monitor = 'collision_monitor'
     sim = {'use_sim_time': use_sim_time}
+    monitor_params = nav2_params_for_distro(os.path.join(cfg, 'collision_monitor.yaml'), use_sim_time)
     return [
         Node(package='twist_mux', executable='twist_mux', name='twist_mux', output='screen',
              parameters=[os.path.join(cfg, 'twist_mux.yaml'), sim],
@@ -155,7 +189,7 @@ def safety_chain(profile, nav2_params, use_sim_time=False):
              output='screen', parameters=[nav2_params, sim],
              remappings=TF_REMAP + [('cmd_vel', 'cmd_vel_mux'), ('cmd_vel_smoothed', 'cmd_vel_smoothed')]),
         Node(package='nav2_collision_monitor', executable='collision_monitor', name=monitor, output='screen',
-             parameters=[os.path.join(cfg, 'collision_monitor.yaml'), sim], remappings=TF_REMAP),
+             parameters=[monitor_params, sim], remappings=TF_REMAP),
         Node(package='nav2_lifecycle_manager', executable='lifecycle_manager', name='lifecycle_manager_safety',
              output='screen',
              parameters=[{'autostart': True, 'node_names': ['velocity_smoother', monitor], **sim}]),

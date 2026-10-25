@@ -4,28 +4,38 @@
     WAIT_START -> GO_SCREEN -> CLASSIFY -> GO_LOADING -> LOAD -> TERRAIN -> OBSTACLES -> JUNCTION
     -> GATE_DECISION -> GO_PATH (Path 2 or Path 1) -> DEPOSIT -> FINISH -> DONE
 
-All decision logic lives in competition_core.py (pure Python, unit tested); this file only does the ROS I/O.
+Decision logic lives in competition_core.py / gate_check.py / obstacle_watch.py (pure Python, unit tested);
+this file only does the ROS I/O.
 
-Topics: in  /mission/start, /mission/abort, /loading/done (std_msgs/Empty), /scan
-        out /mission/state (String), /deposit/trigger (Empty), /speed_limit (nav2 SpeedLimit),
-            /surface_override (String, optional), /cmd_vel (zero on stop)
-Services: /classify (std_srvs/Trigger, answers 'class:conf:colour'); costmap clear services of Nav2.
-Log: ~/logs/mission_<timestamp>.csv, one row per finished state (rulebook section 8 event timestamps).
+Waypoints: `waypoints_file` (waypoints.py format, map frame, origin = start pose). Stages use the poses
+screen, loading_<class>, sequence terrain, sequence obstacles (optional), junction + gate_check, sequence
+path2 / path1, bin_<class>, finish.
 
-Rules of the run: a goal is retried once after clearing both costmaps, then skipped so that one failure does not
-end the run; after `mission_time_limit_s` the mission jumps to FINISH; /mission/abort stops everything at once.
+Topics: in  /mission/start, /mission/abort (std_msgs/Empty), /scan, /map, /collision_monitor_state
+        out /mission/state (String), /mission/event (String JSON -> event_logger), /speed_limit, /cmd_vel (stop)
+Services: /classify (std_srvs/Trigger 'class:conf:colour'), /dump (std_srvs/Trigger, only if has_drop_bin),
+          Nav2 costmap clearing.
+Log: ~/logs/mission_<timestamp>.csv, one row per waypoint/state (the event_logger writes the judges' file).
+
+Rules of the run: every goal has a timeout; a failed goal is retried once after clearing both costmaps, then
+skipped so one failure never ends the run. If the collision monitor holds the robot stopped for
+obstacle_wait_s, the goal is cancelled and re-sent (a replan around the obstacle, max_replans per goal).
+After mission_time_limit_s the mission jumps to FINISH; /mission/abort stops everything at once.
 """
+import json
 import math
 import os
 import time
 
+import numpy as np
 import rclpy
 from action_msgs.msg import GoalStatus
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped, Twist
 from nav2_msgs.action import NavigateToPose
-from nav2_msgs.msg import SpeedLimit
+from nav2_msgs.msg import CollisionMonitorState, SpeedLimit
 from nav2_msgs.srv import ClearEntireCostmap
+from nav_msgs.msg import OccupancyGrid
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -35,7 +45,16 @@ from std_srvs.srv import Trigger
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from robot_slam import competition_core as core
-from robot_slam.coverage_mission import yaw_to_quat
+from robot_slam import gate_check
+from robot_slam import obstacle_watch
+from robot_slam import waypoints as wp
+from robot_slam.loading_adapters import make_loading_adapter
+
+MONITOR_ACTIONS = {1: 'stop', 2: 'slowdown', 3: 'approach', 4: 'limit'}
+
+
+def yaw_to_quat(yaw):
+    return math.sin(yaw / 2.0), math.cos(yaw / 2.0)
 
 
 class Aborted(Exception):
@@ -51,33 +70,50 @@ class CompetitionMission(Node):
         super().__init__('competition_mission')
         p = self.declare_parameter
         p('auto_start', False)
-        p('course_file', '')                       # '' = <share>/config/competition_course.yaml
+        p('waypoints_file', '')                    # '' or missing = <share>/config/waypoints_course.yaml
         p('mission_time_limit_s', 175.0)
-        p('finish_grace_s', 10.0)                  # time allowed for the finish goal after the deadline
+        p('finish_grace_s', 10.0)
         p('goal_timeout_s', 45.0)
-        p('max_retries', 1)                        # retries per goal after ClearEntireCostmap
+        p('max_retries', 1)
         p('classify_retries', 2)
         p('classify_timeout_s', 8.0)
-        p('reposition_yaw_deg', 8.0)               # yaw wiggle at the screen between classify attempts
-        p('default_class', 'plastic')              # used when /classify never gives a usable answer
+        p('reposition_yaw_deg', 8.0)
+        p('default_class', 'plastic')
+        p('stub_class', '')                        # non-empty: skip /classify (sim / no camera)
         p('bay_plastic', 'blue'); p('bay_organic', 'white'); p('bay_metal', 'black')
-        p('load_wait_s', 6.0)                      # PLACEHOLDER loading protocol
-        p('deposit_wait_s', 3.0)                   # PLACEHOLDER deposit actuator
-        p('gate_wait_s', 15.0)                     # PLACEHOLDER: the rulebook "standard waiting time" is unknown
-        p('gate_stable_s', 0.8)
-        p('gate_max_range_m', 0.9)
-        p('gate_half_angle_deg', 20.0)
+        p('loading_adapter', 'stub')
+        p('load_wait_s', 6.0)
+        p('has_drop_bin', False)
+        p('drop_service', '/dump')
+        p('drop_timeout_s', 8.0)
+        p('bin_pause_s', 2.0)                      # pause at the bin when there is nothing to drop
+        p('gate_max_wait_s', 15.0)                 # PLACEHOLDER: rulebook "standard waiting time" unknown
+        p('gate_center_deg', 0.0)                  # sector centre in the laser frame (0 = straight ahead)
+        p('gate_half_width_deg', 10.0)
+        p('gate_open_threshold_m', 1.0)            # median range above this = open
+        p('gate_open_confirm_n', 3)
+        p('gate_poll_hz', 5.0)
+        p('obstacle_wait_s', 3.0)                  # held stopped this long -> cancel + re-send (replan)
+        p('max_replans', 2)
+        p('obstacle_range_m', 0.8)
+        p('obstacle_half_angle_deg', 35.0)
+        p('obstacle_min_points', 4)
         p('mission_speed', 0.30)
         p('terrain_speed', 0.15)
-        p('terrain_surface', '')                   # e.g. SAND; '' = do not publish /surface_override
+        p('terrain_surface', '')
         p('cmd_vel_topic', '/cmd_vel')
         p('log_dir', '~/logs')
         g = lambda n: self.get_parameter(n).value
         self.g = g
 
-        course = str(g('course_file')) or os.path.join(
-            get_package_share_directory('robot_slam'), 'config', 'competition_course.yaml')
-        self.wps, self.stages = core.load_course(course)
+        path = os.path.expanduser(str(g('waypoints_file')))
+        if not path or not os.path.isfile(path):
+            fallback = os.path.join(get_package_share_directory('robot_slam'), 'config', 'waypoints_course.yaml')
+            self.get_logger().warn(f'waypoints file "{path}" not found, using packaged draft {fallback}')
+            path = fallback
+        self.poses, self.seqs, _meta = wp.load_waypoints(path)
+        for problem in wp.check_waypoints(self.poses, self.seqs):
+            self.get_logger().error(f'waypoints: {problem}')
         self.bay_map = {'plastic': str(g('bay_plastic')), 'organic': str(g('bay_organic')),
                         'metal': str(g('bay_metal'))}
 
@@ -85,69 +121,118 @@ class CompetitionMission(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.nav = ActionClient(self, NavigateToPose, 'navigate_to_pose')
         self.classify_cli = self.create_client(Trigger, 'classify')
+        self.drop_cli = self.create_client(Trigger, str(g('drop_service')))
         self.clear_srvs = [self.create_client(ClearEntireCostmap, n) for n in
                            ('/global_costmap/clear_entirely_global_costmap',
                             '/local_costmap/clear_entirely_local_costmap')]
         self.pub_state = self.create_publisher(String, '/mission/state', 10)
+        self.pub_event = self.create_publisher(String, '/mission/event', 50)
         self.pub_limit = self.create_publisher(SpeedLimit, 'speed_limit', 1)
         self.pub_surface = self.create_publisher(String, '/surface_override', 1)
-        self.pub_deposit = self.create_publisher(Empty, '/deposit/trigger', 1)
         self.pub_cmd = self.create_publisher(Twist, str(g('cmd_vel_topic')), 1)
         self.create_subscription(Empty, '/mission/start', lambda m: setattr(self, 'start_req', True), 1)
         self.create_subscription(Empty, '/mission/abort', self.on_abort, 10)
-        self.create_subscription(Empty, '/loading/done', lambda m: setattr(self, 'loading_done', True), 1)
         self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
+        self.create_subscription(OccupancyGrid, '/map', self.on_map, 1)
+        self.create_subscription(CollisionMonitorState, '/collision_monitor_state', self.on_monitor, 10)
         self.create_timer(1.0, lambda: self.publish_state())
+        self.loader = make_loading_adapter(str(g('loading_adapter')), self, {'load_wait_s': g('load_wait_s')})
 
         self.start_req = False
         self.abort_req = False
-        self.loading_done = False
         self.scan = None
+        self.grid = None
         self.state = 'WAIT_START'
         self.endgame = False
         self.deadline = None
-        self.waste_class, self.bay_colour = 'unknown', ''
+        self.waste_class, self.waste_conf, self.bay_colour = 'unknown', 0.0, ''
         self.gate_decision = ''
-        self.active_goal = None
+        # obstacle bookkeeping (first detection/response are the rulebook timestamps)
+        self.monitor_action, self.stop_since = 0, None
+        self.obst_detected_t, self.obst_responded = None, False
+        self.obst_clear_since = None
 
         log_dir = os.path.expanduser(str(g('log_dir')))
         os.makedirs(log_dir, exist_ok=True)
         self.log_path = os.path.join(log_dir, time.strftime('mission_%Y%m%d_%H%M%S.csv'))
         with open(self.log_path, 'w') as f:
             f.write('wall_time,ros_time_s,mission_t_s,state,result,x,y,yaw_deg,detail\n')
-        self.get_logger().info(f'{len(self.wps)} waypoints from {course}; log {self.log_path}')
+        self.get_logger().info(f'{len(self.poses)} poses from {path}; log {self.log_path}')
 
     # ----------------------------------------------------------------- helpers
     def now(self):
         return time.monotonic()
 
+    def running(self):
+        return self.deadline is not None and not self.endgame
+
+    def event(self, name, **detail):
+        self.pub_event.publish(String(data=json.dumps({'event': name, 'detail': detail})))
+        self.log_row(f'EVENT:{name}', 'event', json.dumps(detail).replace(',', ';'))
+
     def on_abort(self, _):
         self.get_logger().error('ABORT received')
         self.abort_req = True
 
+    def on_map(self, m):
+        self.grid = {'data': np.asarray(m.data, dtype=np.int16).reshape(m.info.height, m.info.width),
+                     'resolution': m.info.resolution,
+                     'origin_x': m.info.origin.position.x, 'origin_y': m.info.origin.position.y}
+
+    def on_monitor(self, m):
+        self.monitor_action = m.action_type
+        if m.action_type == 1:
+            if self.stop_since is None:
+                self.stop_since = self.now()
+        else:
+            self.stop_since = None
+        if m.action_type in MONITOR_ACTIONS and self.obst_detected_t is not None and not self.obst_responded:
+            self.obstacle_response(MONITOR_ACTIONS[m.action_type])
+
     def on_scan(self, m):
         self.scan = m
+        if not self.running() or self.grid is None:
+            return
+        pose = self.pose_in_map(m.header.frame_id or 'laser')
+        if pose is None:
+            return
+        n = obstacle_watch.unexpected_points(
+            m.ranges, m.angle_min, m.angle_increment, pose, self.grid, float(self.g('obstacle_range_m')),
+            math.radians(float(self.g('obstacle_half_angle_deg'))))
+        seen = n >= int(self.g('obstacle_min_points'))
+        if seen and self.obst_detected_t is None:
+            self.obst_detected_t = self.now()
+            self.event('obstacle_detected', points=n, state=self.state)
+        if self.obst_detected_t is not None and not self.obst_responded:
+            if seen:
+                self.obst_clear_since = None
+            else:
+                self.obst_clear_since = self.obst_clear_since or self.now()
+                if self.now() - self.obst_clear_since > 1.0:
+                    self.obstacle_response('avoided')          # Nav2 drove around it without a monitor action
+
+    def obstacle_response(self, action):
+        self.obst_responded = True
+        self.event('obstacle_response', action=action, response_s=round(self.now() - self.obst_detected_t, 2))
 
     def publish_state(self):
-        msg = String()
-        msg.data = self.state
-        self.pub_state.publish(msg)
+        self.pub_state.publish(String(data=self.state))
 
-    def pose_now(self):
+    def pose_in_map(self, frame='base_link'):
         try:
-            t = self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time())
+            t = self.tf_buffer.lookup_transform('map', frame, rclpy.time.Time())
         except TransformException:
-            return (float('nan'),) * 3
+            return None
         q = t.transform.rotation
         yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
-        return t.transform.translation.x, t.transform.translation.y, math.degrees(yaw)
+        return t.transform.translation.x, t.transform.translation.y, yaw
 
     def log_row(self, state, result, detail=''):
-        x, y, yaw = self.pose_now()
+        x, y, yaw = self.pose_in_map() or (float('nan'),) * 3
         mt = self.deadline.elapsed(self.now()) if self.deadline else 0.0
         with open(self.log_path, 'a') as f:
             f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S")},{self.get_clock().now().nanoseconds / 1e9:.3f},'
-                    f'{mt:.1f},{state},{result},{x:.3f},{y:.3f},{yaw:.1f},{detail}\n')
+                    f'{mt:.1f},{state},{result},{x:.3f},{y:.3f},{math.degrees(yaw):.1f},{detail}\n')
         self.get_logger().info(f'[{mt:6.1f}s] {state}: {result} {detail}')
 
     def enter(self, state):
@@ -197,9 +282,19 @@ class CompetitionMission(Node):
                 except DeadlineHit:
                     pass
 
+    def call_trigger(self, client, timeout):
+        """-> (ok, message); ok None when the service is missing or timed out."""
+        if not client.wait_for_service(timeout_sec=1.0):
+            return None, 'service missing'
+        fut = client.call_async(Trigger.Request())
+        if not self.wait(fut.done, timeout):
+            return None, 'timeout'
+        r = fut.result()
+        return r.success, r.message
+
     # ----------------------------------------------------------------- navigation
     def send_goal(self, pose, timeout):
-        """One NavigateToPose attempt -> 'ok' | 'failed' | 'timeout' | 'rejected'."""
+        """One NavigateToPose attempt -> 'ok' | 'failed' | 'timeout' | 'rejected' | 'blocked'."""
         goal = NavigateToPose.Goal()
         goal.pose = PoseStamped()
         goal.pose.header.frame_id = 'map'
@@ -207,6 +302,7 @@ class CompetitionMission(Node):
         goal.pose.pose.position.x, goal.pose.pose.position.y = float(pose[0]), float(pose[1])
         goal.pose.pose.orientation.z, goal.pose.pose.orientation.w = yaw_to_quat(pose[2])
         handle = None
+        wait_s = float(self.g('obstacle_wait_s'))
         try:
             if not self.wait(self.nav.server_is_ready, 5.0):
                 return 'rejected'
@@ -217,24 +313,35 @@ class CompetitionMission(Node):
             if handle is None or not handle.accepted:
                 return 'rejected'
             res = handle.get_result_async()
-            if not self.wait(res.done, timeout):
+            blocked = lambda: self.stop_since is not None and self.now() - self.stop_since > wait_s
+            if not self.wait(lambda: res.done() or blocked(), timeout):
                 return 'timeout'
+            if not res.done():
+                return 'blocked'                                    # held by the collision monitor too long
             handle = None                                           # finished by itself
             return 'ok' if res.result().status == GoalStatus.STATUS_SUCCEEDED else 'failed'
         finally:
-            if handle is not None:                                  # timeout, abort or deadline: cancel
+            if handle is not None:                                  # timeout, block, abort or deadline: cancel
                 handle.cancel_goal_async()
                 end = self.now() + 0.4
                 while self.now() < end and rclpy.ok():
                     rclpy.spin_once(self, timeout_sec=0.05)
 
     def navigate(self, pose, label, timeout=None):
-        """Goal with retry (after clearing costmaps) and skip -> 'ok' | 'skipped'."""
+        """Goal with obstacle replans, then retry (after clearing costmaps) and skip -> 'ok' | 'skipped'."""
         policy = core.GoalPolicy(int(self.g('max_retries')))
         timeout = float(self.g('goal_timeout_s')) if timeout is None else timeout
+        replans = 0
         while True:
             res = self.send_goal(pose, timeout)
-            action = policy.on_result(res)
+            if res == 'blocked' and replans < int(self.g('max_replans')):
+                replans += 1
+                self.stop_since = None
+                if self.obst_detected_t is not None and not self.obst_responded:
+                    self.obstacle_response('replan')
+                self.log_row(f'wp:{label}', 'blocked', f'waited {self.g("obstacle_wait_s")} s, replan {replans}')
+                continue
+            action = policy.on_result('failed' if res == 'blocked' else res)
             if action == 'done':
                 return 'ok'
             self.get_logger().warn(f'{label}: {res} (attempt {policy.attempts}) -> {action}')
@@ -242,10 +349,14 @@ class CompetitionMission(Node):
                 return 'skipped'
             self.clear_costmaps()
 
-    def run_stage(self, stage, timeout=None):
+    def run_names(self, names, timeout=None):
         results = []
-        for name in self.stages.get(stage, []):
-            r = self.navigate(self.wps[name], name, timeout)
+        for name in names:
+            if name not in self.poses:
+                self.log_row(f'wp:{name}', 'missing')
+                results.append('skipped')
+                continue
+            r = self.navigate(self.poses[name], name, timeout)
             results.append(r)
             self.log_row(f'wp:{name}', r)
         return core.stage_result(results)
@@ -257,99 +368,113 @@ class CompetitionMission(Node):
         if not self.g('auto_start'):
             self.wait(lambda: self.start_req)
         self.deadline = core.Deadline(self.now(), float(self.g('mission_time_limit_s')))
-        self.log_row('START', 'autonomous start')
+        self.event('autonomous_start')
         return 'started'
 
     def do_go_screen(self):
         self.set_speed(self.g('mission_speed'))
-        return self.run_stage('screen')
+        return self.run_names(['screen'])
 
     def do_classify(self):
+        stub = str(self.g('stub_class'))
+        if stub:
+            self.waste_class, self.waste_conf = stub, 1.0
+            self.event('waste_detected', **{'class': stub, 'confidence': 1.0, 'source': 'stub'})
+            return 'stub'
         n = int(self.g('classify_retries'))
-        base = self.wps[self.stages['screen'][-1]]
+        base = self.poses['screen']
         for k in range(n + 1):
-            if not self.classify_cli.wait_for_service(timeout_sec=1.0):
-                detail = 'service missing'
-            else:
-                fut = self.classify_cli.call_async(Trigger.Request())
-                if self.wait(fut.done, float(self.g('classify_timeout_s'))):
-                    cls, conf, colour = core.parse_classify(fut.result().message)
-                    detail = f'{cls}:{conf:.2f}:{colour}'
-                    if core.usable_class(cls):
-                        self.waste_class = cls
-                        self.log_row('CLASSIFY_TRY', 'ok', detail)
-                        return 'ok'
-                else:
-                    detail = 'timeout'
-            self.log_row('CLASSIFY_TRY', 'unusable', f'{k + 1}/{n + 1} {detail}')
+            ok, msg = self.call_trigger(self.classify_cli, float(self.g('classify_timeout_s')))
+            cls, conf, colour = core.parse_classify(msg) if ok else ('unknown', 0.0, '')
+            if core.usable_class(cls):
+                self.waste_class, self.waste_conf = cls, conf
+                self.event('waste_detected', **{'class': cls, 'confidence': round(conf, 3), 'attempt': k + 1})
+                return 'ok'
+            self.log_row('CLASSIFY_TRY', 'unusable', f'{k + 1}/{n + 1} {msg}')
             if k < n:                                              # small reposition: wiggle the heading
                 sign = 1 if k % 2 == 0 else -1
                 dyaw = math.radians(float(self.g('reposition_yaw_deg'))) * sign
                 self.navigate((base[0], base[1], base[2] + dyaw), 'reposition', 15.0)
-        self.waste_class = str(self.g('default_class'))
+        self.waste_class, self.waste_conf = str(self.g('default_class')), 0.0
+        self.event('waste_detected', **{'class': self.waste_class, 'confidence': 0.0, 'source': 'default'})
         return 'default_class'
 
     def do_go_loading(self):
-        return self.run_stage('loading')
+        return self.run_names([f'loading_{self.waste_class}'])
 
     def do_load(self):
-        """PLACEHOLDER loading protocol: wait load_wait_s or until /loading/done."""
-        self.loading_done = False
-        done = self.wait(lambda: self.loading_done, float(self.g('load_wait_s')))
-        return 'done' if done else 'waited'
+        result, detail = self.loader.run()
+        self.event('loading_complete', result=result, detail=detail)
+        return result
 
     def do_terrain(self):
         self.set_speed(self.g('terrain_speed'))
         self.set_surface(str(self.g('terrain_surface')))
-        return self.run_stage('terrain')
+        r = self.run_names(self.seqs.get('terrain', []))
+        self.event('terrain_complete', result=r)
+        return r
 
     def do_obstacles(self):
         self.set_speed(self.g('mission_speed'))
         if self.g('terrain_surface'):
             self.set_surface('AUTO')
-        return self.run_stage('obstacles')
+        return self.run_names(self.seqs.get('obstacles', []))
 
     def do_junction(self):
-        return self.run_stage('junction')
+        return self.run_names(['junction', 'gate_check'])
 
-    def gate_free_now(self):
+    def gate_median(self):
         s = self.scan
         if s is None:
             return None
-        return core.gate_region_free(s.ranges, s.angle_min, s.angle_increment, float(self.g('gate_max_range_m')),
-                                     math.radians(float(self.g('gate_half_angle_deg'))), max(s.range_min, 0.12))
+        return gate_check.sector_median(s.ranges, s.angle_min, s.angle_increment, float(self.g('gate_center_deg')),
+                                        float(self.g('gate_half_width_deg')), max(s.range_min, 0.12),
+                                        min(s.range_max, 12.0))
 
     def do_gate_decision(self):
-        d = core.GateDecider(self.now(), float(self.g('gate_wait_s')), float(self.g('gate_stable_s')))
-        self.wait(lambda: d.update(self.now(), self.gate_free_now()) is not None)
-        self.gate_decision = d.decision
-        return d.decision
+        poller = gate_check.GatePoller(self.now(), float(self.g('gate_max_wait_s')),
+                                       float(self.g('gate_open_threshold_m')), int(self.g('gate_open_confirm_n')))
+        period = 1.0 / max(float(self.g('gate_poll_hz')), 0.5)
+        decision = None
+        while decision is None:
+            decision = poller.update(self.now(), self.gate_median())
+            if decision is None:
+                self.pause(period)
+        self.gate_decision, wait_s = decision
+        self.event('gate_decision', decision=self.gate_decision, wait_s=round(wait_s, 2),
+                   last_median_m=None if poller.last_median is None else round(poller.last_median, 2))
+        return self.gate_decision
 
     def do_go_path(self):
-        first = 'gate_path2' if self.gate_decision == 'path2' else 'path1_detour'
-        r = self.run_stage(first)
-        if r == 'skipped' and first == 'gate_path2':               # Path 2 unusable: fall back to the open path
+        first = 'path2' if self.gate_decision == 'path2' else 'path1'
+        r = self.run_names(self.seqs.get(first, []))
+        if r == 'skipped' and first == 'path2':                     # Path 2 unusable: fall back to the open path
             self.log_row('GO_PATH', 'path2 failed, trying path1')
-            r = self.run_stage('path1_detour')
+            r = self.run_names(self.seqs.get('path1', []))
         return f'{first}:{r}'
 
     def do_deposit(self):
-        bay = core.bay_for_class(self.waste_class, self.bay_map, str(self.g('default_class')))
-        self.bay_colour = bay
-        r = self.run_stage(core.bay_stage(bay))
-        if r == 'skipped':
-            return f'bay_{bay}:not_reached'
-        self.pub_deposit.publish(Empty())                           # PLACEHOLDER deposit actuator hook
-        self.pause(float(self.g('deposit_wait_s')))
-        return f'bay_{bay}:{r}'
+        self.bay_colour = core.bay_for_class(self.waste_class, self.bay_map, str(self.g('default_class')))
+        name = f'bin_{self.waste_class}' if f'bin_{self.waste_class}' in self.poses else \
+            f'bin_{self.g("default_class")}'
+        r = self.run_names([name])
+        dropped, msg = False, 'no drop bin'
+        if self.g('has_drop_bin'):
+            ok, msg = self.call_trigger(self.drop_cli, float(self.g('drop_timeout_s')))
+            dropped = bool(ok)
+        else:
+            self.pause(float(self.g('bin_pause_s')))
+        self.event('deposit_complete', bin=name, colour=self.bay_colour, reached=r, dropped=dropped, detail=msg)
+        return f'{name}:{r}:{"dropped" if dropped else msg}'
 
     def do_finish(self):
         self.endgame = True
         grace = float(self.g('finish_grace_s'))
         remaining = self.deadline.remaining(self.now()) if self.deadline else grace
         timeout = min(float(self.g('goal_timeout_s')), max(remaining, 0.0) + grace)
-        r = self.run_stage('finish', timeout=timeout)
+        r = self.run_names(['finish'], timeout=timeout)
         self.stop_robot()
+        self.event('finish', result=r)
         return r
 
     # ----------------------------------------------------------------- main loop

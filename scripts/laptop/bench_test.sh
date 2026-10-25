@@ -31,7 +31,7 @@ sleep 25
 check "/scan_filtered publishes" "timeout 8 ros2 topic echo --once /scan_filtered --qos-reliability best_effort --field header.frame_id >/dev/null 2>&1"
 check "/map published by Cartographer" "timeout 10 ros2 topic echo --once /map --field info.resolution >/dev/null 2>&1"
 check "TF map -> base_link" "timeout 8 ros2 run tf2_ros tf2_echo map base_link 2>&1 | grep -q Translation"
-check "safety chain active" "ros2 lifecycle get /collision_monitor_mapping 2>/dev/null | grep -q active"
+check "safety chain active" "ros2 lifecycle get /collision_monitor 2>/dev/null | grep -q active"
 ros2 service call /finish_trajectory cartographer_ros_msgs/srv/FinishTrajectory "{trajectory_id: 0}" >/dev/null 2>&1
 ros2 service call /write_state cartographer_ros_msgs/srv/WriteState "{filename: '$OUT/bench.pbstream', include_unfinished_submaps: true}" >/dev/null 2>&1
 check "pbstream saved" "[ -s $OUT/bench.pbstream ]"
@@ -41,7 +41,7 @@ echo "== mission"
 ros2 launch robot_slam brain.launch.py mode:=mission pbstream:=$OUT/bench.pbstream rviz:=false record_bag:=false > $OUT/mission.log 2>&1 & LAUNCH=$!
 sleep 40
 check "TF map -> base_link (localization)" "timeout 10 ros2 run tf2_ros tf2_echo map base_link 2>&1 | grep -q Translation"
-for n in controller_server planner_server bt_navigator behavior_server velocity_smoother collision_monitor_mission; do
+for n in controller_server planner_server bt_navigator behavior_server velocity_smoother collision_monitor; do
   check "$n active" "ros2 lifecycle get /$n 2>/dev/null | grep -q active"
 done
 timeout 45 ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
