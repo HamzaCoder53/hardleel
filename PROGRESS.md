@@ -141,3 +141,22 @@ Then TEST_TONIGHT.md (safest -> riskiest, expected/fail, required/optional, dura
 
 ## Next
 Step 1.
+
+## Phase B status
+- [x] B1 (15:45) M1 e2e in the sim ON JAZZY (Harmonic): worker run = all 12 required fields (obstacle detected +
+      response), gate path2, 155 s; localization fallback run = StartTrajectory at the start pose OK, mission
+      complete in 135 s (logs in docs/sim_runs/). Fixes found by the sim: velocity_polygon stop/slow boxes
+      (in-place turns deadlocked), stop-box switch via service (CLI flaky), obstacle check vs map frozen at start.
+      Caveat: with an INCOMPLETE saved map, unmapped walls count as obstacles (false obstacle_detected event).
+      Test-harness lessons: background jobs in scripts ignore SIGINT (use TERM); never pkill -f words that are in
+      your own command line.
+- [x] B2 waypoints: waypoints_course.yaml (Figure 1) + waypoints_course_mirror.yaml (mirrored; the 22 Oct scan
+      suggests the room is on the right). Start spot of the 22 Oct run unconfirmed. Click tool = primary.
+      QUESTION for the user: at the start pad facing the field, is the loading room on the left or right?
+- [~] B3 collision monitor: mapping stop box smaller (12-17 cm) DONE; ramp-as-wall sim test next.
+- [~] B4 cold start: up.ps1 + RUNBOOK section 0 written, NOT run yet (needs a real cold start); Humble fallback
+      tested: zenoh Humble<->Jazzy = names but no data -> fallback = CycloneDDS on a router Wi-Fi (RUNBOOK 7).
+- [~] B5 motor_bridge deadband offset + pwm_test + calib file + live params (27 tests pass); deadband_calibrate,
+      motor_calibrator, fit_speed_from_bag written (Sonnet). Not deployed to the Pi; sim test via fake_pico next.
+- [ ] B6 new design (switches off): frontier explorer written (8 tests) not wired/sim-tested; yaw feedback in
+      motor_bridge (off); speed_governor not written yet.

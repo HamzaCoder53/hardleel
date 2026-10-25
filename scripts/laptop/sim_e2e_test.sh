@@ -16,7 +16,7 @@ for a in "$@"; do [ "$a" = worker ] && WORKER=1; [ "$a" = localization ] && LOC=
 WP="$WS/src/robot_slam/config/waypoints_sim.yaml"
 L=~/simtest_m1; rm -rf $L; mkdir -p $L
 GZ="gz"; MSG="gz.msgs"; [ "$ROS_DISTRO" = humble ] && { GZ="ign"; MSG="ignition.msgs"; }
-cleanup() { pkill -INT -f "ros2 launch"; sleep 3; pkill -9 -f "gz sim|ign gazebo"; pkill -9 -f "ros2 bag|ros2 run"; }
+cleanup() { pkill -TERM -f "ros2 launch"; sleep 4; pkill -9 -f "gz sim|ign gazebo"; pkill -9 -f "ros2 bag|ros2 run"; }
 cleanup 2>/dev/null; sleep 1
 ros2 launch rdj2026_sim sim.launch.py gui:=false odom_tf:=false > $L/sim.log 2>&1 &
 sleep 20
@@ -27,9 +27,10 @@ ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag
 sleep 15
 if [ $LOC = 1 ]; then      # save the map, restart as pure localization from the start pose (robot is still there)
   ros2 service call /write_state cartographer_ros_msgs/srv/WriteState "{filename: '$L/sim.pbstream', include_unfinished_submaps: true}" >/dev/null
-  pkill -INT -f "laptop_mapping.launch.py"
-  for i in $(seq 1 20); do pgrep -f "cartographer_node|sensor_prep|collision_monitor|velocity_smoother|twist_mux" >/dev/null || break; sleep 1; done
-  pkill -9 -f "cartographer_node|sensor_prep|collision_monitor|velocity_smoother|twist_mux|occupancy_grid"; sleep 1
+  pkill -TERM -f "laptop_mapping.launch.py"   # TERM: background jobs of a script ignore SIGINT
+  NODES="cartographer_node|occupancy_grid|sensor_prep|collision_monitor|velocity_smoother|twist_mux|imu_filter_madgwick"
+  for i in $(seq 1 20); do pgrep -f "$NODES" >/dev/null || break; sleep 1; done
+  pkill -9 -f "$NODES"; sleep 1
   ros2 launch robot_slam laptop_localization.launch.py sim:=true rviz:=false record_bag:=false pbstream:=$L/sim.pbstream > $L/localization.log 2>&1 &
   sleep 15
 fi

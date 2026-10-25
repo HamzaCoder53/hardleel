@@ -29,9 +29,7 @@ def for_distro(path, hardware=False):
     if HARMONIC:
         text = text.replace('ignition.msgs.', 'gz.msgs.').replace('ignition_frame_id', 'gz_frame_id')
     if hardware:
-        text = text.replace('ros_topic_name: /cmd_vel
-', 'ros_topic_name: /sim_cmd_vel
-')
+        text = text.replace('ros_topic_name: /cmd_vel\n', 'ros_topic_name: /sim_cmd_vel\n')
     out = tempfile.NamedTemporaryFile('w', suffix=os.path.splitext(path)[1], delete=False)
     out.write(text)
     out.close()
