@@ -36,6 +36,7 @@ from nav2_msgs.action import NavigateToPose
 from nav2_msgs.msg import CollisionMonitorState, SpeedLimit
 from nav2_msgs.srv import ClearEntireCostmap
 from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import Path as NavPath
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -65,6 +66,10 @@ class DeadlineHit(Exception):
     pass
 
 
+class SkipToDeposit(Exception):
+    """Soft deadline: less than deposit_reserve_s left before DEPOSIT -> go and deposit now."""
+
+
 class CompetitionMission(Node):
     def __init__(self):
         super().__init__('competition_mission')
@@ -87,7 +92,9 @@ class CompetitionMission(Node):
         p('drop_service', '/dump')
         p('drop_timeout_s', 8.0)
         p('bin_pause_s', 2.0)                      # pause at the bin when there is nothing to drop
-        p('gate_max_wait_s', 15.0)                 # PLACEHOLDER: rulebook "standard waiting time" unknown
+        p('gate_max_wait_s', 5.0)                  # PLACEHOLDER: rulebook "standard waiting time" unknown
+        p('gate_reserve_s', 55.0)                  # time kept for path + deposit + finish after the gate decision
+        p('deposit_reserve_s', 35.0)               # less than this left before DEPOSIT -> skip ahead to deposit
         p('gate_center_deg', 0.0)                  # sector centre in the laser frame (0 = straight ahead)
         p('gate_half_width_deg', 10.0)
         p('gate_open_threshold_m', 1.0)            # median range above this = open
@@ -95,9 +102,15 @@ class CompetitionMission(Node):
         p('gate_poll_hz', 5.0)
         p('obstacle_wait_s', 3.0)                  # held stopped this long -> cancel + re-send (replan)
         p('max_replans', 2)
-        p('obstacle_range_m', 0.8)
+        p('obstacle_range_m', 1.0)                 # cone detector: range and half angle straight ahead
         p('obstacle_half_angle_deg', 35.0)
         p('obstacle_min_points', 4)
+        p('obstacle_route_len_m', 2.5)             # route detector: unexpected points near the first metres of
+        p('obstacle_route_tol_m', 0.30)            # Nav2's plan (/plan) ...
+        p('obstacle_route_max_range_m', 4.0)       # ... up to this lidar range
+        p('obstacle_max_wait_s', 10.0)             # obstacle seen + no progress this long -> give the waypoint up
+        p('obstacle_min_move_m', 0.10)             # (path2: switch to path1)
+        p('obstacle_clear_s', 3.0)                 # this long without detections ends an obstacle episode
         p('mission_speed', 0.30)
         p('terrain_speed', 0.15)
         p('terrain_surface', '')
@@ -139,6 +152,7 @@ class CompetitionMission(Node):
         self.create_subscription(Empty, '/mission/abort', self.on_abort, 10)
         self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
         self.create_subscription(OccupancyGrid, '/map', self.on_map, 1)
+        self.create_subscription(NavPath, '/plan', self.on_plan, 1)
         self.create_subscription(CollisionMonitorState, '/collision_monitor_state', self.on_monitor, 10)
         self.create_timer(1.0, lambda: self.publish_state())
         self.loader = make_loading_adapter(str(g('loading_adapter')), self, {'load_wait_s': g('load_wait_s')})
@@ -152,10 +166,14 @@ class CompetitionMission(Node):
         self.deadline = None
         self.waste_class, self.waste_conf, self.bay_colour = 'unknown', 0.0, ''
         self.gate_decision = ''
-        # obstacle bookkeeping (first detection/response are the rulebook timestamps)
+        # obstacle bookkeeping: every episode logs obstacle_detected + obstacle_response; the event logger keeps
+        # the first of each as the rulebook timestamp and stores the rest
         self.monitor_action, self.stop_since = 0, None
-        self.obst_detected_t, self.obst_responded = None, False
-        self.obst_clear_since = None
+        self.episodes = core.ObstacleEpisodes(float(g('obstacle_clear_s')))
+        self.obst_seen_t = None                    # last time either detector saw something
+        self.plan_xy = []                          # current Nav2 plan (map frame)
+        self.obstacle_skips = 0                    # waypoints given up because of an obstacle
+        self.skipped_to_deposit = False
 
         log_dir = os.path.expanduser(str(g('log_dir')))
         os.makedirs(log_dir, exist_ok=True)
@@ -247,8 +265,11 @@ class CompetitionMission(Node):
                 self.stop_since = self.now()
         else:
             self.stop_since = None
-        if m.action_type in MONITOR_ACTIONS and self.obst_detected_t is not None and not self.obst_responded:
+        if m.action_type in MONITOR_ACTIONS and self.episodes.active:
             self.obstacle_response(MONITOR_ACTIONS[m.action_type])
+
+    def on_plan(self, m):
+        self.plan_xy = [(ps.pose.position.x, ps.pose.position.y) for ps in m.poses]
 
     def on_scan(self, m):
         self.scan = m
@@ -257,24 +278,33 @@ class CompetitionMission(Node):
         pose = self.pose_in_map(m.header.frame_id or 'laser')
         if pose is None:
             return
-        n = obstacle_watch.unexpected_points(
-            m.ranges, m.angle_min, m.angle_increment, pose, self.grid, float(self.g('obstacle_range_m')),
-            math.radians(float(self.g('obstacle_half_angle_deg'))))
-        seen = n >= int(self.g('obstacle_min_points'))
-        if seen and self.obst_detected_t is None:
-            self.obst_detected_t = self.now()
-            self.event('obstacle_detected', points=n, state=self.state)
-        if self.obst_detected_t is not None and not self.obst_responded:
-            if seen:
-                self.obst_clear_since = None
-            else:
-                self.obst_clear_since = self.obst_clear_since or self.now()
-                if self.now() - self.obst_clear_since > 1.0:
-                    self.obstacle_response('avoided')          # Nav2 drove around it without a monitor action
+        g = self.g
+        n_cone = obstacle_watch.unexpected_points(
+            m.ranges, m.angle_min, m.angle_increment, pose, self.grid, float(g('obstacle_range_m')),
+            math.radians(float(g('obstacle_half_angle_deg'))))
+        n_route = obstacle_watch.unexpected_near_path(
+            m.ranges, m.angle_min, m.angle_increment, pose, self.grid, self.plan_xy, float(g('obstacle_route_len_m')),
+            float(g('obstacle_route_tol_m')), float(g('obstacle_route_max_range_m'))) if self.plan_xy else 0
+        need = int(g('obstacle_min_points'))
+        seen = n_cone >= need or n_route >= need
+        if seen:
+            self.obst_seen_t = self.now()
+        change = self.episodes.update(self.now(), seen)
+        if change == 'start':
+            self.event('obstacle_detected', detector='route' if n_route >= need else 'cone', points=max(n_cone, n_route),
+                       state=self.state)
+        elif change == 'cleared' and not self.episodes.responded:
+            self.obstacle_response('avoided')              # gone (walked away / driven around) before any action
+
+    def obstacle_seen_recently(self, hold_s=1.5):
+        return self.obst_seen_t is not None and self.now() - self.obst_seen_t <= hold_s
 
     def obstacle_response(self, action):
-        self.obst_responded = True
-        self.event('obstacle_response', action=action, response_s=round(self.now() - self.obst_detected_t, 2))
+        """First reaction of the robot to the current obstacle episode (one event per episode)."""
+        if self.episodes.start_t is None or self.episodes.responded:
+            return
+        self.episodes.responded = True
+        self.event('obstacle_response', action=action, response_s=round(self.now() - self.episodes.start_t, 2))
 
     def publish_state(self):
         self.pub_state.publish(String(data=self.state))
@@ -306,7 +336,7 @@ class CompetitionMission(Node):
             rclpy.spin_once(self, timeout_sec=0.02)
 
     def wait(self, pred, timeout=None):
-        """Spin until pred() is true (-> True) or timeout (-> False). Raises Aborted / DeadlineHit."""
+        """Spin until pred() is true (-> True) or timeout (-> False). Raises Aborted / DeadlineHit / SkipToDeposit."""
         t_end = self.now() + timeout if timeout is not None else None
         while rclpy.ok():
             rclpy.spin_once(self, timeout_sec=0.05)
@@ -314,6 +344,11 @@ class CompetitionMission(Node):
                 raise Aborted()
             if not self.endgame and self.deadline and self.deadline.expired(self.now()):
                 raise DeadlineHit()
+            if (self.deadline and not self.skipped_to_deposit and
+                    core.soft_deadline_due(self.state, self.deadline.remaining(self.now()),
+                                           float(self.g('deposit_reserve_s')))):
+                self.skipped_to_deposit = True
+                raise SkipToDeposit()
             if pred():
                 return True
             if t_end is not None and self.now() >= t_end:
@@ -355,7 +390,9 @@ class CompetitionMission(Node):
 
     # ----------------------------------------------------------------- navigation
     def send_goal(self, pose, timeout):
-        """One NavigateToPose attempt -> 'ok' | 'failed' | 'timeout' | 'rejected' | 'blocked'."""
+        """One NavigateToPose attempt -> 'ok' | 'failed' | 'timeout' | 'rejected' | 'blocked' | 'obstacle'.
+        'blocked': the collision monitor held the robot stopped for obstacle_wait_s (-> re-send = replan).
+        'obstacle': an obstacle is on the way and the robot made no progress for obstacle_max_wait_s."""
         goal = NavigateToPose.Goal()
         goal.pose = PoseStamped()
         goal.pose.header.frame_id = 'map'
@@ -374,11 +411,25 @@ class CompetitionMission(Node):
             if handle is None or not handle.accepted:
                 return 'rejected'
             res = handle.get_result_async()
+            self.plan_xy = []                                       # the old plan belongs to the previous goal
+            start = self.pose_in_map()
+            watch = core.ProgressWatch(self.now(), start[:2] if start else None, float(self.g('obstacle_max_wait_s')),
+                                       float(self.g('obstacle_min_move_m')))
+            stuck = [False]
+
+            def obstacle_stuck():
+                p = self.pose_in_map()
+                seen = self.obstacle_seen_recently()
+                stuck[0] = watch.update(self.now(), p[:2] if p else None, seen)
+                if seen and self.episodes.active and self.now() - watch.anchor_t >= 1.0:
+                    self.obstacle_response('wait')      # Nav2 stopped short of it (no collision-monitor action)
+                return stuck[0]
+
             blocked = lambda: self.stop_since is not None and self.now() - self.stop_since > wait_s
-            if not self.wait(lambda: res.done() or blocked(), timeout):
+            if not self.wait(lambda: res.done() or blocked() or obstacle_stuck(), timeout):
                 return 'timeout'
             if not res.done():
-                return 'blocked'                                    # held by the collision monitor too long
+                return 'obstacle' if stuck[0] else 'blocked'
             handle = None                                           # finished by itself
             return 'ok' if res.result().status == GoalStatus.STATUS_SUCCEEDED else 'failed'
         finally:
@@ -395,11 +446,16 @@ class CompetitionMission(Node):
         replans = 0
         while True:
             res = self.send_goal(pose, timeout)
+            if res == 'obstacle':                                   # waited obstacle_max_wait_s: give it up
+                self.obstacle_skips += 1
+                self.obstacle_response('wait_then_skip')
+                self.log_row(f'wp:{label}', 'obstacle', f'blocked {self.g("obstacle_max_wait_s")} s without '
+                                                         f'progress: skipping this waypoint')
+                return 'skipped'                     # (costmaps NOT cleared: they still hold the obstacle)
             if res == 'blocked' and replans < int(self.g('max_replans')):
                 replans += 1
                 self.stop_since = None
-                if self.obst_detected_t is not None and not self.obst_responded:
-                    self.obstacle_response('replan')
+                self.obstacle_response('wait_then_replan')
                 self.log_row(f'wp:{label}', 'blocked', f'waited {self.g("obstacle_wait_s")} s, replan {replans}')
                 continue
             action = policy.on_result('failed' if res == 'blocked' else res)
@@ -525,25 +581,36 @@ class CompetitionMission(Node):
                                         min(s.range_max, 12.0))
 
     def do_gate_decision(self):
-        poller = gate_check.GatePoller(self.now(), float(self.g('gate_max_wait_s')),
-                                       float(self.g('gate_open_threshold_m')), int(self.g('gate_open_confirm_n')))
+        """Wait for the gate up to gate_max_wait_s, but never into the time the rest of the run needs
+        (gate_reserve_s). Budget 0 = take whatever is open now: an open gate -> path2, else path1 (always open)."""
+        remaining = self.deadline.remaining(self.now()) if self.deadline else float('inf')
+        budget = core.gate_wait_budget(remaining, float(self.g('gate_max_wait_s')), float(self.g('gate_reserve_s')))
+        confirm = int(self.g('gate_open_confirm_n'))
+        if budget <= 0.0:
+            confirm = 1                                             # no time: one reading decides
+        poller = gate_check.GatePoller(self.now(), budget, float(self.g('gate_open_threshold_m')), confirm)
         period = 1.0 / max(float(self.g('gate_poll_hz')), 0.5)
-        decision = None
+        decision = poller.update(self.now(), self.gate_median())   # budget 0: decided by this reading
         while decision is None:
+            self.pause(period)
             decision = poller.update(self.now(), self.gate_median())
-            if decision is None:
-                self.pause(period)
         self.gate_decision, wait_s = decision
-        self.event('gate_decision', decision=self.gate_decision, wait_s=round(wait_s, 2),
+        self.event('gate_decision', decision=self.gate_decision, wait_s=round(wait_s, 2), wait_budget_s=round(budget, 1),
+                   remaining_s=round(remaining, 1),
                    last_median_m=None if poller.last_median is None else round(poller.last_median, 2))
         return self.gate_decision
 
     def do_go_path(self):
         first = 'path2' if self.gate_decision == 'path2' else 'path1'
+        skips = self.obstacle_skips
         r = self.run_names(self.seqs.get(first, []))
-        if r == 'skipped' and first == 'path2':                     # Path 2 unusable: fall back to the open path
-            self.log_row('GO_PATH', 'path2 failed, trying path1')
+        if first == 'path2' and (r == 'skipped' or self.obstacle_skips > skips):
+            # Path 2 unusable (failed, or blocked by an obstacle for obstacle_max_wait_s): take Path 1 (always open)
+            self.log_row('GO_PATH', 'path2 blocked/failed, switching to path1')
+            if self.obstacle_skips > skips:
+                self.event('obstacle_response', action='switch_to_path1')
             r = self.run_names(self.seqs.get('path1', []))
+            return f'path2->path1:{r}'
         return f'{first}:{r}'
 
     def do_deposit(self):
@@ -588,6 +655,11 @@ class CompetitionMission(Node):
                 except DeadlineHit:
                     self.log_row(state, 'deadline', f'limit {self.g("mission_time_limit_s")}s')
                     state = core.state_after_deadline(state)
+                except SkipToDeposit:
+                    left = self.deadline.remaining(self.now())
+                    self.log_row(state, 'skip_to_deposit', f'{left:.0f} s left < deposit_reserve_s '
+                                                           f'{self.g("deposit_reserve_s")}')
+                    state = core.state_after_soft_deadline(state)
         except Aborted:
             self.state = 'ABORTED'
             self.publish_state()

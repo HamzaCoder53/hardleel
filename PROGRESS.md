@@ -190,3 +190,14 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
       for SV,done; servo_calibrate --backend pico (default). fake_pico implements SV like the firmware.
       Sim: close-on-start SV,30 + /dump SV,150 -> hold -> SV,30 = "dropped" in 3.2 s. NOT deployed (Pi off):
       run deploy_pi.sh when the Pi is on (TEST_TONIGHT step 0).
+- [x] 25 Oct ~18:10 (code only, no sim, Pi off): user priorities while testing on the robot
+      1 obstacle logging: worker not logged because the 0.8 m cone never reached it (Nav2 stops planning metres
+        away from a corridor-blocking worker). Added a ROUTE detector (unexpected points within 0.3 m of the
+        first 2.5 m of /plan, up to 4 m range); cone range 1.0 m; every obstacle EPISODE logs obstacle_detected
+        + obstacle_response (stop/slowdown/wait/wait_then_replan/wait_then_skip/switch_to_path1/avoided).
+      2 worker wait cap: obstacle in view + < 0.10 m progress for obstacle_max_wait_s (10 s) -> skip the
+        waypoint (costmaps kept); on path2 -> switch to path1.
+      3 clock-aware: gate wait budget = min(gate_max_wait_s, remaining - gate_reserve_s 55 s), 0 -> take what is
+        open now; any stage before DEPOSIT with < deposit_reserve_s (35 s) left -> skip to DEPOSIT + FINISH.
+      4 gate_max_wait_s 5.0.
+      112 unit tests pass. NEXT (after the user's robot test): sim course gate_closed with and without a worker.

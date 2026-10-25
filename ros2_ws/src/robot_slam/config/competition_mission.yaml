@@ -25,7 +25,10 @@ competition_mission:
     drop_timeout_s: 8.0
     bin_pause_s: 2.0           # pause at the bin when has_drop_bin is false
     # gate (robot stands at gate_check facing the gate)
-    gate_max_wait_s: 15.0      # PLACEHOLDER: rulebook "standard waiting time" not announced yet
+    gate_max_wait_s: 5.0       # PLACEHOLDER: rulebook "standard waiting time" not announced (gate seen opening ~2 s)
+    gate_reserve_s: 55.0       # never wait at the gate into the last 55 s (path + deposit + finish); 0 s budget =
+                               # take what is open NOW (open gate -> path2, else path1)
+    deposit_reserve_s: 35.0    # any stage before DEPOSIT with less than this left -> skip ahead to deposit + finish
     gate_center_deg: 0.0       # sector centre in the laser frame, 0 = straight ahead
     gate_half_width_deg: 10.0
     gate_open_threshold_m: 1.5 # median range above this = open. Course map: gate_check ~0.9 m from the closed gate,
@@ -35,9 +38,17 @@ competition_mission:
     # obstacles
     obstacle_wait_s: 3.0       # stopped by the collision monitor this long -> cancel + re-send the goal (replan)
     max_replans: 2             # per goal, then it counts as a failure (retry/skip policy)
-    obstacle_range_m: 0.8      # unexpected-obstacle detection (lidar points not in /map) ahead within this range
+    # obstacle detection = lidar points not explained by the map frozen at the start, either in a cone ahead or
+    # near the first metres of Nav2's plan (a worker blocking a corridor stops Nav2 metres away)
+    obstacle_range_m: 1.0      # cone detector range
     obstacle_half_angle_deg: 35.0
     obstacle_min_points: 4
+    obstacle_route_len_m: 2.5  # route detector: first metres of /plan ...
+    obstacle_route_tol_m: 0.30 # ... points within this distance of it ...
+    obstacle_route_max_range_m: 4.0   # ... and within this lidar range
+    obstacle_max_wait_s: 10.0  # obstacle in view + no progress this long -> skip the waypoint (path2 -> path1)
+    obstacle_min_move_m: 0.10
+    obstacle_clear_s: 3.0      # no detection this long = the episode is over (next one is logged again)
     # speeds
     mission_speed: 0.30        # Nav2 /speed_limit, m/s
     terrain_speed: 0.15

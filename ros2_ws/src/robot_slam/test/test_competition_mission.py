@@ -176,3 +176,48 @@ def test_arena_to_map_start_is_origin():
     # 1 m ahead of the start (arena +y) is map +x; 1 m to its left (arena -x) is map +y
     assert core.arena_to_map((6215, 1300, 90), (6215, 300, 90))[:2] == pytest.approx((1.0, 0.0))
     assert core.arena_to_map((5215, 300, 90), (6215, 300, 90))[:2] == pytest.approx((0.0, 1.0))
+
+
+# --- clock-aware decisions, obstacle wait cap, episodes (25 Oct) -------------------------------------------
+def test_soft_deadline_skips_to_deposit_only_before_it():
+    assert core.state_after_soft_deadline('TERRAIN') == 'DEPOSIT'
+    assert core.state_after_soft_deadline('GATE_DECISION') == 'DEPOSIT'
+    assert core.state_after_soft_deadline('DEPOSIT') == 'DEPOSIT'
+    assert core.state_after_soft_deadline('FINISH') == 'FINISH'
+    assert core.soft_deadline_due('GO_PATH', 30.0, 35.0)
+    assert not core.soft_deadline_due('GO_PATH', 40.0, 35.0)
+    assert not core.soft_deadline_due('DEPOSIT', 10.0, 35.0)
+
+
+def test_gate_wait_budget():
+    assert core.gate_wait_budget(120.0, 5.0, 55.0) == 5.0          # plenty of time: full wait
+    assert core.gate_wait_budget(58.0, 5.0, 55.0) == pytest.approx(3.0)
+    assert core.gate_wait_budget(40.0, 5.0, 55.0) == 0.0           # short: take what is open now
+
+
+def test_gate_budget_zero_decides_on_one_reading():
+    from robot_slam.gate_check import GatePoller
+    assert GatePoller(0.0, 0.0, 1.5, 1).update(0.0, 3.0) == ('path2', 0.0)   # open now
+    assert GatePoller(0.0, 0.0, 1.5, 1).update(0.0, 0.9) == ('path1', 0.0)   # closed now
+    assert GatePoller(0.0, 0.0, 1.5, 1).update(0.0, None) == ('path1', 0.0)  # no data: the always-open path
+
+
+def test_progress_watch_gives_up_after_max_wait_only_with_an_obstacle():
+    w = core.ProgressWatch(0.0, (0.0, 0.0), max_wait_s=10.0)
+    assert not w.update(5.0, (0.0, 0.0), True)
+    assert w.update(10.5, (0.02, 0.0), True)                      # 10 s, no progress, obstacle in view
+    w = core.ProgressWatch(0.0, (0.0, 0.0), max_wait_s=10.0)
+    assert not w.update(10.5, (0.0, 0.0), False)                  # stuck but no obstacle: not this rule
+    w = core.ProgressWatch(0.0, (0.0, 0.0), max_wait_s=10.0)
+    w.update(6.0, (0.5, 0.0), True)                               # moved: clock restarts
+    assert not w.update(12.0, (0.5, 0.0), True)
+    assert w.update(16.5, (0.52, 0.0), True)
+
+
+def test_obstacle_episodes():
+    e = core.ObstacleEpisodes(clear_s=3.0)
+    assert e.update(0.0, True) == 'start'
+    assert e.update(1.0, True) is None
+    assert e.update(2.0, False) is None                           # brief gap: same episode
+    assert e.update(4.5, False) == 'cleared'
+    assert e.update(6.0, True) == 'start'                         # a new worker: logged again

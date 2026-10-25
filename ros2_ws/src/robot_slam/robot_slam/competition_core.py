@@ -40,6 +40,69 @@ class Deadline:
         return self.remaining(now) <= 0.0
 
 
+# ------------------------------------------------------------------ clock-aware decisions (25 Oct)
+def state_after_soft_deadline(state):
+    """Little time left: skip whatever is still ahead of DEPOSIT (depositing scores, terrain left half-done does
+    not lose what was already earned). DEPOSIT / FINISH and later run normally."""
+    if state in TERMINAL or STATES.index(state) >= STATES.index('DEPOSIT'):
+        return state
+    return 'DEPOSIT'
+
+
+def soft_deadline_due(state, remaining_s, reserve_s):
+    """True if the mission should jump to DEPOSIT now: still before it and less than reserve_s left."""
+    return state not in TERMINAL and STATES.index(state) < STATES.index('DEPOSIT') and remaining_s <= reserve_s
+
+
+def gate_wait_budget(remaining_s, max_wait_s, reserve_s):
+    """Seconds the gate may still be waited for: the configured max, but never eating into reserve_s (what the
+    path, deposit and finish need after the decision). 0 = decide on the current reading: take whatever is
+    open NOW (open gate -> path2, else path1, which is always open)."""
+    return max(0.0, min(float(max_wait_s), float(remaining_s) - float(reserve_s)))
+
+
+class ProgressWatch:
+    """'Stuck behind an obstacle': an obstacle was seen recently and the robot has not moved min_move_m for
+    max_wait_s. update(t, xy, obstacle_seen) -> True once that holds (then the mission gives up the waypoint)."""
+
+    def __init__(self, t0, xy, max_wait_s=10.0, min_move_m=0.10, seen_hold_s=1.5):
+        self.max_wait_s, self.min_move_m, self.seen_hold_s = max_wait_s, min_move_m, seen_hold_s
+        self.anchor_t, self.anchor_xy = t0, xy
+        self.last_seen = None
+
+    def update(self, t, xy, obstacle_seen):
+        if obstacle_seen:
+            self.last_seen = t
+        if xy is not None and (self.anchor_xy is None or
+                               math.hypot(xy[0] - self.anchor_xy[0], xy[1] - self.anchor_xy[1]) >= self.min_move_m):
+            self.anchor_t, self.anchor_xy = t, xy            # progress made: restart the clock
+        recently_seen = self.last_seen is not None and t - self.last_seen <= self.seen_hold_s
+        return recently_seen and t - self.anchor_t >= self.max_wait_s
+
+
+class ObstacleEpisodes:
+    """Split detections into episodes: a new episode starts when an obstacle is seen after clear_s without one.
+    update(t, seen) -> 'start' (log obstacle_detected), 'cleared' (episode over without any response yet), None."""
+
+    def __init__(self, clear_s=3.0):
+        self.clear_s = clear_s
+        self.active = False
+        self.start_t = self.last_seen = None
+        self.responded = False
+
+    def update(self, t, seen):
+        if seen:
+            self.last_seen = t
+            if not self.active:
+                self.active, self.start_t, self.responded = True, t, False
+                return 'start'
+            return None
+        if self.active and t - self.last_seen >= self.clear_s:
+            self.active = False
+            return 'cleared'
+        return None
+
+
 # ------------------------------------------------------------------ classification
 def parse_classify(text):
     """'plastic:0.93:blue' -> (class, confidence, colour); malformed -> ('unknown', 0.0, '')."""
