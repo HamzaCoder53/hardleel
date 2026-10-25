@@ -85,7 +85,7 @@ class MotorCalibrator(Node):
                                  callback_group=cb_sub)
         self.pub = self.create_publisher(Int32MultiArray, '/motor/pwm_test', 10)
         self.tfbuf = tf2_ros.Buffer()
-        self.tfl = tf2_ros.TransformListener(self.tfbuf, self)
+        self.tfl = tf2_ros.TransformListener(self.tfbuf, self, spin_thread=True)   # own thread: never starved
         self.create_service(Trigger, '/motor/calibrate_turn', self.srv_turn, callback_group=cb_srv)
         self.create_service(Trigger, '/motor/calibrate_speed', self.srv_speed, callback_group=cb_srv)
         self.get_logger().info('motor_calibrator ready: /motor/calibrate_turn, /motor/calibrate_speed')
@@ -238,7 +238,8 @@ class MotorCalibrator(Node):
             tf = self.tfbuf.lookup_transform(self.get_parameter('map_frame').value,
                                              self.get_parameter('base_frame').value,
                                              rclpy.time.Time())
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            self.get_logger().warn(f'pose lookup failed: {e}', throttle_duration_sec=2.0)
             return None
         s = tf.header.stamp
         tr = tf.transform.translation
@@ -264,6 +265,9 @@ class MotorCalibrator(Node):
 
     def _do_speed(self):
         g = lambda n: self.get_parameter(n).value
+        end = time.monotonic() + 3.0                     # the first TF can take a moment after start-up
+        while self._pose() is None and time.monotonic() < end:
+            time.sleep(0.1)
         if self._pose() is None:
             return False, f'no TF {g("map_frame")}->{g("base_frame")}'
         clear = self.clear_ahead()

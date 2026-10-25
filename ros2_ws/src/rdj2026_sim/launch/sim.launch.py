@@ -50,6 +50,9 @@ def generate_launch_description():
     gui = LaunchConfiguration('gui')
     return LaunchDescription([
         DeclareLaunchArgument('gui', default_value='true', description='Show the Gazebo window'),
+        DeclareLaunchArgument('hardware', default_value='false',
+                              description='true: the REAL motor_bridge drives the robot through fake_pico (motor '
+                                          'model with deadband / slow zone); implies no odom TF from the sim'),
         DeclareLaunchArgument('gate', default_value='false' if gate.get('hide') else 'true',
                               description='Run the time-based gate (off when the layout has no gate)'),
         SetEnvironmentVariable('IGN_GAZEBO_RESOURCE_PATH', pkg),
@@ -72,12 +75,10 @@ def generate_launch_description():
                                           'like the real robot without encoders)'),
         Node(package='ros_gz_bridge', executable='parameter_bridge', name='gz_bridge',
              condition=IfCondition(PythonExpression(["'", LaunchConfiguration('noisy_odom'), "' != 'true' and '",
-                                                     LaunchConfiguration('odom_tf'), "' == 'true'"])),
+                                                     LaunchConfiguration('odom_tf'), "' == 'true' and '",
+                                                     LaunchConfiguration('hardware'), "' != 'true'"])),
              parameters=[{'config_file': for_distro(os.path.join(pkg, 'config', 'bridge.yaml')), 'use_sim_time': True}],
              output='screen'),
-        DeclareLaunchArgument('hardware', default_value='false',
-                              description='true: the REAL motor_bridge drives the robot through fake_pico (motor '
-                                          'model with deadband / slow zone); implies no odom TF from the sim'),
         Node(package='ros_gz_bridge', executable='parameter_bridge', name='gz_bridge',
              condition=IfCondition(LaunchConfiguration('hardware')),
              parameters=[{'config_file': for_distro(os.path.join(pkg, 'config', 'bridge_noisy_odom.yaml'), True),

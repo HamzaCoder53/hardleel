@@ -44,3 +44,5 @@ competition_mission:
     cmd_vel_topic: /cmd_vel
     log_dir: ~/logs
     collision_monitor: /collision_monitor   # switched from the mapping stop box to the mission one at start-up
+    turn_calibration: false    # NEW (off): spin test right after the start (set by laptop_mission turn_calibration:=true)
+    turn_calibration_timeout_s: 40.0

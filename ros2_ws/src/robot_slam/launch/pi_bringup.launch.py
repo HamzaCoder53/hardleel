@@ -17,6 +17,7 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def first(pattern, fallback):
@@ -38,6 +39,7 @@ def generate_launch_description():
         DeclareLaunchArgument('camera_rotate_deg', default_value='0'),   # 13:00 25 Oct frame: upright
         DeclareLaunchArgument('motors', default_value='true'),
         DeclareLaunchArgument('drop', default_value='true'),
+        DeclareLaunchArgument('yaw_feedback', default_value='false'),   # NEW, off: gyro turn-rate loop in motor_bridge
 
         Node(package='robot_slam', executable='imu_serial_node', name='imu_serial_node', output='screen',
              parameters=[{'port': L('imu_port'), 'frame_id': 'imu_link', 'gyro_calib_s': 3.0}]),
@@ -48,7 +50,8 @@ def generate_launch_description():
         # motors stop 0.3-0.4 s after the last /cmd_vel.
         Node(package='motor_teleop', executable='motor_bridge', name='motor_bridge', output='screen',
              condition=IfCondition(L('motors')),
-             parameters=[{'port': L('pico_port'), 'send_rate': 10.0, 'max_pwm': 255, 'cmd_timeout': L('cmd_timeout')}]),
+             parameters=[{'port': L('pico_port'), 'send_rate': 10.0, 'max_pwm': 255, 'cmd_timeout': L('cmd_timeout'),
+                          'yaw_feedback': ParameterValue(L('yaw_feedback'), value_type=bool)}]),
         ExecuteProcess(
             cmd=['python3', os.path.expanduser('~/pi_cam/pi_cam_node.py'), '--ros-args',
                  '-p', ['fps:=', L('camera_fps')], '-p', ['width:=', L('camera_width')],

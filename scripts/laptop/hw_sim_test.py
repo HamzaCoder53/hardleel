@@ -98,6 +98,41 @@ def main():
         t.drive(-0.10, 0.0, 3.0)
         print(f'cmd 0.10 m/s: without compensation {v0:.3f} m/s, with 60/70 {v1:.3f} m/s (yaw drift {w1:.3f} rad/s)')
         ok = v0 < 0.03 and 0.07 < v1 < 0.13
+    elif what == 'speed':                       # needs laptop_mapping (TF) + speed_governor started by the caller
+        def zone_speed(secs):
+            """Drive straight at 0.2 m/s; mean ground-truth speed while inside the slow zone (world y 1.3-2.4)."""
+            t0, inside = time.monotonic(), []
+            while time.monotonic() - t0 < secs:
+                tw = Twist()
+                tw.linear.x = 0.2
+                t.pub.publish(tw)
+                rclpy.spin_once(t.n, timeout_sec=0.05)
+                if t.pose and 1.45 < t.pose[1] < 2.3:
+                    inside.append(t.pose)
+            if len(inside) < 2:
+                return 0.0
+            return math.hypot(inside[-1][0] - inside[0][0], inside[-1][1] - inside[0][1]) / (inside[-1][3] - inside[0][3])
+        t.set(min_pwm_left=60, min_pwm_right=70, speed_scale_enabled=False)
+        start_y = t.pose[1]
+        v0 = zone_speed(12.0)
+        t.drive(-0.25, 0.0, (t.pose[1] - start_y) / 0.25 + 1.0)       # back to the start
+        t.set(speed_scale_enabled=True)                                  # what speed_governor does at start-up
+        v1 = zone_speed(12.0)
+        t.drive(-0.25, 0.0, (t.pose[1] - start_y) / 0.25 + 1.0)
+        print(f'0.20 m/s in the slow zone (x0.6): governor off {v0:.3f}, on {v1:.3f} m/s')
+        ok = v0 < 0.15 and v1 > 0.17
+    elif what in ('cal_turn', 'cal_speed'):     # needs motor_calibrator (and laptop_mapping for cal_speed)
+        from std_srvs.srv import Trigger
+        srv = '/motor/calibrate_turn' if what == 'cal_turn' else '/motor/calibrate_speed'
+        cli = t.n.create_client(Trigger, srv)
+        ok = cli.wait_for_service(timeout_sec=15)
+        if ok:
+            fut = cli.call_async(Trigger.Request())
+            t.wait(fut.done, 120)
+            ok = fut.done() and fut.result().success
+            print(f'{srv}: {fut.result().message if fut.done() else "TIMEOUT"}')
+        else:
+            print(f'{srv}: service not found')
     elif what == 'yaw':
         t.set(min_pwm_left=60, min_pwm_right=70, yaw_feedback=False)
         _, w0 = t.drive(0.0, 0.8, 5.0)

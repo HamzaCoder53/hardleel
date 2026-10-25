@@ -104,6 +104,8 @@ class CompetitionMission(Node):
         p('cmd_vel_topic', '/cmd_vel')
         p('log_dir', '~/logs')
         p('collision_monitor', '/collision_monitor')   # node whose stop box is switched to the mission one
+        p('turn_calibration', False)               # NEW, off: /motor/calibrate_turn right after the start
+        p('turn_calibration_timeout_s', 40.0)
         g = lambda n: self.get_parameter(n).value
         self.g = g
 
@@ -428,6 +430,10 @@ class CompetitionMission(Node):
             self.wait(lambda: self.start_req)
         self.deadline = core.Deadline(self.now(), float(self.g('mission_time_limit_s')))
         self.event('autonomous_start')
+        if self.g('turn_calibration'):
+            ok, msg = self.call_trigger(self.create_client(Trigger, '/motor/calibrate_turn'),
+                                        float(self.g('turn_calibration_timeout_s')))
+            self.log_row('TURN_CALIBRATION', 'ok' if ok else 'failed', str(msg).replace(',', ';'))
         return 'started'
 
     def do_go_screen(self):

@@ -21,6 +21,13 @@ from motor_teleop.calib_store import CalibStore, DEFAULT_PATH
 
 def read_bag(path):
     """Returns (pwm_samples [(t,l,r)], poses [(t,x,y,yaw)]) with t in seconds (bag receive time)."""
+    import glob
+    import os
+    import subprocess
+    if not os.path.isfile(os.path.join(path, 'metadata.yaml')) and glob.glob(os.path.join(path, '*.mcap')):
+        # recorder killed before it wrote metadata.yaml (crash, power loss): rebuild it
+        print(f'{path}: no metadata.yaml, running ros2 bag reindex ...')
+        subprocess.run(['ros2', 'bag', 'reindex', path, '-s', 'mcap'], check=False)
     storage = None
     for sid in ('mcap', 'sqlite3'):
         try:

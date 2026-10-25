@@ -33,6 +33,7 @@ setup(
             'click_waypoints = robot_slam.click_waypoints:main',
             'drop_servo_node = robot_slam.drop_servo_node:main',
             'frontier_explorer = robot_slam.frontier_explorer:main',
+            'speed_governor = robot_slam.speed_governor:main',
         ]
     },
 )
