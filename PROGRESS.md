@@ -23,12 +23,19 @@ Living handoff file. A fresh Claude Code session should read this first, then `T
 
 ## Steps
 - [x] Step 0: worktree + branch, Sonnet agent file, agy check (Gemini 3.8 Flash available, already signed in)
-- [~] Step 1: backups done + verified (see Findings). WAITING: user runs the Pi apt update (kernel/firmware held)
-      + reboot over ssh; then re-check topics/rates, lidar by-id, camera, motor timeout vs the 12:22 baseline.
-- [~] Step 2: Jazzy WSL distro, started ~13:05 (1.5 h report 14:35, hard stop 15:05 -> back to Humble).
-      Ubuntu-24.04 installed (user hamza, NOPASSWD sudo, systemd). ROS Jazzy + deps installing
-      ($CLAUDE_JOB_DIR/tmp/install_jazzy.sh). Still to do: .wslconfig (5 GB + 4 GB swap, mirrored) + one
-      `wsl --shutdown`, copy workspace + cyclonedds/env, colcon build (rf2o check), Pi topics/TF/teleop/stop/Carto.
+- [x] Step 1: backups verified; user ran the Pi apt upgrade (26 kernel/firmware pkgs held) 14:13, reboot 14:17.
+      Re-check vs 12:22 baseline: NO differences (/scan 6.26 Hz, IMU 93.6, camera 30 Hz upright, lidar by-id
+      present, gyro bias -12.385, motor timeout 0.4 s with the old hwtest). No more Pi updates after the office test.
+- [~] Step 2: Jazzy WSL distro (started ~13:05). DONE: Ubuntu-24.04 + ROS Jazzy + Nav2/Carto/etc, workspace
+      ~/hardleel_ws (src symlinked to this worktree) builds incl. rf2o; CLIP deps + weights; .wslconfig
+      5 GB + 4 GB swap. Pi deployed with pi_bringup (Boost lidar 6 Hz, camera 5 Hz = 7.7 % CPU, cmd_timeout
+      0.3 s, IMU calib OK). From Jazzy over zenoh: all Pi topics at rate, laptop_mapping -> Cartographer /map,
+      TF map->laser, collision_monitor active, /cmd_vel Twist on both ends, bag recording.
+      LEFT (needs hands on the robot): teleop drives it, motors stop when the laptop stops, map while driving.
+- NETWORK DECISION (user, 14:30): keep the hotspot, use rmw_zenoh. WSL (mirrored or NAT) cannot reach the
+  hotspot subnet; laptop rmw_zenohd -> Windows portproxy 0.0.0.0:7447 -> Pi rmw_zenohd:7447
+  (scripts/laptop/windows_zenoh_proxy.ps1, admin, done on this laptop). .wslconfig now networkingMode=nat.
+  ros_env.sh starts the laptop router; robot_hw.sh starts the Pi router. HARDLEEL_RMW/RMW=cyclone = old setup.
 - [x] M1.1 IMU calibration motion check (imu_serial_node: CalibStats, retry, /imu/recalibrate, /imu/calib_status)
 - [x] M1.2 laptop_mapping / laptop_mission / laptop_localization launch files (untested on ROS yet)
 - [x] M1.3 waypoints.py, save_pose, click_waypoints (+selftest), waypoints_course.yaml draft, waypoints_office.yaml
