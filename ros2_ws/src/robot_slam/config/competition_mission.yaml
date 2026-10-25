@@ -5,7 +5,7 @@ competition_mission:
     auto_start: false          # false: wait for std_msgs/Empty on /mission/start (scripts/laptop/go.sh)
     mission_time_limit_s: 175.0   # hard global deadline; rulebook limit is 180 s
     finish_grace_s: 10.0       # extra time for the finish goal after the deadline
-    goal_timeout_s: 45.0       # per Nav2 goal
+    goal_timeout_s: 30.0       # per Nav2 goal (a leg is ~10 s at 0.3 m/s; 45 s x 2 attempts nearly cost the deadline in the sim)
     max_retries: 1             # retries per goal after clearing costmaps, then skip the waypoint
     # classification
     classify_retries: 2        # extra /classify attempts (with a small yaw wiggle in between)

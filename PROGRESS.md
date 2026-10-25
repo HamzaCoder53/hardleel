@@ -23,17 +23,36 @@ Living handoff file. A fresh Claude Code session should read this first, then `T
 
 ## Steps
 - [x] Step 0: worktree + branch, Sonnet agent file, agy check (Gemini 3.8 Flash available, already signed in)
-- [ ] Step 1: commit; user runs `wsl --export` backup; Pi apt update with kernel/firmware held; reboot; re-check topics
-- [ ] Step 2: Jazzy WSL distro (time-boxed 2 h)
-- [ ] M1.1 IMU calibration motion check
-- [ ] M1.2 laptop_mapping / laptop_mission / localization fallback (Cartographer continuity)
-- [ ] M1.3 waypoint files + save_pose tool
-- [ ] M1.4 CLIP classifier + monitor test
-- [ ] M1.5 gate check (median range in sector)
-- [ ] M1.6 mission node adaptations
-- [ ] M1.7 event logger
-- [ ] M1.8 obstacle wait-then-replan + logging
-- [ ] M1.9 pi_bringup, RUNBOOK.md
+- [~] Step 1: backups done + verified (see Findings). WAITING: user runs the Pi apt update (kernel/firmware held)
+      + reboot over ssh; then re-check topics/rates, lidar by-id, camera, motor timeout vs the 12:22 baseline.
+- [~] Step 2: Jazzy WSL distro, started ~13:05 (1.5 h report 14:35, hard stop 15:05 -> back to Humble).
+      Ubuntu-24.04 installed (user hamza, NOPASSWD sudo, systemd). ROS Jazzy + deps installing
+      ($CLAUDE_JOB_DIR/tmp/install_jazzy.sh). Still to do: .wslconfig (5 GB + 4 GB swap, mirrored) + one
+      `wsl --shutdown`, copy workspace + cyclonedds/env, colcon build (rf2o check), Pi topics/TF/teleop/stop/Carto.
+- [x] M1.1 IMU calibration motion check (imu_serial_node: CalibStats, retry, /imu/recalibrate, /imu/calib_status)
+- [x] M1.2 laptop_mapping / laptop_mission / laptop_localization launch files (untested on ROS yet)
+- [x] M1.3 waypoints.py, save_pose, click_waypoints (+selftest), waypoints_course.yaml draft, waypoints_office.yaml
+- [~] M1.4 CLIP classifier (Sonnet agent running) + monitor test script (Gemini)
+- [x] M1.5 gate_check.py (sector median + GatePoller) wired into the mission
+- [x] M1.6 mission node: waypoints files, events, loading adapter (stub), /dump if has_drop_bin, replan
+- [x] M1.7 event_logger (+ judges_sender stub)
+- [x] M1.8 collision_monitor boxes (one node, both phases), obstacle_watch (lidar vs /map), wait-then-replan
+- [~] M1.9 pi_bringup + robot_hw.sh done (not deployed to the Pi yet); RUNBOOK.md (Gemini draft) pending
+- [x] Bag recording: built into laptop_mapping/localization (record_bag:=true default, mcap, ~/hardleel_bags)
+- [x] FIRST END-TO-END SIM RUN (13:48, Humble distro, scripts/laptop/sim_e2e_test.sh, log docs/sim_runs/):
+      all stages + every required timestamp; gate -> path2 in 0.41 s; bin_metal skipped (sim waypoint in a
+      narrow lane, 2 x 45 s timeouts) -> goal_timeout_s now 30 s. Total 174 s.
+- [x] RUNBOOK.md (Gemini draft, corrected) incl. office test sequence
+
+## Decisions added during the build
+- Sim stays on Gazebo Fortress in the Humble distro tonight (porting to Harmonic = risk, no gain for tomorrow).
+  The laptop launch files work on both distros (stack_common.nav2_params_for_distro rewrites Jazzy-only bits).
+- Sim tests use FastDDS: CycloneDDS over WSL loopback silently drops the sim's LaserScan messages (IMU gets
+  through). The real robot keeps CycloneDDS (unicast to the Pi over the hotspot interface: worked on 22 Oct).
+- `ros2 topic hz` ignores SIGTERM in WSL; use scripts/laptop/topic_probe.py or `timeout -k 2 -s INT`.
+- Humble distro: a pip --user setuptools (pulled in by torch) broke colcon; removed. Same guard in the Jazzy setup.
+- One collision_monitor for both phases; StopBox only 12-22 cm ahead -> loading/bin waypoints ~0.30 m off faces.
+- Obstacle detection = lidar points ahead that are not near an occupied /map cell (obstacle_watch.py).
 - [ ] First end-to-end sim run (stub classifier)
 - [ ] Office test
 
@@ -47,6 +66,44 @@ Living handoff file. A fresh Claude Code session should read this first, then `T
   (~5 x 5 m, clean-ish), track_20261022_1648_final (fragments spread over 18 x 39 m, unusable). WSL
   `~/map_rebuild/scans_bag` (16 Oct) holds thinned scans extracted from the 15 Oct pbstream (no IMU).
   Each map's origin is wherever that run started; whether that was the official start spot is user knowledge.
+
+- 25 Oct 13:20, user: the 22 Oct maps ARE the course (15 Oct is not). Reference = track_20261022_1644.
+  Chamfer fit of Figure 1 walls to it (normal and mirrored, all rotations) is NOT credible (67 % inliers, start
+  lands at the bins, the map and its own autosave disagree). The map shows: wall 0.3 m behind the start, a
+  ~0.7 m x 5 m corridor straight ahead (fits Figure 1's right corridor), and a ~2.6 x 2.3 m room on the robot's
+  RIGHT, whereas Figure 1 has only 0.49 m of floor right of the start pad. Either the real field differs from
+  Figure 1 or the map is mirrored/partial. Covers ~30 % of the field: junction, gate, bins, path 1/2 missing.
+  1626 / 1626_autosave do not fill the gap (2 x 2 m / broken 53 x 34 m). Renders: docs/maps_review/.
+  Decision: waypoints_course.yaml = Figure 1 draft relative to the start pose (all LOW confidence); tomorrow the
+  click tool on the fresh phase-1 map is the primary way to set the points.
+- Camera (13:00 frame): upright and level, no rotation needed (param rotate_deg: 0 kept). Mounted low: the
+  frame is mostly floor/desk legs. Cable not clearly in view (small white blur at the bottom-left edge).
+- Backups: WSL Humble export `%USERPROFILE%\wsl-backups\Ubuntu-22.04-humble-25oct.tar` (6.68 GB, verified
+  listing); Pi `Documents\hardleel-backups\pi_home_20261025.tgz` (45 MB, 415 files = Pi count, md5 spot-checked).
+- Robot ID: "HARDLEEL" (config, replace if the organisers give an official one).
+
+## Interfaces (all Milestone 1 code builds against these)
+- Waypoints file (`robot_slam/config/waypoints_course.yaml`, `waypoints_office.yaml`), map frame, origin = start pose
+  (x forward, y left), yaw in degrees:
+  ```yaml
+  frame: map
+  poses:                      # ordered: the click tool asks for them in this order
+    screen: {x: 0.8, y: -0.14, yaw_deg: -90, conf: low, note: '...'}
+  sequences:                  # ordered pose-name lists
+    terrain: [terrain_1, terrain_2]
+    path1: [path1_1, path1_2]
+    path2: [path2_1, path2_2]
+  ```
+  Required pose names: screen, loading_plastic, loading_metal, loading_organic, terrain_* , junction, gate_check,
+  path1_*, path2_*, bin_plastic, bin_organic, bin_metal, finish.
+- Events: topic `/mission/event` (std_msgs/String, JSON `{"event": name, "detail": {...}}`). Names: autonomous_start,
+  waste_detected {class, confidence}, loading_complete, terrain_complete, obstacle_detected, obstacle_response
+  {action, response_s}, gate_decision {decision: path1|path2, wait_s}, deposit_complete {bin, dropped}, finish.
+  The event_logger stamps them, computes total_run_time and gate_wait_time, writes JSON+CSV, prints a summary.
+- Classifier: service `/classify` (std_srvs/Trigger) -> message `class:conf:colour` (existing parse_classify format;
+  class `unknown` when below threshold); also `/classifier/result` (String JSON with per-class scores).
+- Drop: service `/dump` (std_srvs/Trigger) on the Pi; the mission calls it only if `has_drop_bin: true`.
+- Gate: `robot_slam/gate_check.py` pure helpers (sector median, poller) used by the mission.
 
 ## Open questions for the user
 - Robot ID; camera rotation/cable status; saved course scans (path, format, start spot?); servo pins.
