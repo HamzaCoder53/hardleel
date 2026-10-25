@@ -153,7 +153,13 @@ Step 1.
 - [x] B2 waypoints: waypoints_course.yaml (Figure 1) + waypoints_course_mirror.yaml (mirrored; the 22 Oct scan
       suggests the room is on the right). Start spot of the 22 Oct run unconfirmed. Click tool = primary.
       QUESTION for the user: at the start pad facing the field, is the loading room on the left or right?
-- [~] B3 collision monitor: mapping stop box smaller (12-17 cm) DONE; ramp-as-wall sim test next.
+- [x] B3 collision monitor: mapping stop box 12-17 cm (mission 12-22 cm), forward-only velocity_polygons.
+      Ramp sim (docs/sim_runs/ramp_*.log): a 50-100 mm ramp is below the 15 cm lidar plane -> no fake wall, 0
+      collision-monitor stops; pitch ~2 deg at the foot -> sensor_prep ramp mode ON, a few hits -> SLOWDOWN only.
+      The sim robot cannot climb even 50 mm (low chassis, 17.5 mm casters) -> on-ramp behaviour = real board test.
+      Ramp SIDES are invisible to the lidar: click ramp waypoints so the robot meets ramps end-on.
+      Also found: Nav2 lifecycle bring-up can time out under load -> every goal rejected; the mission now checks
+      /lifecycle_manager_navigation/is_active before the start, retries STARTUP, logs NAV2 READY / NOT ACTIVE.
 - [~] B4 cold start: up.ps1 + RUNBOOK section 0 written, NOT run yet (needs a real cold start); Humble fallback
       tested: zenoh Humble<->Jazzy = names but no data -> fallback = CycloneDDS on a router Wi-Fi (RUNBOOK 7).
 - [~] B5 motor_bridge deadband offset + pwm_test + calib file + live params (27 tests pass); deadband_calibrate,

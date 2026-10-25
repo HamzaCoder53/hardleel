@@ -4,7 +4,7 @@
 # Works in the Jazzy distro (Gazebo Harmonic, ~/hardleel_ws) and the Humble one (Fortress, WS=~/hardleel_m1_ws).
 #   worker        spawn a 0.25 m "worker" cylinder in the right corridor at GO, remove it 75 s later
 #   localization  phase 2 on laptop_localization (saved .pbstream) instead of the live mapping session
-#   ramp=<mm>     a 1.14 m ramp of that height in the right corridor (map x ~1.5) before mapping starts
+#   ramp=<mm>     a 1.14 m ramp of that height in the walled right corridor (map x 2.1-3.3) before mapping
 # Private domain 42 and FastDDS: CycloneDDS over WSL loopback drops the sim's LaserScan messages (tested 25 Oct).
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export ROS_DOMAIN_ID=42 RMW_IMPLEMENTATION=rmw_fastrtps_cpp LIBGL_ALWAYS_SOFTWARE=1
@@ -20,8 +20,8 @@ cleanup() { pkill -TERM -f "ros2 launch"; sleep 4; pkill -9 -f "gz sim|ign gazeb
 cleanup 2>/dev/null; sleep 1
 ros2 launch rdj2026_sim sim.launch.py gui:=false odom_tf:=false > $L/sim.log 2>&1 &
 sleep 20
-if [ "$RAMP" != 0 ]; then   # ramp across the right corridor, arena (6352, 1800) = map x 1.5, along the corridor
-  ros2 run ros_gz_sim create -world rdj2026 -name ramp -x 6.352 -y 1.8 -z 0 -Y 1.5708 -string "$(python3 "$HERE/ramp_sdf.py" $RAMP)" > $L/ramp.log 2>&1
+if [ "$RAMP" != 0 ]; then   # ramp in the walled part of the right corridor, arena (6352, 3000) = map x 2.13-3.27, end-on
+  ros2 run ros_gz_sim create -world rdj2026 -name ramp -x 6.352 -y 3.0 -z 0 -Y 1.5708 -string "$(python3 "$HERE/ramp_sdf.py" $RAMP)" > $L/ramp.log 2>&1
 fi
 ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=false > $L/mapping.log 2>&1 &
 sleep 15

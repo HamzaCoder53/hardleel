@@ -184,6 +184,37 @@ class CompetitionMission(Node):
                      'resolution': m.info.resolution,
                      'origin_x': m.info.origin.position.x, 'origin_y': m.info.origin.position.y}
 
+    def ensure_nav2_active(self, tries=3):
+        """Before the start: Nav2 must be active. A lifecycle bring-up that timed out (seen in the sim under load)
+        leaves every goal 'rejected'; ask the lifecycle manager to STARTUP again. Loud log either way."""
+        from nav2_msgs.srv import ManageLifecycleNodes
+        mgr = '/lifecycle_manager_navigation'
+        is_active = self.create_client(Trigger, mgr + '/is_active')
+        manage = self.create_client(ManageLifecycleNodes, mgr + '/manage_nodes')
+
+        def call(cli, req, timeout):
+            if not cli.wait_for_service(timeout_sec=5.0):
+                return None
+            fut = cli.call_async(req)
+            end = self.now() + timeout
+            while not fut.done() and self.now() < end:
+                rclpy.spin_once(self, timeout_sec=0.05)
+            return fut.result() if fut.done() else None
+
+        for k in range(tries):
+            r = call(is_active, Trigger.Request(), 5.0)
+            if r is not None and r.success:
+                self.get_logger().info('NAV2 READY')
+                return True
+            self.get_logger().error(f'NAV2 NOT ACTIVE (check {k + 1}/{tries}): asking {mgr} to start it again')
+            req = ManageLifecycleNodes.Request()
+            req.command = ManageLifecycleNodes.Request.RESET
+            call(manage, req, 30.0)
+            req.command = ManageLifecycleNodes.Request.STARTUP
+            call(manage, req, 60.0)
+        self.get_logger().error('!' * 60 + '\nNAV2 STILL NOT ACTIVE - restart laptop_mission before the start\n' + '!' * 60)
+        return False
+
     def set_monitor_profile(self, mission=True):
         """Collision monitor: mapping stop box -> mission stop box (or back). Logged, never fatal."""
         from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
@@ -392,6 +423,7 @@ class CompetitionMission(Node):
         self.get_logger().info('Waiting for /mission/start' + (' (auto_start)' if self.g('auto_start') else ''))
         self.log_row('WAIT_START', 'waiting')
         self.set_monitor_profile(mission=True)
+        self.ensure_nav2_active()
         if not self.g('auto_start'):
             self.wait(lambda: self.start_req)
         self.deadline = core.Deadline(self.now(), float(self.g('mission_time_limit_s')))
