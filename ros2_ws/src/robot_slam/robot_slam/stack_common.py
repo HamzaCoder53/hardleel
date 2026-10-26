@@ -91,20 +91,69 @@ def imu_and_prep(imu_port):
     return [*imu_hw(imu_port), *sensor_prep()]
 
 
-def cartographer(localization=False, pbstream='', use_sim_time=False, initial_pose=(0.0, 0.0, 0.0)):
-    """Cartographer on /scan_filtered + /imu/data. Localization mode loads a frozen .pbstream and starts the
+# Final-stack localization switches (all OFF by default; laptop launch args of the same name, loc_v2:=true = all).
+LOC_SWITCHES = ('scan_gate', 'imu_bias', 'wall_heading', 'carto_odom', 'carto_stationary', 'loc_monitor')
+
+
+def loc_options(context):
+    """Launch configurations -> {switch: bool}. loc_v2:=true turns every switch on."""
+    lc = context.launch_configurations
+    on = lambda n: str(lc.get(n, 'false')).lower() in ('1', 'true', 'yes', 'on')
+    allv2 = on('loc_v2')
+    opts = {k: allv2 or on(k) for k in LOC_SWITCHES}
+    opts['apply_corrections'] = on('loc_apply_corrections')
+    return opts
+
+
+def loc_launch_args():
+    from launch.actions import DeclareLaunchArgument
+    return [DeclareLaunchArgument('loc_v2', default_value='false', description='NEW, off: all localization v2 parts'),
+            *[DeclareLaunchArgument(k, default_value='false', description='NEW, off (final stack item 1)')
+              for k in LOC_SWITCHES],
+            DeclareLaunchArgument('loc_apply_corrections', default_value='false',
+                                  description='NEW, off: loc_monitor relocalizes Cartographer (else it only logs)')]
+
+
+def carto_config_dir(opts):
+    """Config dir for Cartographer: the package's, or a temp copy with the v2 changes patched in."""
+    cfg = os.path.join(pkg_share(), 'config')
+    if not opts or not (opts.get('carto_odom') or opts.get('carto_stationary')):
+        return cfg
+    import shutil
+    import tempfile
+    out = tempfile.mkdtemp(prefix='carto_v2_')
+    for f in ('cartographer_2d.lua', 'cartographer_2d_localization.lua'):
+        shutil.copy(os.path.join(cfg, f), out)
+    path = os.path.join(out, 'cartographer_2d.lua')
+    text = open(path).read()
+    if opts.get('carto_odom'):                       # rf2o + gyro + wall-heading EKF (/odom_loc), never PWM
+        text = text.replace('use_odometry = false,', 'use_odometry = true,')
+    if opts.get('carto_stationary'):                 # still scans inserted during stops (checkpoints, turns)
+        text = text.replace('motion_filter.max_time_seconds = 2.0', 'motion_filter.max_time_seconds = 1.0')
+    open(path, 'w').write(text)
+    return out
+
+
+def cartographer(localization=False, pbstream='', use_sim_time=False, initial_pose=(0.0, 0.0, 0.0), opts=None):
+    """Cartographer on /scan_filtered + /imu/data (v2 switches: /scan_mapping from scan_gate, /imu/data_v2 from
+    imu_bias, /odom_loc odometry). Localization mode loads a frozen .pbstream and starts the
     live trajectory AT `initial_pose` (x, y, yaw in the saved map; the start pose is (0, 0, 0) because mapping
     began there), so it does not have to search the whole map to find itself."""
-    cfg = os.path.join(pkg_share(), 'config')
+    opts = opts or {}
+    cfg = carto_config_dir(opts)
     basename = 'cartographer_2d_localization.lua' if localization else 'cartographer_2d.lua'
     args = ['-configuration_directory', cfg, '-configuration_basename', basename]
     if localization:
         args += ['-load_state_filename', pbstream, '-load_frozen_state=true',
                  '-start_trajectory_with_default_topics=false']
+    remaps = [('scan', '/scan_mapping' if opts.get('scan_gate') else '/scan_filtered'),
+              ('imu', '/imu/data_v2' if opts.get('imu_bias') else '/imu/data')]
+    if opts.get('carto_odom'):
+        remaps.append(('odom', '/odom_loc'))
     nodes = [
         Node(package='cartographer_ros', executable='cartographer_node', name='cartographer_node',
              output='screen', parameters=[{'use_sim_time': use_sim_time}], arguments=args,
-             remappings=[('scan', '/scan_filtered'), ('imu', '/imu/data')]),
+             remappings=remaps),
         Node(package='cartographer_ros', executable='cartographer_occupancy_grid_node',
              name='occupancy_grid_node', output='screen', parameters=[{'use_sim_time': use_sim_time}],
              arguments=['-resolution', '0.05', '-publish_period_sec', '0.5']),
@@ -125,13 +174,58 @@ def cartographer(localization=False, pbstream='', use_sim_time=False, initial_po
     return nodes
 
 
+def loc_v2(opts, use_sim_time=False, localization=False):
+    """Final-stack localization nodes for the switches that are on (laptop only; nothing runs on the Pi)."""
+    if not opts or not any(opts.get(k) for k in LOC_SWITCHES):
+        return []
+    cfg = os.path.join(pkg_share(), 'config')
+    sim = {'use_sim_time': use_sim_time}
+    nodes = []
+    if opts.get('scan_gate'):
+        nodes.append(Node(package='robot_slam', executable='scan_gate', name='scan_gate', output='screen',
+                          parameters=[sim]))
+    if opts.get('imu_bias'):
+        nodes += [Node(package='robot_slam', executable='imu_bias', name='imu_bias', output='screen', parameters=[sim]),
+                  Node(package='imu_filter_madgwick', executable='imu_filter_madgwick_node', name='imu_madgwick_v2',
+                       output='log', parameters=[{'use_mag': False, 'publish_tf': False, 'world_frame': 'enu',
+                                                  'gain': 0.02, **sim}],
+                       remappings=[('imu/data_raw', '/imu/data_raw_unbiased'), ('imu/data', '/imu/data_v2')])]
+    need_odom = opts.get('wall_heading') or opts.get('carto_odom') or opts.get('loc_monitor')
+    if need_odom:                                    # own rf2o + EKF: also works in manual mapping (no Nav2 chain)
+        nodes += [
+            Node(package='rf2o_laser_odometry', executable='rf2o_laser_odometry_node', name='rf2o_loc', output='log',
+                 parameters=[{'laser_scan_topic': '/scan_filtered', 'odom_topic': '/odom_rf2o_loc', 'publish_tf': False,
+                              'base_frame_id': 'base_link', 'odom_frame_id': 'odom', 'init_pose_from_topic': '',
+                              'freq': 10.0, **sim}]),
+            Node(package='robot_localization', executable='ekf_node', name='ekf_loc', output='log',
+                 parameters=[os.path.join(cfg, 'ekf_nav_v2.yaml'),
+                             {'imu0': '/imu/data_raw_unbiased' if opts.get('imu_bias') else '/imu/data_raw', **sim}],
+                 remappings=[('odometry/filtered', '/odom_loc')])]
+    if opts.get('wall_heading'):
+        nodes.append(Node(package='robot_slam', executable='wall_heading', name='wall_heading', output='screen',
+                          parameters=[{'odom_topic': '/odom_loc', **sim}]))
+    if opts.get('loc_monitor'):
+        cdir = carto_config_dir(opts)
+        nodes.append(Node(package='robot_slam', executable='loc_monitor', name='loc_monitor', output='screen',
+                          parameters=[{'apply_corrections': bool(opts.get('apply_corrections')),
+                                       'carto_config_dir': cdir,
+                                       'carto_config_basename': 'cartographer_2d_localization.lua' if localization
+                                       else 'cartographer_2d.lua', **sim}],
+                          remappings=[('/odom_rf2o', '/odom_rf2o_loc')]))
+    return nodes
+
+
 def record_bag(bag_dir, name, topics=None):
     """ros2 bag record (mcap) of everything needed to rebuild the map / tune offline."""
     import time
     topics = topics or ['/scan', '/scan_filtered', '/imu/data_raw', '/imu/data', '/imu/data_lpf', '/imu/calib_status',
                         '/tf', '/tf_static', '/cmd_vel', '/cmd_vel_teleop', '/cmd_vel_nav', '/odom',
                         '/mission/state', '/mission/event', '/collision_monitor_state', '/classifier/result',
-                        '/motor/pwm_state', '/motor/speed_scale', '/exploration/state']   # pwm_state: speed fit
+                        '/motor/pwm_state', '/motor/speed_scale', '/exploration/state',   # pwm_state: speed fit
+                        # final-stack localization (only present when the switches are on)
+                        '/scan_gate/state', '/imu/bias', '/imu/data_v2', '/wall_heading/imu', '/wall_heading/state',
+                        '/odom_loc', '/odom_rf2o_loc', '/localization/confidence', '/localization/state',
+                        '/localization/event', '/localization/recovering', '/tracked_pose', '/map_nav']
     from launch.actions import ExecuteProcess
     bag_dir = os.path.expanduser(bag_dir)
     os.makedirs(bag_dir, exist_ok=True)

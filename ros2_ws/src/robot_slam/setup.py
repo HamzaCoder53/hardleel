@@ -36,6 +36,10 @@ setup(
             'frontier_explorer = robot_slam.frontier_explorer:main',
             'speed_governor = robot_slam.speed_governor:main',
             'map_freezer = robot_slam.map_freezer:main',
+            'scan_gate = robot_slam.scan_gate:main',
+            'imu_bias = robot_slam.imu_bias:main',
+            'wall_heading = robot_slam.wall_heading:main',
+            'loc_monitor = robot_slam.loc_monitor:main',
         ]
     },
 )

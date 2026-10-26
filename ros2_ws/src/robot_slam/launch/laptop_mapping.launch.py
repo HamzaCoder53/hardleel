@@ -10,6 +10,8 @@ at the start pose.
     ros2 bag record (mcap) of scans, IMU, TF, commands -> ~/hardleel_bags (record_bag:=false to skip)
 
     ros2 launch robot_slam laptop_mapping.launch.py [rviz:=true] [sim:=false]
+        [loc_v2:=true | scan_gate:= imu_bias:= wall_heading:= carto_odom:= carto_stationary:= loc_monitor:=]
+        (final-stack localization, all OFF by default; loc_apply_corrections:=true lets loc_monitor relocalize)
     Save the map at the end of phase 1: scripts/laptop/save_map.sh <name>
 """
 import os
@@ -31,7 +33,9 @@ def setup(context):
     nav2_params = sc.nav2_params_for_distro(os.path.join(cfg, 'nav2_params_mission.yaml'), sim)
     actions = [] if sim else sc.transforms()          # the sim publishes the body TFs itself
     actions += sc.sensor_prep(sim)
-    actions += sc.cartographer(localization=False, use_sim_time=sim)
+    opts = sc.loc_options(context)                    # final-stack localization switches, all off by default
+    actions += sc.cartographer(localization=False, use_sim_time=sim, opts=opts)
+    actions += sc.loc_v2(opts, sim)
     actions += sc.safety_chain('mapping', nav2_params, sim)
     mode = context.launch_configurations['mapping_mode']
     if mode == 'auto':
@@ -69,5 +73,6 @@ def generate_launch_description():
         DeclareLaunchArgument('rviz', default_value='true'),
         DeclareLaunchArgument('record_bag', default_value='true'),
         DeclareLaunchArgument('bag_dir', default_value='~/hardleel_bags'),
+        *sc.loc_launch_args(),
         OpaqueFunction(function=setup),
     ])

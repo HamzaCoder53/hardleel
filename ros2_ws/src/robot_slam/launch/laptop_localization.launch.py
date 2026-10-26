@@ -29,7 +29,9 @@ def setup(context):
     nav2_params = sc.nav2_params_for_distro(os.path.join(cfg, 'nav2_params_mission.yaml'), sim)
     actions = [] if sim else sc.transforms()
     actions += sc.sensor_prep(sim)
-    actions += sc.cartographer(localization=True, pbstream=pbstream, use_sim_time=sim, initial_pose=pose)
+    opts = sc.loc_options(context)                    # final-stack localization switches, all off by default
+    actions += sc.cartographer(localization=True, pbstream=pbstream, use_sim_time=sim, initial_pose=pose, opts=opts)
+    actions += sc.loc_v2(opts, sim, localization=True)
     actions += sc.safety_chain('mission', nav2_params, sim)
     if truthy(context, 'rviz'):
         actions.append(Node(package='rviz2', executable='rviz2', name='rviz2', output='log',
@@ -49,5 +51,6 @@ def generate_launch_description():
         DeclareLaunchArgument('rviz', default_value='true'),
         DeclareLaunchArgument('record_bag', default_value='true'),
         DeclareLaunchArgument('bag_dir', default_value='~/hardleel_bags'),
+        *sc.loc_launch_args(),
         OpaqueFunction(function=setup),
     ])
