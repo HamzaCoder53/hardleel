@@ -53,6 +53,10 @@ class MotorBridge(Node):
     def __init__(self):
         super().__init__('motor_bridge')
         self.declare_parameter('port', '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0')
+        # which ESP32 sketch is flashed: motor_code = the team's firmware/esp32_motor_code/motor_code.ino (26 Oct,
+        # lowercase m/s/x, timed runs); bridge = firmware/esp32_pi_bridge (M/S/X/P + 500 ms watchdog)
+        self.declare_parameter('esp32_protocol', 'motor_code')
+        self.declare_parameter('esp32_hold_ms', 400)   # motor_code: each drive command runs this long (the timeout)
         self.declare_parameter('max_speed', 1.0)     # Twist value (m/s) that maps to max_pwm
         self.declare_parameter('turn_gain', 0.5)     # wheel speed per rad/s of angular.z
         self.declare_parameter('max_pwm', 255)       # hard cap, 0..255
@@ -162,7 +166,10 @@ class MotorBridge(Node):
             on_watchdog=self.on_esp32_watchdog,
             on_connect=self.on_esp32_connect,
             on_disconnect=self.on_esp32_disconnect,
+            protocol=str(g('esp32_protocol')),
+            hold_ms=int(g('esp32_hold_ms')),
         )
+        self.get_logger().info(f'ESP32 protocol {self.esp32.protocol} (hold {self.esp32.hold_ms} ms)')
         self.left_pwm = 0          # target
         self.right_pwm = 0         # target
         self.cur_l = 0.0           # ramped value actually sent

@@ -12,6 +12,14 @@ Incoming from ESP32:
     PONG                - Reply to ping
     ERR <reason>        - Command error
     WATCHDOG STOP       - Firmware watchdog stopped motors after 500ms without M command
+
+protocol='motor_code' - the team's sketch firmware/esp32_motor_code/motor_code.ino (26 Oct, what is flashed):
+    m <left> <right> <ms>  speeds -255..255 for <ms> milliseconds. The sketch has NO watchdog, so every drive
+                           command carries hold_ms (400): the keepalive re-sends it every 100 ms while driving,
+                           and if the Pi / link stops, the sketch's timed run ends and the motors stop.
+    s <angle> | x (stop) | h (help: used as the handshake, answer "Commands:")
+    Replies: "Motor test ready" at boot, "Left .., right .. for .. ms", "Timed run finished" (= stopped by the
+    timeout -> reported like WATCHDOG STOP while driving), "Stop", "Unknown command ...".
 """
 
 import argparse
@@ -39,7 +47,13 @@ class Esp32Motors:
         on_watchdog: Optional[Callable[[], None]] = None,
         on_connect: Optional[Callable[[], None]] = None,
         on_disconnect: Optional[Callable[[], None]] = None,
+        protocol: str = 'bridge',
+        hold_ms: int = 400,
     ):
+        if protocol not in ('bridge', 'motor_code'):
+            raise ValueError(f'protocol must be bridge or motor_code, not {protocol!r}')
+        self.protocol = protocol
+        self.hold_ms = max(150, int(hold_ms))
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
@@ -115,15 +129,23 @@ class Esp32Motors:
                 except Exception:
                     pass
 
-                # Handshake: ping ESP32 until PONG or READY
+                # Handshake: ping ESP32 until PONG or READY ('motor_code' sketch: its help text / boot line;
+                # opening the port may reset the ESP32, whose setup() takes ~0.7 s)
                 handshake_ok = False
+                ping = b'P\n' if self.protocol == 'bridge' else b'h\n'
+                good = ('PONG', 'READY') if self.protocol == 'bridge' else ('Commands:', 'Motor test ready')
                 t0 = time.monotonic()
-                while time.monotonic() - t0 < 2.0 and not self._stop_event.is_set():
-                    s.write(b'P\n')
+                while time.monotonic() - t0 < 2.5 and not self._stop_event.is_set():
+                    s.write(ping)
                     s.flush()
-                    line = s.readline().decode('ascii', errors='ignore').strip()
-                    if line in ('PONG', 'READY') or line.endswith('PONG') or line.endswith('READY'):
-                        handshake_ok = True
+                    for _ in range(6):                     # the help text is several lines
+                        line = s.readline().decode('ascii', errors='ignore').strip()
+                        if not line:
+                            break
+                        if any(line == g or line.endswith(g) for g in good):
+                            handshake_ok = True
+                            break
+                    if handshake_ok:
                         break
                     time.sleep(0.1)
 
@@ -160,23 +182,28 @@ class Esp32Motors:
         self.target_l = left
         self.target_r = right
         self.is_driving = (left != 0 or right != 0)
-        self._send_command(f'M {left} {right}')
+        self._send_command(self._drive_cmd(left, right))
+
+    def _drive_cmd(self, left, right):
+        if self.protocol == 'motor_code':
+            return f'm {left} {right} {self.hold_ms}'     # timed: stops by itself if the Pi goes quiet
+        return f'M {left} {right}'
 
     def stop(self):
         """Emergency stop: stops both motors and sends X command."""
         self.target_l = 0
         self.target_r = 0
         self.is_driving = False
-        self._send_command('X')
+        self._send_command('X' if self.protocol == 'bridge' else 'x')
 
     def servos(self, angle: int):
         """Sets both drop servos to target angle (0..180)."""
         angle = max(0, min(180, int(angle)))
-        self._send_command(f'S {angle}')
+        self._send_command(f'S {angle}' if self.protocol == 'bridge' else f's {angle}')
 
     def ping(self):
-        """Sends ping 'P' command."""
-        self._send_command('P')
+        """Sends ping 'P' command (motor_code: 'h', the sketch has no ping)."""
+        self._send_command('P' if self.protocol == 'bridge' else 'h')
 
     def _send_command(self, cmd: str) -> bool:
         if not self.connected or not self.ser or not self.ser.is_open:
@@ -185,7 +212,7 @@ class Esp32Motors:
             try:
                 self.ser.write((cmd.strip() + '\n').encode('ascii'))
                 self.ser.flush()
-                if cmd.startswith('M'):
+                if cmd[:1] in ('M', 'm'):
                     self._last_m_time = time.monotonic()
                 return True
             except Exception as e:
@@ -208,7 +235,7 @@ class Esp32Motors:
         while not self._stop_event.wait(0.1):
             if self.connected and self.is_driving:
                 # If driving, periodically re-send M command to keep ESP32 watchdog fed
-                self._send_command(f'M {self.target_l} {self.target_r}')
+                self._send_command(self._drive_cmd(self.target_l, self.target_r))
 
     def _read_loop(self):
         """Continuously reads incoming lines from the ESP32."""
@@ -231,6 +258,17 @@ class Esp32Motors:
 
             if line.startswith('ERR'):
                 log.warning(f'ESP32 ERR: {line}')
+                if self.on_error:
+                    self.on_error(line)
+            elif line.startswith('Timed run finished') and self.protocol == 'motor_code':
+                if self.is_driving:                          # our hold ran out: the Pi side went quiet
+                    log.warning('ESP32 timed run ended while driving: motors stopped (no command for '
+                                f'{self.hold_ms} ms)')
+                    self.is_driving = False
+                    if self.on_watchdog:
+                        self.on_watchdog()
+            elif line.startswith('Unknown command') or line.startswith('Usage:'):
+                log.warning(f'ESP32 rejected a command: {line}')
                 if self.on_error:
                     self.on_error(line)
             elif line.startswith('WATCHDOG STOP'):
