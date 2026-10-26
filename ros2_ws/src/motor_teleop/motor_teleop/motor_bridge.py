@@ -323,7 +323,8 @@ class MotorBridge(Node):
             if len(m.data) == 2 and any(m.data):
                 self.get_logger().warn('dash PWM ignored: dash_input is false', throttle_duration_sec=5.0)
             return
-        l, r = (max(-self.max_pwm, min(self.max_pwm, int(v))) for v in m.data)
+        # full -255..255, NOT max_pwm: the team caps normal driving at 75 but the ramp needs full power (26 Oct)
+        l, r = (max(-255, min(255, int(v))) for v in m.data)
         now = self.get_clock().now()
         self.dash = (l, r, now)
         t = now.nanoseconds * 1e-9
