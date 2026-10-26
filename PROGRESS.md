@@ -256,14 +256,20 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
         blobs, plus `scripts/laptop/rebuild_map_from_bag.sh`.
       4 Verification: 157/157 existing tests pass + 4 map tidy tests pass. Background simulation run with
         localization v2 completed.
-- [x] 26 Oct ~09:30 ESP32 motor transition + Sim test results archive:
+- [x] 26 Oct ~09:45 ESP32 motor transition + Sim test results archive:
       1 ESP32 motor controller firmware added (`firmware/esp32_pi_bridge/esp32_pi_bridge.ino` and README)
         driving dual BTS7960 (IBT-2) H-bridges with 500ms HW command watchdog and dual servos.
+        Old Pico firmware preserved in `firmware/pico_motor/` and marked retired (`RETIRED.md`).
       2 `motor_bridge.py` upgraded to use `Esp32Motors` link (`ros2_ws/src/motor_teleop/motor_teleop/esp32_link.py`)
-        with 300ms cmd_vel timeout, 10 Hz keepalive, auto-reconnect, and servo confirmation.
-      3 Tests added: `test_esp32_bridge.py` and `test_esp32_link.py` (32/32 motor_teleop unit tests passing;
-        189 total unit tests passing across packages).
-      4 Simulation test results from all regression/rehearsal runs archived in `docs/sim_runs/*.log`
+        with 300ms cmd_vel timeout (safety watchdog independent of Wi-Fi), 10 Hz keep-alive, auto-reconnect,
+        clean thread termination via `threading.Event()`, and servo confirmation to `/motor/servo_state`.
+      3 Launch files (`motor_bridge.launch.py`, `pi_bringup.launch.py`) updated to auto-detect persistent
+        `/dev/serial/by-id/*CP210*` / `*CH340*` ESP32 paths while maintaining interface compatibility.
+      4 Documentation: RUNBOOK Section 9 added with complete ESP32 pinout table, serial configuration,
+        dialout permissions, and wheels-up hardware test plan.
+      5 Tests verified: 32/32 motor_teleop unit tests passing (PTY fake hardware test, safety watchdog,
+        servo routing, mapping consistency; 189 total unit tests passing across all packages).
+      6 Simulation test results from all regression/rehearsal runs archived in `docs/sim_runs/*.log`
         (`simrun_full_20261026.log`, `simrun_base_20261026.log`, `simrun_orig_20261026.log`, `simrun_v2_20261026.log`,
         `simrun_side_20261025.log`, `simrun_side2_20261025.log`, `simrun_side3_20261025.log`, `simrun_side4_20261025.log`).
-      5 Added helper scripts `chk_teleop.sh`, `runsim.sh`, `start_map.sh` to `scripts/laptop/`.
+      7 Added helper scripts `chk_teleop.sh`, `runsim.sh`, `start_map.sh` to `scripts/laptop/`.

@@ -20,9 +20,14 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
-def first(pattern, fallback):
-    found = sorted(glob.glob(pattern))
-    return found[0] if found else fallback
+def first(patterns, fallback):
+    if isinstance(patterns, str):
+        patterns = [patterns]
+    for pattern in patterns:
+        found = sorted(glob.glob(pattern))
+        if found:
+            return found[0]
+    return fallback
 
 
 def generate_launch_description():
@@ -30,7 +35,15 @@ def generate_launch_description():
     L = LaunchConfiguration
     return LaunchDescription([
         DeclareLaunchArgument('imu_port', default_value=first('/dev/serial/by-id/usb-Arduino*', '/dev/ttyACM1')),
-        DeclareLaunchArgument('pico_port', default_value=first('/dev/serial/by-id/*Raspberry_Pi_Pico*', '/dev/ttyACM0')),
+        DeclareLaunchArgument('pico_port', default_value=first([
+            '/dev/serial/by-id/*CP210*',
+            '/dev/serial/by-id/*CH340*',
+            '/dev/serial/by-id/*1a86_USB_Serial*',
+            '/dev/serial/by-id/*Silicon_Labs*',
+            '/dev/serial/by-id/*Espressif*',
+            '/dev/serial/by-id/*USB-Serial*',
+            '/dev/serial/by-id/*Raspberry_Pi_Pico*',
+        ], '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0')),
         DeclareLaunchArgument('cmd_timeout', default_value='0.3'),
         DeclareLaunchArgument('camera', default_value='true'),
         DeclareLaunchArgument('camera_fps', default_value='5.0'),

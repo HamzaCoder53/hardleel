@@ -57,6 +57,7 @@ class Esp32Motors:
         self.is_driving = False
 
         self._running = False
+        self._stop_event = threading.Event()
         self._keepalive_thread: Optional[threading.Thread] = None
         self._reader_thread: Optional[threading.Thread] = None
         self._reconnect_thread: Optional[threading.Thread] = None
@@ -68,6 +69,7 @@ class Esp32Motors:
     def start(self):
         """Starts worker threads and begins connection loop."""
         self._running = True
+        self._stop_event.clear()
         self._connect_serial()
 
         self._reader_thread = threading.Thread(target=self._read_loop, name='esp32_reader', daemon=True)
@@ -102,7 +104,7 @@ class Esp32Motors:
                 try:
                     s.dtr = False
                     s.rts = False
-                except (OSError, IOError):
+                except Exception:
                     pass
 
                 # Settle and flush any garbage/boot messages
@@ -110,13 +112,13 @@ class Esp32Motors:
                 try:
                     s.reset_input_buffer()
                     s.reset_output_buffer()
-                except (OSError, IOError):
+                except Exception:
                     pass
 
                 # Handshake: ping ESP32 until PONG or READY
                 handshake_ok = False
                 t0 = time.monotonic()
-                while time.monotonic() - t0 < 2.0:
+                while time.monotonic() - t0 < 2.0 and not self._stop_event.is_set():
                     s.write(b'P\n')
                     s.flush()
                     line = s.readline().decode('ascii', errors='ignore').strip()
@@ -124,6 +126,13 @@ class Esp32Motors:
                         handshake_ok = True
                         break
                     time.sleep(0.1)
+
+                if self._stop_event.is_set():
+                    try:
+                        s.close()
+                    except Exception:
+                        pass
+                    return False
 
                 if not handshake_ok:
                     log.warning(f'ESP32 opened on {self.port} but handshake timed out (no PONG/READY)')
@@ -138,8 +147,9 @@ class Esp32Motors:
                         log.error(f'Error in on_connect callback: {e}')
                 return True
 
-            except (serial.SerialException, OSError) as e:
-                log.error(f'Failed to open ESP32 serial port {self.port}: {e}')
+            except Exception as e:
+                if not self._stop_event.is_set():
+                    log.error(f'Failed to open ESP32 serial port {self.port}: {e}')
                 self.connected = False
                 return False
 
@@ -178,7 +188,7 @@ class Esp32Motors:
                 if cmd.startswith('M'):
                     self._last_m_time = time.monotonic()
                 return True
-            except (serial.SerialException, OSError) as e:
+            except Exception as e:
                 log.error(f'Serial write error on {self.port}: {e}')
                 self._handle_disconnect()
                 return False
@@ -195,23 +205,23 @@ class Esp32Motors:
 
     def _keepalive_loop(self):
         """Resends M command at least every 100 ms (10 Hz) while driving to prevent ESP32 500ms watchdog trip."""
-        while self._running:
-            time.sleep(0.1)  # 10 Hz
+        while not self._stop_event.wait(0.1):
             if self.connected and self.is_driving:
                 # If driving, periodically re-send M command to keep ESP32 watchdog fed
                 self._send_command(f'M {self.target_l} {self.target_r}')
 
     def _read_loop(self):
         """Continuously reads incoming lines from the ESP32."""
-        while self._running:
+        while not self._stop_event.is_set():
             s = self.ser
-            if not self._running or not self.connected or s is None:
-                time.sleep(0.05)
+            if not self.connected or s is None:
+                if self._stop_event.wait(0.05):
+                    break
                 continue
             try:
                 line = s.readline().decode('ascii', errors='ignore').strip()
-            except (serial.SerialException, OSError, TypeError) as e:
-                if self._running:
+            except Exception as e:
+                if not self._stop_event.is_set():
                     log.error(f'Serial read exception: {e}')
                     self._handle_disconnect()
                 continue
@@ -237,8 +247,7 @@ class Esp32Motors:
 
     def _reconnect_loop(self):
         """Retries connection every 1.0 second if disconnected."""
-        while self._running:
-            time.sleep(1.0)
+        while not self._stop_event.wait(1.0):
             if not self.connected:
                 log.info(f'Attempting reconnect to ESP32 on {self.port}...')
                 self._connect_serial()
@@ -246,6 +255,7 @@ class Esp32Motors:
     def close(self):
         """Stops motors and closes serial connection cleanly."""
         self._running = False
+        self._stop_event.set()
         try:
             self.stop()
         except Exception:
@@ -256,6 +266,7 @@ class Esp32Motors:
                     self.ser.close()
                 except Exception:
                     pass
+            self.ser = None
             self.connected = False
         if self._keepalive_thread and self._keepalive_thread.is_alive():
             self._keepalive_thread.join(timeout=0.3)

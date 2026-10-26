@@ -259,3 +259,78 @@ Switch back: `.wslconfig` -> `networkingMode=nat`, `wsl --shutdown`, Pi `./robot
 | Speed fit from a mapping bag | `ros2 run motor_teleop fit_speed_from_bag ~/hardleel_bags/<mapping_...> --apply` |
 Commanded PWM is never used as odometry: Cartographer runs on lidar + IMU only.
 Ramps: their sides are invisible to the 15 cm lidar plane, so place waypoints so the robot meets a ramp end-on.
+
+---
+
+## 9. ESP32 & BTS7960 Motor Controller Setup
+
+The Raspberry Pi Pico motor bridge has been replaced by an ESP32-WROOM-32 dev board driving two BTS7960 (IBT-2) half-bridge motor drivers and dual drop-bin servos.
+
+### ESP32 Wiring Table
+| ESP32 Pin | Connected To | Notes |
+|---|---|---|
+| GPIO 25 | Left module RPWM | Left forward PWM |
+| GPIO 33 | Left module LPWM | Left reverse PWM |
+| GPIO 26 | Right module RPWM | Right forward PWM |
+| GPIO 27 | Right module LPWM | Right reverse PWM |
+| GPIO 32 | R_EN + L_EN on both modules | Active HIGH motor driver enable (10k pull-down to GND) |
+| GPIO 13 | Servo 1 signal | Drop servo 1 (50 Hz, 500-2500 us) |
+| GPIO 4 | Servo 2 signal | Drop servo 2 (50 Hz, 500-2500 us) |
+| 3V3 | VCC on both BTS7960 modules | Logic level VCC |
+| GND | GND on both BTS7960 modules & servos | Common ground |
+| USB | Raspberry Pi 4 USB port | Serial communication + ESP32 dev board power |
+
+> [!NOTE]
+> - Motors: 4x Johnson 37GB/37GM385 12V 1000 rpm gear motors, open-loop (no encoders). Left motors wired in parallel to left BTS7960, right motors to right BTS7960.
+> - Drop bin servos are powered from a dedicated 5V power supply.
+> - ESP32 firmware handles side inversions via `LEFT_INVERT` / `RIGHT_INVERT` flags in `firmware/esp32_pi_bridge/esp32_pi_bridge.ino`. Do not invert in ROS code.
+
+### Pi Serial Configuration & Permissions
+1. Ensure the `hardleel` user belongs to the `dialout` group on the Pi:
+   ```bash
+   sudo usermod -a -G dialout $USER
+   ```
+2. Verify `pyserial` is installed on the Pi:
+   ```bash
+   sudo apt-get install -y python3-serial
+   ```
+3. Identify the ESP32 persistent `/dev/serial/by-id/` path (CP2102 or CH340):
+   ```bash
+   ls -la /dev/serial/by-id/
+   ```
+   *Expected output: `usb-Silicon_Labs_CP2102_...` or `usb-1a86_USB_Serial...` (distinct from the lidar and IMU ports).*
+
+### Protocol Specification (115200 baud, ASCII, newline terminated)
+- `M <left> <right>`: Motor speeds (-255..255). Left/right PWM duty cycle. Pi sends at 10 Hz keep-alive.
+- `S <angle>`: Drop servo angle (0..180 degrees, default 90).
+- `X`: Motor emergency stop (brakes both sides).
+- `P`: Ping command (replies `PONG`).
+- Firmware outputs: `READY` on boot, `PONG` on ping, `ERR <reason>` on parse error, and `WATCHDOG STOP` if no `M` command received for 500 ms.
+
+### Wheels-Up Hardware Test Plan
+*Run this test with the robot elevated on blocks so all 4 wheels spin freely in the air.*
+
+1. **Direct ESP32 Link Check:**
+   ```bash
+   ssh hardleel@192.168.137.8
+   python3 -m motor_teleop.esp32_link
+   ```
+   - Type `p` -> Verify `PONG` response.
+   - Type `m 80 80` -> Verify both left and right wheels spin forward smoothly.
+   - Type `m -80 -80` -> Verify wheels spin reverse.
+   - Type `s 120` -> Verify both drop servos move synchronously to 120°.
+   - Type `x` -> Verify motors brake immediately.
+   - Type `q` to exit.
+
+2. **ROS 2 Motor Bridge Integration Check:**
+   ```bash
+   ros2 launch motor_teleop motor_bridge.launch.py
+   ```
+   In a second terminal:
+   - Forward test: `ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.2}}"`
+     *Check:* Wheels spin forward.
+   - Watchdog stop test: Stop the pub command (Ctrl-C).
+     *Check:* After 300 ms, wheels stop completely.
+   - Servo test: `ros2 topic pub --once /motor/servo_cmd std_msgs/msg/Int32MultiArray "{data: [120, 240]}"`
+     *Check:* Servos move to 120° and `/motor/servo_state` prints `moving,120` then `done,120`.
+
