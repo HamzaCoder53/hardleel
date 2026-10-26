@@ -20,3 +20,4 @@ maps/*_autosave.*
 
 # Claude Code local settings
 .claude/settings.local.json
+.pixi/

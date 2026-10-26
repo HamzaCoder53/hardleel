@@ -1,0 +1,33 @@
+# Mac-only (Apple Silicon) RoboStack environment. The Windows/WSL laptop keeps its apt setup.
+[workspace]
+name = "hardleel-sim"
+channels = ["https://prefix.dev/robostack-jazzy", "conda-forge"]
+platforms = ["osx-arm64"]
+
+[dependencies]
+python = "3.12.*"
+ros-jazzy-desktop = "*"
+ros-jazzy-navigation2 = "*"
+ros-jazzy-nav2-bringup = "*"
+ros-jazzy-cartographer = "*"
+ros-jazzy-cartographer-ros = "*"
+ros-jazzy-robot-localization = "*"
+ros-jazzy-imu-filter-madgwick = "*"
+ros-jazzy-laser-filters = "*"
+ros-jazzy-twist-mux = "*"
+ros-jazzy-teleop-twist-keyboard = "*"
+ros-jazzy-rosbag2-storage-mcap = "*"
+ros-jazzy-foxglove-bridge = "*"
+ros-jazzy-rmw-cyclonedds-cpp = "*"
+ros-jazzy-ros-gz = "*"
+colcon-common-extensions = "*"
+numpy = "*"
+scipy = "*"
+opencv = "*"
+pytorch = "*"
+open-clip-torch = "*"
+
+[activation.env]
+ROS_AUTOMATIC_DISCOVERY_RANGE = "LOCALHOST"
+RMW_IMPLEMENTATION = "rmw_cyclonedds_cpp"
+ROS_DOMAIN_ID = "42"

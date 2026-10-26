@@ -267,3 +267,7 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
         (`simrun_full_20261026.log`, `simrun_base_20261026.log`, `simrun_orig_20261026.log`, `simrun_v2_20261026.log`,
         `simrun_side_20261025.log`, `simrun_side2_20261025.log`, `simrun_side3_20261025.log`, `simrun_side4_20261025.log`).
       5 Added helper scripts `chk_teleop.sh`, `runsim.sh`, `start_map.sh` to `scripts/laptop/`.
+
+# SIM BRANCH `feat/sim` (26 Oct, Mac mini) - STOPPED EARLY on the disk floor
+- Done: pixi installed (brew), `pixi.toml` + `pixi.lock` (resolves), BLOCKERS/DECISIONS/SIM_MEASUREMENTS_NEEDED.
+- Blocked: env install (19 GiB free < 20 GB floor). See BLOCKERS.md B1. Resume with `pixi install` once space exists.
