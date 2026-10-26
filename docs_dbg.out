@@ -1,0 +1,9 @@
+/scan_mapping: 6.4 Hz
+/odom_loc: 29.8 Hz
+/imu/data_v2: 99.2 Hz
+{}
+odom base_link FAIL "odom" passed to lookupTransform argument target_frame does not exist. 
+map odom FAIL "map" passed to lookupTransform argument target_frame does not exist. 
+base_link laser geometry_msgs.msg.Vector3(x=0.0, y=0.0, z=0.15)
+scripts/sim/lib.sh: line 19: 28228 Killed: 9               "$@" >> "$OUT/$LOGNAME_.log" 2>&1
+scripts/sim/lib.sh: line 19: 28238 Killed: 9               "$@" >> "$OUT/$LOGNAME_.log" 2>&1

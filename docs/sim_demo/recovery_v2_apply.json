@@ -1,0 +1,44 @@
+{
+  "succeeded": 5,
+  "total": 5,
+  "results": [
+    {
+      "goal": "loading_metal",
+      "status": "SUCCEEDED",
+      "seconds": 9.5,
+      "true_dist_to_goal_m": 0.145,
+      "loc_error_end_m": 0.02,
+      "loc_error_worst_m": 0.047
+    },
+    {
+      "goal": "terrain_1",
+      "status": "SUCCEEDED",
+      "seconds": 7.4,
+      "true_dist_to_goal_m": 0.145,
+      "loc_error_end_m": 0.032,
+      "loc_error_worst_m": 0.051
+    },
+    {
+      "goal": "_recovery_standing_still",
+      "status": "RECOVERED",
+      "seconds": 24.4,
+      "loc_error_end_m": 0.030853648813484083
+    },
+    {
+      "goal": "terrain_2",
+      "status": "SUCCEEDED",
+      "seconds": 26.6,
+      "true_dist_to_goal_m": 0.184,
+      "loc_error_end_m": 0.026,
+      "loc_error_worst_m": 0.065
+    },
+    {
+      "goal": "junction",
+      "status": "SUCCEEDED",
+      "seconds": 19.6,
+      "true_dist_to_goal_m": 0.159,
+      "loc_error_end_m": 0.053,
+      "loc_error_worst_m": 0.073
+    }
+  ]
+}

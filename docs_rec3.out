@@ -1,0 +1,12 @@
+waiting for navigate_to_pose ...
+{"goal": "loading_metal", "status": "SUCCEEDED", "seconds": 9.5, "true_dist_to_goal_m": 0.145, "loc_error_end_m": 0.02, "loc_error_worst_m": 0.047}
+{"goal": "terrain_1", "status": "SUCCEEDED", "seconds": 7.4, "true_dist_to_goal_m": 0.145, "loc_error_end_m": 0.032, "loc_error_worst_m": 0.051}
+teleport data: true
+TELEPORTED to -4.25,-1.0,90 est (0.6034775747635436, -2.1271560115129513, 3.126267530085887) truth (-4.249999999998626, -1.0000000000169242, 1.5707963267948961)
+RECOVERY standing still: 24.4 s (None = not recovered in 90 s), error now 0.030853648813484083
+{"goal": "terrain_2", "status": "SUCCEEDED", "seconds": 26.6, "true_dist_to_goal_m": 0.184, "loc_error_end_m": 0.026, "loc_error_worst_m": 0.065}
+{"goal": "junction", "status": "SUCCEEDED", "seconds": 19.6, "true_dist_to_goal_m": 0.159, "loc_error_end_m": 0.053, "loc_error_worst_m": 0.073}
+NAV SUMMARY 5/5 succeeded
+scripts/sim/lib.sh: line 19: 28409 Killed: 9               "$@" >> "$OUT/$LOGNAME_.log" 2>&1
+scripts/sim/lib.sh: line 19: 28418 Killed: 9               "$@" >> "$OUT/$LOGNAME_.log" 2>&1
+scripts/sim/lib.sh: line 19: 28419 Killed: 9               "$@" >> "$OUT/$LOGNAME_.log" 2>&1

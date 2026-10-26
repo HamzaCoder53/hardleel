@@ -277,3 +277,6 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
   -> map + bag; `pixi run python scripts/sim/accuracy_report.py docs/sim_demo/mapping_course.yaml`
   -> wall error mean 1.6 cm / p95 5 cm, coverage 99.6 %, size within 1 cell of truth. Next: localization + Nav2 goals,
   recovery test, mission rehearsal, foxglove layout, world features (ramps/gate/workers/docks/screen/bins), maze world.
+- 26 Oct: Virtual SLAM steps 3+4 done: `scripts/sim/localization_demo.sh` (Nav2 goals 8/8, loc error < 5 cm).
+  Recovery (teleport 5 m): default stack never recovers standing still, ~40 s while driving; `loc_v2 + loc_apply_corrections`
+  recovers standing still in 24 s -> 3 cm. Open: mission rehearsal (gate/worker), foxglove layout, world features, maze, report.

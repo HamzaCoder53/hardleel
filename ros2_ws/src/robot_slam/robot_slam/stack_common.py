@@ -212,12 +212,13 @@ def loc_v2(opts, use_sim_time=False, localization=False):
         nodes.append(Node(package='robot_slam', executable='wall_heading', name='wall_heading', output='screen',
                           parameters=[{'odom_topic': '/odom_loc', **sim}]))
     if opts.get('loc_monitor'):
-        cdir = carto_config_dir(opts)
+        from robot_slam.carto_lua import config_for_platform   # macOS: relocalize must not load the `include` config
+        cdir, cbase = config_for_platform(carto_config_dir(opts), 'cartographer_2d_localization.lua' if localization
+                                          else 'cartographer_2d.lua')
         nodes.append(Node(package='robot_slam', executable='loc_monitor', name='loc_monitor', output='screen',
                           parameters=[{'apply_corrections': bool(opts.get('apply_corrections')),
                                        'carto_config_dir': cdir,
-                                       'carto_config_basename': 'cartographer_2d_localization.lua' if localization
-                                       else 'cartographer_2d.lua', **sim}],
+                                       'carto_config_basename': cbase, **sim}],
                           remappings=[('/odom_rf2o', '/odom_rf2o_loc')]))
     return nodes
 

@@ -22,6 +22,7 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 from tf2_ros import Buffer, TransformListener
 
+GOAL_TOL = 0.35   # m, true distance to the goal that counts as arrived (Nav2's own tolerance is ~0.15-0.2)
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_WP = os.path.join(HERE, '../../ros2_ws/src/robot_slam/config/waypoints_course.yaml')
 
@@ -90,6 +91,8 @@ class Runner(Node):
             status = {4: 'SUCCEEDED', 5: 'CANCELED', 6: 'ABORTED'}.get(res.result().status, str(res.result().status))
         self.spin(0.5)
         d = math.hypot(self.truth[0] - pose['x'], self.truth[1] - pose['y']) if self.truth else None
+        if status == 'SUCCEEDED' and (d is None or d > GOAL_TOL):
+            status = 'FALSE_SUCCESS'              # Nav2 said done but the TRUE pose is not at the goal
         return dict(goal=name, status=status, seconds=round(time.time() - t0, 1),
                     true_dist_to_goal_m=None if d is None else round(d, 3),
                     loc_error_end_m=None if self.loc_error() is None else round(self.loc_error(), 3),
@@ -124,7 +127,14 @@ def main():
             teleport(tx + start[0], ty + start[1], math.radians(tyaw))
             n.spin(1.0)
             print('TELEPORTED to', a.teleport_to, 'est', n.est(), 'truth', n.truth, flush=True)
-    ok = sum(r['status'] == 'SUCCEEDED' for r in results)
+            t1 = time.time()                      # robot stands still: how long until the pose estimate is right again?
+            while time.time() - t1 < 90 and not ((n.loc_error() or 9.0) < 0.15):
+                n.spin(0.2)
+            rec = round(time.time() - t1, 1) if (n.loc_error() or 9.0) < 0.15 else None
+            print(f'RECOVERY standing still: {rec} s (None = not recovered in 90 s), error now {n.loc_error()}', flush=True)
+            results.append(dict(goal='_recovery_standing_still', status='RECOVERED' if rec is not None else 'LOST',
+                                seconds=rec, loc_error_end_m=n.loc_error()))
+    ok = sum(r['status'] in ('SUCCEEDED', 'RECOVERED') for r in results)
     summary = dict(succeeded=ok, total=len(results), results=results)
     if a.out:
         json.dump(summary, open(a.out, 'w'), indent=2)

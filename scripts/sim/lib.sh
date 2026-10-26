@@ -3,11 +3,12 @@
 # Usage: source lib.sh ; sim_start [world] ; ... ; sim_stop
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export ROS_DOMAIN_ID=42 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+[ "$(uname)" = Darwin ] && export CYCLONEDDS_URI="file://$REPO/scripts/sim/mac/cyclonedds.xml"
 OUT="${OUT:-$REPO/docs/sim_demo}"; mkdir -p "$OUT"
 PIDS=()
 if [ -f "$REPO/ros2_ws/install/setup.bash" ]; then source "$REPO/ros2_ws/install/setup.bash"; fi
 if [ -f "$REPO/mac_ws/install/setup.bash" ]; then source "$REPO/mac_ws/install/setup.bash"; fi   # macOS cartographer fix
-bg() { "$@" >>"$OUT/$LOGNAME_.log" 2>&1 & PIDS+=($!); }
+bg() { : >"$OUT/$LOGNAME_.log"; "$@" >>"$OUT/$LOGNAME_.log" 2>&1 & PIDS+=($!); }
 sim_start() {   # world (default course), extra launch args
   local world="${1:-course}"; shift
   LOGNAME_=sim bg ros2 launch rdj2026_sim sim.launch.py gui:=false world:=$world "$@"

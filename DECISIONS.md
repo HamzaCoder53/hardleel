@@ -22,3 +22,11 @@
   on macOS only; repo configs unchanged. Alternative (rebuild libcartographer with Lua 5.3) was far longer.
 - Demo scripts live in `scripts/sim/` (lib.sh, mapping_demo.sh, accuracy_report.py), domain 42, localhost discovery.
 - Mapping demo used `rdj2026_sim/config/cartographer_sim.lua` (same as the robot's cartographer_2d.lua; sim has no EKF).
+- **Bugs found and fixed while bringing the stack up on macOS (some also affect Linux):**
+  1. `ekf_nav_v2.yaml` was keyed `ekf_filter_node:` but stack_common starts the EKF as `ekf_loc` -> the EKF ignored its whole
+     config, no /odom_loc, Cartographer (use_odometry=true) got no odometry and produced no TF. Now keyed `"/**"`.
+     (The earlier Linux v2 sim run also reported "no map TF", so `loc_v2` was probably silently broken there too.)
+  2. `loc_monitor` passed the un-flattened Cartographer config to /start_trajectory -> Lua-5.4 `include` crash on macOS. Fixed.
+  3. CycloneDDS "failed to create domain" with ~25 nodes -> `scripts/sim/mac/cyclonedds.xml` (MaxAutoParticipantIndex 200).
+  4. rf2o needed libpython link flags -> `scripts/sim/mac/build_ws.sh`.
+- Scoring: `nav_goals.py` counts a goal only if the TRUE pose is within 0.35 m (Nav2 reported success while 2 m away once).

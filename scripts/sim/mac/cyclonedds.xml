@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- macOS sim: the final stack runs ~25 ROS nodes; CycloneDDS' default participant-index range is too small
+     ("rmw_create_node: failed to create domain"). Localhost only. -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="any">
+    <General><AllowMulticast>false</AllowMulticast><Interfaces><NetworkInterface address="127.0.0.1"/></Interfaces></General>
+    <Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>200</MaxAutoParticipantIndex>
+      <Peers><Peer address="localhost"/></Peers></Discovery>
+  </Domain>
+</CycloneDDS>
