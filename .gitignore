@@ -22,3 +22,7 @@ maps/*_autosave.*
 .claude/settings.local.json
 .pixi/
 sim_run.log
+mac_ws/
+docs/sim_demo/*_bag/
+docs/sim_demo/*.mcap
+docs_md.out

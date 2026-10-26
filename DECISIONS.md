@@ -14,3 +14,11 @@
   `--headless-rendering` on macOS. Result: server-only `gz sim -r -s`, gpu_lidar works (360 finite ranges, 0.15-12 m).
   Ogre2 logs one plugin-path error but rendering sensors still run. **Real-time factor measured 0.99.**
 - Sensor rates set to spec: lidar 6.4 Hz, IMU 93 Hz.
+- **macOS Cartographer fixes** (RoboStack package is broken on osx-arm64): (1) `cartographer_node` dies "flag collect_metrics
+  defined more than once" -> built cartographer_ros 2.0.9003 from source into the gitignored overlay `mac_ws/` with
+  `scripts/sim/mac/cartographer_ros_macos.patch` (offline_node moved to its own exe, GUARDED_BY->ABSL_*, glog call),
+  + rpath/libpython link flags (`scripts/sim/mac/build_cartographer_overlay.sh`). (2) the packaged Lua 5.4 does not export
+  globals from `include "x.lua"` (stock backpack_2d.lua fails too) -> `launch/carto_lua.py` inlines includes at launch
+  on macOS only; repo configs unchanged. Alternative (rebuild libcartographer with Lua 5.3) was far longer.
+- Demo scripts live in `scripts/sim/` (lib.sh, mapping_demo.sh, accuracy_report.py), domain 42, localhost discovery.
+- Mapping demo used `rdj2026_sim/config/cartographer_sim.lua` (same as the robot's cartographer_2d.lua; sim has no EKF).

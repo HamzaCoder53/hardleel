@@ -273,3 +273,7 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
 - Blocked: env install (19 GiB free < 20 GB floor). See BLOCKERS.md B1. Resume with `pixi install` once space exists.
 - 26 Oct: env INSTALLED (floor lifted). colcon build OK (sllidar skipped). Headless Gazebo Harmonic + lidar OK, RTF 0.99.
   Next: foxglove layout, world features (ramps/gate/workers/docks/screen/bins), GT map export, demo scripts.
+- 26 Oct: Virtual SLAM step 1+2 WORK on Mac: `pixi run bash scripts/sim/mapping_demo.sh course mapping_course`
+  -> map + bag; `pixi run python scripts/sim/accuracy_report.py docs/sim_demo/mapping_course.yaml`
+  -> wall error mean 1.6 cm / p95 5 cm, coverage 99.6 %, size within 1 cell of truth. Next: localization + Nav2 goals,
+  recovery test, mission rehearsal, foxglove layout, world features (ramps/gate/workers/docks/screen/bins), maze world.
