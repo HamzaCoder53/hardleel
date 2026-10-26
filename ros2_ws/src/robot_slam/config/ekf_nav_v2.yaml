@@ -1,7 +1,7 @@
 # EKF v2 (final stack, switch `loc_v2`): rf2o forward speed + gyro yaw rate (online-unbiased) + ABSOLUTE yaw from
 # the square course walls (wall_heading). world_frame odom: the EKF's odom starts aligned with the map (start
 # (0,0,0) facing east), so the wall yaw (map frame) is valid here. No commanded PWM goes into this filter.
-ekf_filter_node:
+ekf_loc:                 # = the node name in stack_common.loc_v2 (under ekf_filter_node it was ignored: sim 26 Oct)
   ros__parameters:
     frequency: 30.0
     sensor_timeout: 0.3

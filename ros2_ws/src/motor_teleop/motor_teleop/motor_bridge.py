@@ -223,11 +223,16 @@ class MotorBridge(Node):
     def on_esp32_watchdog(self):
         self.get_logger().warn('ESP32 WATCHDOG STOP: firmware cut motor power', throttle_duration_sec=1.0)
 
+    def esp32_port(self):
+        # the first connect happens inside Esp32Motors(...), before self.esp32 exists
+        return self.esp32.port if hasattr(self, 'esp32') else self.get_parameter('port').value
+
     def on_esp32_connect(self):
-        self.get_logger().info(f'ESP32 connected successfully on {self.esp32.port}')
+        self.get_logger().info(f'ESP32 connected successfully on {self.esp32_port()}')
 
     def on_esp32_disconnect(self):
-        self.get_logger().error(f'ESP32 disconnected from {self.esp32.port}; reconnecting every 1s...', throttle_duration_sec=2.0)
+        self.get_logger().error(f'ESP32 disconnected from {self.esp32_port()}; reconnecting every 1s...',
+                                throttle_duration_sec=2.0)
 
     # ------------------------------------------------------------- calibration / live params
     def load_calib(self, path):

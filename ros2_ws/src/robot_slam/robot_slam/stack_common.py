@@ -102,7 +102,9 @@ def loc_options(context):
     lc = context.launch_configurations
     on = lambda n: str(lc.get(n, 'false')).lower() in ('1', 'true', 'yes', 'on')
     allv2 = on('loc_v2')
-    opts = {k: allv2 or on(k) for k in LOC_SWITCHES}
+    # carto_odom is NOT part of loc_v2: Cartographer waits for /odom_loc, the EKF for rf2o, and rf2o for the odom
+    # frame only Cartographer publishes -> nothing starts (sim 26 Oct). Separate switch until that loop is broken.
+    opts = {k: (allv2 and k != 'carto_odom') or on(k) for k in LOC_SWITCHES}
     opts['apply_corrections'] = on('loc_apply_corrections')
     opts['laser_filter'] = on('laser_filter')
     return opts
@@ -310,7 +312,10 @@ def safety_chain(profile, nav2_params, use_sim_time=False):
              parameters=[monitor_params, sim], remappings=TF_REMAP),
         Node(package='nav2_lifecycle_manager', executable='lifecycle_manager', name='lifecycle_manager_safety',
              output='screen',
-             parameters=[{'autostart': True, 'node_names': ['velocity_smoother', monitor], **sim}]),
+             # bond 10 s: with the 4 s default a busy startup (Cartographer + RViz) declared the smoother DOWN and
+             # deactivated the whole chain -> teleop silently did nothing (real robot, 26 Oct)
+             parameters=[{'autostart': True, 'node_names': ['velocity_smoother', monitor], 'bond_timeout': 10.0,
+                          'attempt_respawn_reconnection': True, 'bond_respawn_max_duration': 15.0, **sim}]),
     ]
 
 
