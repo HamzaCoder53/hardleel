@@ -15,17 +15,28 @@ after its left-back channel died); the Pico is DEAD (warm, no USB even in BOOTSE
 unplugged. Pi (192.168.137.231), lidar, IMU, camera OK. Start Pi drivers without motors:
 `bash ~/robot_hw.sh motors:=false drop:=false` (with no Pico, pico_port falls back to /dev/ttyACM0 = the IMU!).
 
-| item | status |
+**Hardware state 26 Oct ~12:15 (real robot, Claude):** motors now ESP32 + 2x BTS7960 running the team's
+`firmware/esp32_motor_code/motor_code.ino`; motor_bridge defaults esp32_protocol=motor_code, invert_left=true,
+invert_linear=false (checked wheels-up with teleop: forward = all forward, j/l turn correctly). Teleop works on the
+Pi alone: tmux bridge + `ros2 run teleop_twist_keyboard teleop_twist_keyboard` (default RMW, domain 7).
+**OPEN HARDWARE PROBLEM:** since the ESP32/BTS7960 was connected, the IMU (Arduino, port 1-1.3) is in a USB reset
+loop (36 disconnects in ~30 min) and the lidar FTDI keeps dropping off USB, even with the motors stopped; the ESP32
+itself dropped once (bridge reconnects). throttled=0x0. Suspect the ESP32/motor power wiring (ESP32 powered from two
+sources / ground loop) - test: unplug ESP32 USB + motor battery, watch `journalctl -k | grep "USB disconnect"`.
+Motors NOT calibrated (max_speed, turn_gain defaults). Real-robot Nav2 / mission never run yet.
+
+| item | status (honest, 26 Oct 12:15) |
 |---|---|
-| setup: maps -> `maps/course/` (docs/course removed; identical files), sim world rebuilt from course_full_approx | done |
-| 1: Localization v2 (scan gate, online gyro bias, wall heading modulo 90°, loc monitor, switches OFF) | done |
-| 2: Recording (mcap bag recording in laptop_mapping/localization) | done |
-| 3: Camera v2 & classifier (feature switch camera_v2) | done |
-| 4: Motors/driving & Pico firmware (`firmware/pico_motor`, HW watchdog 500ms, cmd WD 300ms, deadband MIN, ZERO mode) | done |
-| 5: Ramp dash on Pi (behind switch ramp_dash OFF) | done |
-| 6: Obstacles & clock (route detector, 10s wait cap, 2-scan obstacle episode confirm) | done |
-| 7: Map quality (`map_tidy.py` blob removal + `rebuild_map_from_bag.sh`) | done |
-| 8: Full autonomy rehearsal & regression sim (tested with localization v2) | done |
+| setup: maps -> `maps/course/`, sim world from course_full_approx, course_geometry.yaml | done |
+| 1: Localization v2 (scan gate, gyro bias, wall heading, loc monitor; switches OFF) | code + unit tests done; EKF name + carto_odom loop fixed (03208d3); v2-vs-baseline sim comparison NOT run yet (baseline: full course 146 s, pos err mean 3.3 cm) |
+| 2: Recording (run_recorder, verify_run, backup_run.ps1, runs_index, soak_monitor) | code done, not tested on the robot |
+| 3: Camera v2 (`pi_cam/camera_node.py`, 1080p30 HW H.264 MKV + lores + stills, tested on the Pi) | node done; OpenCV screen/bin/gate tools, calibration tools, visual memory NOT done |
+| 4: Motors/driving | Pico firmware hardened then RETIRED (ESP32 now); ESP32 motor_code protocol done; turn-and-straight mode + closed-loop speed NOT done |
+| 5: Ramp dash (Pi node + bridge dash input + mission hook, switch OFF) | unit tests pass; Gazebo test (`sim_dash_test.sh`) NOT run; dash input not yet adapted/tested with the ESP32 |
+| 6: Obstacles & clock | Nav2 tuning, 2-scan confirm, map_freezer fixes done; worker sim tests + gate-closed bag replay NOT done |
+| 7: Map quality (laser filter, map_tidy, rebuild_map_from_bag.sh) | done (map_tidy tested on the course map: match 0.93) |
+| 8: Full autonomy supervisor + guided mapping route | NOT started |
+| TEST_FINAL.md + summary | NOT started |
 
 ## Decisions
 - Middleware: CycloneDDS (`cyclonedds.xml`), `ROS_DOMAIN_ID=7`, chrony for time. Never run ROS on domain 7 in two
