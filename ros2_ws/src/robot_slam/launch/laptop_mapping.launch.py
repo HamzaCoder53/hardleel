@@ -36,8 +36,11 @@ def setup(context):
     opts = sc.loc_options(context)                    # final-stack localization switches, all off by default
     actions += sc.cartographer(localization=False, use_sim_time=sim, opts=opts)
     actions += sc.loc_v2(opts, sim)
-    actions += sc.safety_chain('mapping', nav2_params, sim)
     mode = context.launch_configurations['mapping_mode']
+    # safety:=false (default since 26 Oct, team request): no twist_mux / smoother / collision monitor; teleop
+    # publishes /cmd_vel straight to the Pi bridge. Auto mode always keeps the chain (Nav2 drives through it).
+    if truthy(context, 'safety') or mode == 'auto':
+        actions += sc.safety_chain('mapping', nav2_params, sim)
     if mode == 'auto':
         # OFF by default. Nav2 + frontier exploration that stops by itself (time_limit_s < 180 s). Then start
         # laptop_mission with nav2:=false (Nav2 is already up). auto_calibrate: a short straight speed test
@@ -74,6 +77,8 @@ def generate_launch_description():
         DeclareLaunchArgument('auto_calibrate', default_value='false',
                               description='auto mode only: speed calibration drive before exploring'),
         DeclareLaunchArgument('rviz', default_value='true'),
+        DeclareLaunchArgument('safety', default_value='false',
+                              description='twist_mux -> velocity_smoother -> collision_monitor for teleop (off)'),
         DeclareLaunchArgument('record_bag', default_value='true'),
         DeclareLaunchArgument('bag_dir', default_value='~/hardleel_bags'),
         DeclareLaunchArgument('record_run', default_value='false',

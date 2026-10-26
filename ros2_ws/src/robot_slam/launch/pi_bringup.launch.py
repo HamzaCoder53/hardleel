@@ -44,7 +44,7 @@ def generate_launch_description():
             '/dev/serial/by-id/*USB-Serial*',
             '/dev/serial/by-id/*Raspberry_Pi_Pico*',
         ], '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0')),
-        DeclareLaunchArgument('cmd_timeout', default_value='0.3'),
+        DeclareLaunchArgument('cmd_timeout', default_value='0.2'),   # team 26 Oct: no smoother any more, bridge timeout = stop time
         DeclareLaunchArgument('madgwick', default_value='false'),     # /imu/data orientation filter, off since 26 Oct
         DeclareLaunchArgument('camera', default_value='true'),
         DeclareLaunchArgument('camera_fps', default_value='5.0'),
