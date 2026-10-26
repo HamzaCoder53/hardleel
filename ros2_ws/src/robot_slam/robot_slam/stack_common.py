@@ -339,7 +339,7 @@ def nav2_nodes(nav2_params, use_sim_time=False):
                   remappings=TF_REMAP + remaps.get(n, [])) for n in nav_names]
     nodes.append(Node(package='nav2_lifecycle_manager', executable='lifecycle_manager',
                       name='lifecycle_manager_navigation', output='screen',
-                      parameters=[{'autostart': True, 'node_names': nav_names, 'bond_timeout': 10.0,
+                      parameters=[{'autostart': True, 'node_names': nav_names, 'bond_timeout': 0.0,   # bond off: fails over zenoh (26 Oct)
                                    'service_timeout': 30.0,          # bring-up under load timed out in the sim
                                    'attempt_respawn_reconnection': True, 'bond_respawn_max_duration': 15.0, **sim}]))
     return nodes
