@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Gazebo world from an occupancy map (nav2 map_server .yaml + .pgm): every run of occupied cells in a row becomes a
-0.4 m wall box. Used for the REAL course drawn by the team (maps/course_reference.*, 25 Oct): the world frame is the
+0.4 m wall box. Used for the REAL course drawn by the team (maps/course_full_approx.*: measured walls + the approximate back half, 26 Oct): the world frame is the
 map frame (start = (0, 0), robot facing +x = east).
 
-    python3 arena/world_from_map.py maps/course_reference.yaml worlds/course.sdf
+    python3 arena/world_from_map.py maps/course_full_approx.yaml worlds/course.sdf
 The world keeps the name `rdj2026` so the sim tools (create/remove services) work unchanged. Unknown cells are
 left open; the plugins/ground come from worlds/rdj2026.sdf (Fortress names; sim.launch.py rewrites for Harmonic).
 """

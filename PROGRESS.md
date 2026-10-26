@@ -3,6 +3,22 @@
 Living handoff file. A fresh Claude Code session should read this first, then `TODO.md`, then continue at
 "Next". Branch `feat/mission-m1` (worktree `.claude/worktrees/mission-m1`, from `feat/laptop-brain`).
 
+# FINAL STACK (final 25 Nov) — branch `feat/final-stack` (same worktree), started 26 Oct ~05:40
+Plan = the user's 8-item list (26 Oct chat): 1 localization, 2 recording, 3 camera, 4 motors/driving, 5 ramp dash,
+6 obstacles/clock, 7 map quality, 8 full autonomy; then TEST_FINAL.md + summary. Rules: software only (Pico
+firmware included), every new behaviour behind a switch OFF by default, NEVER send motion to the real robot unless
+the user says they are with it (read-only checks OK), sim first, commit after each item, never feed commanded PWM
+into localization. Course facts: `robot_slam/config/course_geometry.yaml`; maps: `maps/course/`.
+
+**Hardware state 26 Oct ~05:30 (user):** LEFT TB6612FNG driver board burnt (smoked while PWM 0 was being sent,
+after its left-back channel died); the Pico is DEAD (warm, no USB even in BOOTSEL). Motors + motor battery are
+unplugged. Pi (192.168.137.231), lidar, IMU, camera OK. Start Pi drivers without motors:
+`bash ~/robot_hw.sh motors:=false drop:=false` (with no Pico, pico_port falls back to /dev/ttyACM0 = the IMU!).
+
+| item | status |
+|---|---|
+| setup: maps -> `maps/course/` (docs/course removed; identical files), sim world rebuilt from course_full_approx | done |
+
 ## Decisions
 - Middleware: CycloneDDS (`cyclonedds.xml`), `ROS_DOMAIN_ID=7`, chrony for time. Never run ROS on domain 7 in two
   WSL distros at once.
