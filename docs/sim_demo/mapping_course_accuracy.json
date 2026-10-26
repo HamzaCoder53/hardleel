@@ -2,18 +2,18 @@
   "map": "docs/sim_demo/mapping_course.yaml",
   "truth": "/Users/StoreOperations/hardleel/scripts/sim/../../maps/truth/course_truth.yaml",
   "wall_distance_raw": {
-    "mean_m": 0.006165228205309255,
+    "mean_m": 0.006151990441490859,
     "median_m": 0.0,
     "p95_m": 0.05000000074505806,
     "max_m": 0.05000000074505806,
-    "n": 811
+    "n": 829
   },
   "wall_distance_aligned": {
-    "mean_m": 0.006165228205309255,
+    "mean_m": 0.006151990441490859,
     "median_m": 0.0,
     "p95_m": 0.05000000074505806,
     "max_m": 0.05000000074505806,
-    "n": 811
+    "n": 829
   },
   "alignment": {
     "dx_m": 0.0,

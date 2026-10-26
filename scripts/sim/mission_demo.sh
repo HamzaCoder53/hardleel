@@ -1,14 +1,16 @@
 #!/bin/bash
 # Virtual SLAM step 5: full mission rehearsal with the REAL mission node (stub classifier), phase 2 on the saved map.
 #   mission_demo.sh NAME [gate=open|closed] [worker=none|x,y[,remove_after_s]] [pbstream]
+#   features=dirt_ramp,gravel_ramp,docks,bins,screen   spawn those course features (config/course_features.yaml) before the run
 #   gate=timed:S  closed until S seconds after the mission reaches GATE_DECISION, then it opens (spec: ~2 s)
 #   gate=closed: a 0.6 m panel across the gated lane (x -3.02) the whole run (lidar sees a wall -> mission takes path 1)
 #   worker=x,y : a 0.25 m cylinder at that MAP position from GO (removed after N s if given; map = world - 0.06 in x)
 source "$(dirname "$0")/lib.sh"
-NAME="${1:-mission}"; GATE=open; WORKER=none; PB="$OUT/mapping_course.pbstream"
-for a in "${@:2}"; do case "$a" in gate=*) GATE=${a#gate=};; worker=*) WORKER=${a#worker=};; *.pbstream) PB=$a;; esac; done
+NAME="${1:-mission}"; GATE=open; WORKER=none; FEATURES=; PB="$OUT/mapping_course.pbstream"
+for a in "${@:2}"; do case "$a" in gate=*) GATE=${a#gate=};; worker=*) WORKER=${a#worker=};; features=*) FEATURES=${a#features=};; *.pbstream) PB=$a;; esac; done
 WP="$REPO/ros2_ws/src/robot_slam/config/waypoints_course.yaml"
 sim_start course odom_tf:=false || exit 1
+[ -n "$FEATURES" ] && python "$REPO/scripts/sim/world_features.py" --only "$FEATURES" | tee -a "$OUT/features.log"
 case "$GATE" in closed|timed:*) spawn_box gate -3.02 0.07 0.2 0.05 0.60 0.4;; esac
 LOGNAME_=localization bg ros2 launch robot_slam laptop_localization.launch.py sim:=true rviz:=false record_bag:=false pbstream:=$PB $EXTRA_LOC
 LOGNAME_=mission bg ros2 launch robot_slam laptop_mission.launch.py sim:=true classifier:=stub stub_class:=metal waypoints:=$WP $EXTRA_MISSION

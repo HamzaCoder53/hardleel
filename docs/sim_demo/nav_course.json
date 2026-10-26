@@ -5,66 +5,66 @@
     {
       "goal": "loading_metal",
       "status": "SUCCEEDED",
-      "seconds": 9.3,
-      "true_dist_to_goal_m": 0.153,
-      "loc_error_end_m": 0.026,
-      "loc_error_worst_m": 0.044
+      "seconds": 10.1,
+      "true_dist_to_goal_m": 0.16,
+      "loc_error_end_m": 0.028,
+      "loc_error_worst_m": 0.065
     },
     {
       "goal": "terrain_1",
       "status": "SUCCEEDED",
-      "seconds": 7.5,
-      "true_dist_to_goal_m": 0.156,
-      "loc_error_end_m": 0.025,
-      "loc_error_worst_m": 0.04
+      "seconds": 10.7,
+      "true_dist_to_goal_m": 0.147,
+      "loc_error_end_m": 0.04,
+      "loc_error_worst_m": 0.049
     },
     {
       "goal": "terrain_2",
       "status": "SUCCEEDED",
-      "seconds": 11.0,
-      "true_dist_to_goal_m": 0.188,
-      "loc_error_end_m": 0.024,
-      "loc_error_worst_m": 0.038
+      "seconds": 12.2,
+      "true_dist_to_goal_m": 0.111,
+      "loc_error_end_m": 0.036,
+      "loc_error_worst_m": 0.054
     },
     {
       "goal": "terrain_3",
       "status": "SUCCEEDED",
-      "seconds": 10.0,
-      "true_dist_to_goal_m": 0.218,
-      "loc_error_end_m": 0.022,
-      "loc_error_worst_m": 0.05
+      "seconds": 10.6,
+      "true_dist_to_goal_m": 0.175,
+      "loc_error_end_m": 0.026,
+      "loc_error_worst_m": 0.055
     },
     {
       "goal": "junction",
       "status": "SUCCEEDED",
-      "seconds": 9.5,
-      "true_dist_to_goal_m": 0.183,
-      "loc_error_end_m": 0.015,
-      "loc_error_worst_m": 0.046
+      "seconds": 8.8,
+      "true_dist_to_goal_m": 0.131,
+      "loc_error_end_m": 0.035,
+      "loc_error_worst_m": 0.041
     },
     {
       "goal": "path1_1",
       "status": "SUCCEEDED",
-      "seconds": 3.2,
-      "true_dist_to_goal_m": 0.158,
-      "loc_error_end_m": 0.02,
-      "loc_error_worst_m": 0.026
+      "seconds": 6.6,
+      "true_dist_to_goal_m": 0.156,
+      "loc_error_end_m": 0.025,
+      "loc_error_worst_m": 0.054
     },
     {
       "goal": "path1_2",
       "status": "SUCCEEDED",
-      "seconds": 6.4,
-      "true_dist_to_goal_m": 0.155,
-      "loc_error_end_m": 0.021,
-      "loc_error_worst_m": 0.045
+      "seconds": 6.2,
+      "true_dist_to_goal_m": 0.158,
+      "loc_error_end_m": 0.033,
+      "loc_error_worst_m": 0.041
     },
     {
       "goal": "finish",
       "status": "SUCCEEDED",
-      "seconds": 6.2,
-      "true_dist_to_goal_m": 0.162,
-      "loc_error_end_m": 0.016,
-      "loc_error_worst_m": 0.04
+      "seconds": 7.6,
+      "true_dist_to_goal_m": 0.134,
+      "loc_error_end_m": 0.034,
+      "loc_error_worst_m": 0.042
     }
   ]
 }

@@ -1,6 +1,0 @@
-[INFO] [competition_mission-9]: process started with pid [38179]
-19 poses from /Users/StoreOperations/hardleel/ros2_ws/src/robot_slam/config/waypoints_course.yaml; log /Users/StoreOperations/logs/mission_20261026_063015.csv
-Waiting for /mission/start
-[   0.0s] WAIT_START: waiting 
-collision monitor: mission stop box
-NAV2 READY

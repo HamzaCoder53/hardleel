@@ -51,8 +51,10 @@ def ramp_sdf(name, L, W, h, bumps, bump_h, color='0.55 0.42 0.25 1'):
     """Up-slope, plateau (with bumps), down-slope along +x; rotate at spawn for other directions."""
     seg, t = L / 3, 0.01
     slope, hyp = math.atan2(h, seg), math.hypot(seg, h)
-    links = [box_link('up', -seg, 0, h / 2, hyp, W, t, -slope, color), box_link('top', 0, 0, h - t / 2, seg, W, t, 0, color, mu=1.5),
-             box_link('down', seg, 0, h / 2, hyp, W, t, slope, color), box_link('fill', 0, 0, (h - t) / 2, seg, W, h - t, 0, color)]
+    # the sloped plates sit t/2 lower so their TOP face meets the floor flush (a plate edge 5 mm proud of the floor stops
+    # the robot's fixed, frictionless front caster: found in the Mac sim, 26 Oct)
+    links = [box_link('up', -seg, 0, h / 2 - t / 2, hyp, W, t, -slope, color), box_link('top', 0, 0, h - t / 2, seg, W, t, 0, color, mu=1.5),
+             box_link('down', seg, 0, h / 2 - t / 2, hyp, W, t, slope, color), box_link('fill', 0, 0, (h - t) / 2, seg, W, h - t, 0, color)]
     for i in range(bumps):                      # rough middle: small bars across the plateau, higher friction
         bx = -seg / 2 + (i + 0.5) * seg / max(bumps, 1)
         links.append(box_link(f'b{i}', bx, 0, h + bump_h / 2, 0.03, W * 0.9, bump_h, 0, '0.4 0.3 0.2 1', mu=2.0))

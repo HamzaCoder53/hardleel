@@ -26,45 +26,49 @@
     </inertial>
   </link>
 
-  <!-- drive wheels -->
-  <link name="left_wheel">
+  <!-- four driven wheels (skid steer): left pair / right pair share one command each. Wheelbase 0.20, track 0.245 -->
+  <link name="front_left_wheel">
     <visual><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry>
       <material name="tyre"><color rgba="0.1 0.1 0.1 1"/></material></visual>
     <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry></collision>
     <inertial><mass value="0.08"/><inertia ixx="3e-5" ixy="0" ixz="0" iyy="5e-5" iyz="0" izz="3e-5"/></inertial>
   </link>
-  <joint name="left_wheel_joint" type="continuous">
-    <parent link="base_link"/><child link="left_wheel"/>
-    <origin xyz="0 0.1225 0"/><axis xyz="0 1 0"/>
+  <joint name="front_left_wheel_joint" type="continuous">
+    <parent link="base_link"/><child link="front_left_wheel"/>
+    <origin xyz="0.10 0.1225 0"/><axis xyz="0 1 0"/>
   </joint>
 
-  <link name="right_wheel">
+  <link name="rear_left_wheel">
     <visual><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry>
-      <material name="tyre"/></visual>
+      <material name="tyre"><color rgba="0.1 0.1 0.1 1"/></material></visual>
     <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry></collision>
     <inertial><mass value="0.08"/><inertia ixx="3e-5" ixy="0" ixz="0" iyy="5e-5" iyz="0" izz="3e-5"/></inertial>
   </link>
-  <joint name="right_wheel_joint" type="continuous">
-    <parent link="base_link"/><child link="right_wheel"/>
-    <origin xyz="0 -0.1225 0"/><axis xyz="0 1 0"/>
+  <joint name="rear_left_wheel_joint" type="continuous">
+    <parent link="base_link"/><child link="rear_left_wheel"/>
+    <origin xyz="-0.10 0.1225 0"/><axis xyz="0 1 0"/>
   </joint>
 
-  <!-- frictionless casters front and back -->
-  <link name="caster_front">
-    <collision><geometry><sphere radius="0.0175"/></geometry></collision>
-    <visual><geometry><sphere radius="0.0175"/></geometry><material name="tyre"/></visual>
-    <inertial><mass value="0.02"/><inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/></inertial>
+  <link name="front_right_wheel">
+    <visual><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry>
+      <material name="tyre"><color rgba="0.1 0.1 0.1 1"/></material></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry></collision>
+    <inertial><mass value="0.08"/><inertia ixx="3e-5" ixy="0" ixz="0" iyy="5e-5" iyz="0" izz="3e-5"/></inertial>
   </link>
-  <joint name="caster_front_joint" type="fixed">
-    <parent link="base_link"/><child link="caster_front"/><origin xyz="0.10 0 -0.0175"/>
+  <joint name="front_right_wheel_joint" type="continuous">
+    <parent link="base_link"/><child link="front_right_wheel"/>
+    <origin xyz="0.10 -0.1225 0"/><axis xyz="0 1 0"/>
   </joint>
-  <link name="caster_back">
-    <collision><geometry><sphere radius="0.0175"/></geometry></collision>
-    <visual><geometry><sphere radius="0.0175"/></geometry><material name="tyre"/></visual>
-    <inertial><mass value="0.02"/><inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/></inertial>
+
+  <link name="rear_right_wheel">
+    <visual><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry>
+      <material name="tyre"><color rgba="0.1 0.1 0.1 1"/></material></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.035" length="0.025"/></geometry></collision>
+    <inertial><mass value="0.08"/><inertia ixx="3e-5" ixy="0" ixz="0" iyy="5e-5" iyz="0" izz="3e-5"/></inertial>
   </link>
-  <joint name="caster_back_joint" type="fixed">
-    <parent link="base_link"/><child link="caster_back"/><origin xyz="-0.10 0 -0.0175"/>
+  <joint name="rear_right_wheel_joint" type="continuous">
+    <parent link="base_link"/><child link="rear_right_wheel"/>
+    <origin xyz="-0.10 -0.1225 0"/><axis xyz="0 1 0"/>
   </joint>
 
   <!-- RPLIDAR A1 -->
@@ -94,10 +98,11 @@
     <parent link="base_link"/><child link="camera"/><origin xyz="0.10 0 0.20" rpy="0 0 0"/>
   </joint>
 
-  <gazebo reference="caster_front"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
-  <gazebo reference="caster_back"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
-  <gazebo reference="left_wheel"><mu1>1.2</mu1><mu2>1.2</mu2></gazebo>
-  <gazebo reference="right_wheel"><mu1>1.2</mu1><mu2>1.2</mu2></gazebo>
+  <!-- skid steer: grip along the roll direction, less sideways so the robot can turn in place (PLACEHOLDER values) -->
+  <gazebo reference="front_left_wheel"><mu1>1.2</mu1><mu2>0.7</mu2><fdir1>1 0 0</fdir1></gazebo>
+  <gazebo reference="rear_left_wheel"><mu1>1.2</mu1><mu2>0.7</mu2><fdir1>1 0 0</fdir1></gazebo>
+  <gazebo reference="front_right_wheel"><mu1>1.2</mu1><mu2>0.7</mu2><fdir1>1 0 0</fdir1></gazebo>
+  <gazebo reference="rear_right_wheel"><mu1>1.2</mu1><mu2>0.7</mu2><fdir1>1 0 0</fdir1></gazebo>
 
   <gazebo reference="laser">
     <sensor name="lidar" type="gpu_lidar">
@@ -154,8 +159,10 @@
 
   <gazebo>
     <plugin filename="ignition-gazebo-diff-drive-system" name="ignition::gazebo::systems::DiffDrive">
-      <left_joint>left_wheel_joint</left_joint>
-      <right_joint>right_wheel_joint</right_joint>
+      <left_joint>front_left_wheel_joint</left_joint>
+      <left_joint>rear_left_wheel_joint</left_joint>
+      <right_joint>front_right_wheel_joint</right_joint>
+      <right_joint>rear_right_wheel_joint</right_joint>
       <wheel_separation>0.245</wheel_separation>
       <wheel_radius>0.035</wheel_radius>
       <max_linear_acceleration>1.0</max_linear_acceleration>

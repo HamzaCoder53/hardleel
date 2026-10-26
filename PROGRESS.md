@@ -280,3 +280,6 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
 - 26 Oct: Virtual SLAM steps 3+4 done: `scripts/sim/localization_demo.sh` (Nav2 goals 8/8, loc error < 5 cm).
   Recovery (teleport 5 m): default stack never recovers standing still, ~40 s while driving; `loc_v2 + loc_apply_corrections`
   recovers standing still in 24 s -> 3 cm. Open: mission rehearsal (gate/worker), foxglove layout, world features, maze, report.
+- 26 Oct (end of session, usage limit): sim DONE except re-scoring on the final 4-wheel model. Done: Jazzy/Harmonic headless (RTF 0.99), mapping/accuracy/localization/Nav2/recovery/mission rehearsal (gate open/closed/timed, worker, ramps), maze world, camera + screen, 4-wheel skid-steer model, Foxglove layout + bridge,
+  unit tests 158 pass. A background run `scripts/sim/final_matrix.sh` (tmux `fm`) may still be writing docs/sim_demo/ results; then run `pixi run python scripts/sim/summarize.py`, re-run maze (mapping_demo.sh maze + localization_demo.sh maze) on the 4-wheel model, update SIM_REPORT.md tables.
+  Not done: section 7 re-runs in sim (only loc_v2/apply_corrections + gate_align_heading), wall height 0.45, WSL re-test, Foxglove app test.

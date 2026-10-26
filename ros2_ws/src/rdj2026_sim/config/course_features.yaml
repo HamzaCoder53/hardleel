@@ -40,7 +40,7 @@ docks:                        # thin panels in the column x 0.03..0.38 (E3 measu
   y: {E2: -0.95, E3: -1.50, E4: -2.31}
 screen:                       # ~1 m straight ahead of the start, against the east wall (x 1.10)
   enabled: true
-  x: 1.09
+  x: 1.05                     # just in front of the east wall's inner face (~1.075)
   y: 0.0
   width_m: 0.40
   height_m: 0.30
