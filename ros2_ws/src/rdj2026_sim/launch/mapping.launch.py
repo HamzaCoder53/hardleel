@@ -8,10 +8,6 @@ Save when done:
     ros2 run nav2_map_server map_saver_cli -f ~/maps/sim_map
 """
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from carto_lua import config_for_platform  # noqa: E402
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -19,6 +15,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from robot_slam.carto_lua import config_for_platform
 
 
 def generate_launch_description():

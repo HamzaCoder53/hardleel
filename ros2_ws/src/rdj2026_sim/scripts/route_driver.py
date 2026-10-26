@@ -21,6 +21,8 @@ class RouteDriver(Node):
         self.route = list(zip(flat[0::2], flat[1::2]))
         self.v = float(self.declare_parameter('speed', 0.25).value)
         self.tol = float(self.declare_parameter('tolerance', 0.08).value)
+        self.wp_timeout = float(self.declare_parameter('wp_timeout', 60.0).value)   # s per waypoint, then skip
+        self.wp_t0 = None
         self.i = 0
         self.pose = None
         self.pub = self.create_publisher(Twist, 'cmd_vel', 10)
@@ -37,12 +39,25 @@ class RouteDriver(Node):
         if self.pose is None or self.done:
             return
         x, y, th = self.pose
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if self.wp_t0 is None:
+            self.wp_t0 = now
         gx, gy = self.route[self.i]
+        if now - self.wp_t0 > self.wp_timeout:
+            self.get_logger().warn(f'waypoint {self.i + 1}/{len(self.route)} ({gx:.2f}, {gy:.2f}) TIMEOUT at ({x:.2f}, {y:.2f}) - skipping')
+            self.i += 1
+            self.wp_t0 = now
+            if self.i >= len(self.route):
+                self.pub.publish(Twist())
+                self.get_logger().info('ROUTE DONE')
+                self.done = True
+            return
         dx, dy = gx - x, gy - y
         dist = math.hypot(dx, dy)
         if dist < self.tol:
             self.get_logger().info(f'waypoint {self.i + 1}/{len(self.route)} reached ({gx:.2f}, {gy:.2f})')
             self.i += 1
+            self.wp_t0 = now
             if self.i >= len(self.route):
                 self.pub.publish(Twist())
                 self.get_logger().info('ROUTE DONE')

@@ -2,18 +2,18 @@
   "map": "docs/sim_demo/mapping_course.yaml",
   "truth": "/Users/StoreOperations/hardleel/scripts/sim/../../maps/course/course_full_approx.yaml",
   "wall_distance_raw": {
-    "mean_m": 0.016488095179998448,
+    "mean_m": 0.006165228205309255,
     "median_m": 0.0,
     "p95_m": 0.05000000074505806,
-    "max_m": 0.06999969482421875,
-    "n": 1008
+    "max_m": 0.05000000074505806,
+    "n": 811
   },
   "wall_distance_aligned": {
-    "mean_m": 0.016488095179998448,
+    "mean_m": 0.006165228205309255,
     "median_m": 0.0,
     "p95_m": 0.05000000074505806,
-    "max_m": 0.06999969482421875,
-    "n": 1008
+    "max_m": 0.05000000074505806,
+    "n": 811
   },
   "alignment": {
     "dx_m": 0.0,
@@ -23,8 +23,8 @@
   "coverage_of_true_walls_within_10cm": 0.9962121212121212,
   "size": {
     "mapped_free_bbox_m": [
-      5.6,
-      2.85
+      5.65,
+      2.9
     ],
     "truth_free_bbox_m": [
       5.65,
@@ -35,12 +35,12 @@
       3.05
     ],
     "error_vs_rulebook_m": [
-      -0.15,
-      -0.2
+      -0.1,
+      -0.15
     ],
     "error_vs_truth_map_m": [
-      -0.05,
-      -0.05
+      0.0,
+      0.0
     ],
     "note": "the truth map itself is 1 cell (5 cm) per side smaller than the rulebook inner size"
   }

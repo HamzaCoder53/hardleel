@@ -26,3 +26,4 @@ mac_ws/
 docs/sim_demo/*_bag/
 docs/sim_demo/*.mcap
 docs_md.out
+docs/sim_demo/*.pbstream

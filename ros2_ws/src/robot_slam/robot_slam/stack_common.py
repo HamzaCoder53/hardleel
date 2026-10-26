@@ -147,6 +147,8 @@ def cartographer(localization=False, pbstream='', use_sim_time=False, initial_po
     opts = opts or {}
     cfg = carto_config_dir(opts)
     basename = 'cartographer_2d_localization.lua' if localization else 'cartographer_2d.lua'
+    from robot_slam.carto_lua import config_for_platform   # macOS only: inlines `include` (RoboStack Lua 5.4 bug)
+    cfg, basename = config_for_platform(cfg, basename)
     args = ['-configuration_directory', cfg, '-configuration_basename', basename]
     if localization:
         args += ['-load_state_filename', pbstream, '-load_frozen_state=true',
