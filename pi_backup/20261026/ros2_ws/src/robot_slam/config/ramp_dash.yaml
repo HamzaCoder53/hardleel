@@ -1,0 +1,40 @@
+# Ramp dash (final stack item 5, Pi node ramp_dash; launched only with pi_bringup ramp_dash:=true).
+# PLACEHOLDERS until the board-ramp test with dirt/gravel: tune from /ramp_dash/log + ~/logs/ramp_dash_*.csv.
+ramp_dash:
+  ros__parameters:
+    side_sector_deg: [70.0, 110.0]   # wall distances from the side sectors only (usable while pitched)
+    robot_half_width_m: 0.135
+    pitch_up_sign: 1.0               # +1: accel x > 0 nose-up (REP-103 IMU). Check on the board ramp first!
+    gyro_z_sign: 1.0
+    align_heading_tol_deg: 2.0       # centred within ~2 cm, heading within ~2 deg before launching
+    align_lat_tol_m: 0.02
+    align_turn_pwm: 110              # raw PWM: must beat the motor deadband (measure it with deadband_calibrate)
+    align_drive_pwm: 110
+    align_max_s: 10.0
+    clear_len_m: 0.60                # corridor ahead that must be empty (short of where beams hit the ramp)
+    clear_wait_s: 5.0
+    require_camera_clear: false      # true once a laptop low-object detector publishes /ramp_dash/camera_clear
+    runup_start_pwm: 153             # 60 % -> 100 % over runup_s
+    runup_s: 0.25
+    full_pwm: 255
+    downhill_pwm: 180                # descend slower, same steering
+    max_steer_frac: 0.6
+    k_heading: 2.5
+    k_rate: 0.15
+    k_lat: 1.5
+    max_target_deg: 8.0
+    near_wall_m: 0.05
+    near_gain: 2.5
+    near_max_target_deg: 18.0
+    target_rate_dps: 30.0
+    arm_deg: 5.0
+    release_deg: 2.0
+    profile: up_down                 # up_down (dirt ramp: up, top, down) | up_only
+    bog_pitch_deg: 6.0
+    bog_s: 1.0
+    max_climb_s: 3.0
+    reverse_pwm: 160
+    reverse_extra_s: 0.6
+    retry_runup_gain: 1.5
+    max_attempts: 2
+    max_dash_s: 12.0

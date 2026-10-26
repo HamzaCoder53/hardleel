@@ -1,0 +1,57 @@
+import os
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+# Keep identical to slam.launch.py
+LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0
+
+
+def generate_launch_description():
+    pkg = get_package_share_directory('robot_slam')
+    sllidar_pkg = get_package_share_directory('sllidar_ros2')
+
+    return LaunchDescription([
+        DeclareLaunchArgument('lidar_port', default_value='/dev/ttyUSB0'),
+        DeclareLaunchArgument('autonomous_explore', default_value='true'),
+        DeclareLaunchArgument('guardian_cmd', default_value='true'),   # false: the guardian only filters the scan
+
+        # LiDAR driver
+
+        # base_link -> laser
+        Node(package='tf2_ros', executable='static_transform_publisher', name='base_to_laser',
+             arguments=['--x', str(LASER_X), '--y', str(LASER_Y), '--z', str(LASER_Z),
+                        '--yaw', str(LASER_YAW), '--pitch', '0', '--roll', '0',
+                        '--frame-id', 'base_link', '--child-frame-id', 'laser']),
+
+        # Guardian Node: IMU pitch tilt gating + APF safety bumper + autonomous exploration
+        Node(package='robot_slam', executable='hardleel_guardian_node',
+             name='hardleel_guardian_node', output='screen',
+             parameters=[{
+                 'autonomous_explore': LaunchConfiguration('autonomous_explore'),
+                 'publish_cmd_vel': LaunchConfiguration('guardian_cmd'),
+                 'safe_dist_m': 0.50,
+                 'crit_dist_m': 0.28,
+                 'max_lin_vel': 0.18,
+                 'max_ang_vel': 0.35,
+                 'yaw_kp': 0.75,
+             }]),
+
+        # Cartographer: SLAM subscribed to /scan_filtered to prevent ramp corruption
+        Node(package='cartographer_ros', executable='cartographer_node',
+             name='cartographer_node', output='screen',
+             parameters=[{'use_sim_time': False}],
+             arguments=['-configuration_directory', os.path.join(pkg, 'config'),
+                        '-configuration_basename', 'cartographer_2d.lua'],
+             remappings=[('scan', '/scan_filtered'), ('imu', '/imu/data')]),
+
+        # Cartographer's submaps -> /map occupancy grid
+        Node(package='cartographer_ros', executable='cartographer_occupancy_grid_node',
+             name='occupancy_grid_node', output='screen',
+             parameters=[{'use_sim_time': False}],
+             arguments=['-resolution', '0.05', '-publish_period_sec', '0.5']),
+    ])

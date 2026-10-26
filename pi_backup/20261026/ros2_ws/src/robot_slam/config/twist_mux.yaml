@@ -1,0 +1,14 @@
+# Higher priority wins. Teleop (RC / keyboard) overrides navigation; a topic that goes quiet for `timeout`
+# seconds releases its lock, so a lost signal falls back to the next source and finally to zero.
+twist_mux:
+  ros__parameters:
+    use_stamped: false
+    topics:
+      teleop:
+        topic: cmd_vel_teleop
+        timeout: 0.5
+        priority: 100
+      navigation:
+        topic: cmd_vel_nav
+        timeout: 0.5
+        priority: 10

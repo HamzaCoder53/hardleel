@@ -1,0 +1,29 @@
+# REAL COURSE waypoints from the team map (Documents/hardleel map maullay made/course_reference.*, 25 Oct).
+# Frame = that map = mission frame: start (0,0), robot FACING EAST (the 3 m wall), x east, y north, yaw deg.
+# conf med = read off the map labels/route; low = assumption (screen, class->dock, bins, finish).
+# Re-click on the phase-1 map tomorrow (click_waypoints) - this is the starting point.
+frame: map
+poses:
+  screen: {x: 0.150, y: 0.000, yaw_deg: 0.0, conf: "high", note: "CONFIRMED by the team: the screen is right in front of the start (east wall); start pose after the 0.15 m start nudge"}
+  loading_plastic: {x: 0.680, y: -0.950, yaw_deg: 90.0, conf: "low", note: "E2 dock (hollow green, estimated) approached from the south; class->dock PLACEHOLDER"}
+  loading_metal: {x: 0.700, y: -1.460, yaw_deg: 180.0, conf: "med", note: "E3 dock (green bar x 0.0-0.36, y -1.46), robot east of it facing west; class->dock PLACEHOLDER"}
+  loading_organic: {x: 0.700, y: -2.310, yaw_deg: 180.0, conf: "low", note: "E4 dock (hollow green, estimated) facing west; class->dock PLACEHOLDER"}
+  terrain_1: {x: 0.720, y: -2.070, yaw_deg: 180.0, conf: "med", note: "SE corner, start of the bottom corridor (purple route)"}
+  terrain_2: {x: -2.000, y: -2.070, yaw_deg: 180.0, conf: "med", note: "bottom corridor middle"}
+  terrain_3: {x: -4.250, y: -2.070, yaw_deg: 90.0, conf: "med", note: "SW corner, foot of the dirt ramp; meet the ramp end-on"}
+  terrain_4: {x: -4.250, y: -1.000, yaw_deg: 90.0, conf: "med", note: "on the dirt ramp (left column)"}
+  junction: {x: -4.250, y: -0.250, yaw_deg: 0.0, conf: "med", note: "top-left: gravel lane (path 1) east, gate lane (path 2) north-east"}
+  gate_check: {x: -3.900, y: 0.080, yaw_deg: 0.0, conf: "med", note: "top lane facing the gate (x -3.02): closed ~0.9 m, open > 2 m"}
+  path2_1: {x: -2.500, y: 0.080, yaw_deg: 0.0, conf: "med", note: "through the gate, top lane (flat, gated)"}
+  path2_2: {x: -1.600, y: 0.080, yaw_deg: 0.0, conf: "med", note: "top lane end -> pink area"}
+  path1_1: {x: -3.900, y: -0.530, yaw_deg: 0.0, conf: "med", note: "gravel lane (path 1, always open)"}
+  path1_2: {x: -2.500, y: -0.530, yaw_deg: 0.0, conf: "med", note: "gravel lane"}
+  path1_2b: {x: -1.600, y: -0.530, yaw_deg: 0.0, conf: "med", note: "gravel lane end -> pink area"}
+  bin_plastic: {x: -1.450, y: -1.450, yaw_deg: -90.0, conf: "low", note: "ASSUMED bins in the end room along its south wall (map: bins/finish?)"}
+  bin_organic: {x: -1.200, y: -1.450, yaw_deg: -90.0, conf: "low", note: "ASSUMED, see bin_plastic"}
+  bin_metal: {x: -0.950, y: -1.450, yaw_deg: -90.0, conf: "low", note: "ASSUMED, see bin_plastic"}
+  finish: {x: -1.200, y: -0.350, yaw_deg: 0.0, conf: "low", note: "ASSUMED finish in the pink area where the purple route ends"}
+sequences:
+  terrain: [terrain_1, terrain_2, terrain_3, terrain_4]
+  path2: [path2_1, path2_2]
+  path1: [path1_1, path1_2, path1_2b]

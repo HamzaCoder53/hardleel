@@ -1,0 +1,8 @@
+event_logger:
+  ros__parameters:
+    robot_id: HARDLEEL         # PLACEHOLDER: replace with the organisers' official id
+    log_dir: ~/logs/runs
+    sender: stub               # stub | http
+    sender_url: ''             # PLACEHOLDER: judges' endpoint (format unknown)
+    sender_timeout_s: 1.0
+    print_period_s: 2.0

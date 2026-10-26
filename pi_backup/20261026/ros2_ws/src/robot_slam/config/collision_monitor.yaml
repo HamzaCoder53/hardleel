@@ -1,0 +1,109 @@
+# Nav2 collision_monitor: ONE node that is started by laptop_mapping and keeps running into the mission.
+# Chain: twist_mux -> velocity_smoother (/cmd_vel_smoothed) -> collision_monitor -> /cmd_vel -> Pi motor_bridge.
+#
+# Why boxes ahead, not circles: corridors are ~0.70 m wide, so the walls are ~0.35 m from the robot centre.
+# Any circle bigger than that (the old 0.40 m stop circle) would stop the robot for good in every corridor.
+#   StopBox   12-22 cm ahead of base_link (front bumper ~0.13 m PLACEHOLDER), as wide as the robot -> stop
+#   SlowBox   12-55 cm ahead, a bit wider -> scale speed by slowdown_ratio
+#   Approach  the robot footprint simulated along the commanded twist (covers turning/reversing into things)
+# Stop/Slow boxes are velocity_polygons that act only while driving forward: a box that also stopped in-place
+# turns deadlocked the robot whenever it turned to face a wall in a 0.7 m corridor (Jazzy sim, 25 Oct).
+# Humble has no velocity_polygon: stack_common turns them back into plain boxes there.
+# Polygon points are Jazzy-style strings; stack_common.nav2_params_for_distro rewrites them for Humble.
+# Footprint: robot max 0.30 x 0.30 m (rules); current body ~0.26 x 0.22 m (PLACEHOLDER: re-measure with the bin).
+collision_monitor:
+  ros__parameters:
+    base_frame_id: base_link
+    odom_frame_id: odom
+    cmd_vel_in_topic: cmd_vel_smoothed
+    cmd_vel_out_topic: cmd_vel
+    state_topic: collision_monitor_state
+    transform_tolerance: 0.3
+    source_timeout: 1.0            # lidar is ~6 Hz; older data counts as "no data" (robot stops)
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+    enable_stamped_cmd_vel: false  # Pi motor_bridge takes geometry_msgs/Twist
+    polygons: ["StopBoxMapping", "StopBox", "SlowBox", "FootprintApproach"]
+    # Mapping phase (manual driving close to walls): the SMALLER stop box is active. laptop_mission switches
+    # to the mission box with `ros2 param set /collision_monitor StopBox.enabled true` (+ Mapping one false).
+    StopBoxMapping:
+      type: velocity_polygon          # direction-aware: only while driving FORWARD (turning in place is free)
+      action_type: stop
+      min_points: 3
+      visualize: true
+      polygon_pub_topic: polygon_stop_mapping
+      enabled: true
+      holonomic: false
+      velocity_polygons: ["forward", "other"]
+      forward:
+        points: "[[0.17, 0.12], [0.17, -0.12], [0.12, -0.12], [0.12, 0.12]]"
+        linear_min: 0.03
+        linear_max: 2.0
+        theta_min: -4.0
+        theta_max: 4.0
+      other:                          # in-place turns / reversing: a 1 cm sliver = effectively off
+        points: "[[0.125, 0.005], [0.125, -0.005], [0.12, -0.005], [0.12, 0.005]]"
+        linear_min: -2.0
+        linear_max: 0.03
+        theta_min: -4.0
+        theta_max: 4.0
+    # short on purpose: loading-station and bin waypoints stand the robot ~0.30 m (centre) off the face
+    StopBox:
+      type: velocity_polygon          # direction-aware: only while driving FORWARD (turning in place is free)
+      action_type: stop
+      min_points: 3
+      visualize: true
+      polygon_pub_topic: polygon_stop
+      enabled: false
+      holonomic: false
+      velocity_polygons: ["forward", "other"]
+      forward:
+        points: "[[0.22, 0.13], [0.22, -0.13], [0.12, -0.13], [0.12, 0.13]]"
+        linear_min: 0.03
+        linear_max: 2.0
+        theta_min: -4.0
+        theta_max: 4.0
+      other:                          # in-place turns / reversing: a 1 cm sliver = effectively off
+        points: "[[0.125, 0.005], [0.125, -0.005], [0.12, -0.005], [0.12, 0.005]]"
+        linear_min: -2.0
+        linear_max: 0.03
+        theta_min: -4.0
+        theta_max: 4.0
+    SlowBox:
+      type: velocity_polygon          # direction-aware: only while driving FORWARD (turning in place is free)
+      action_type: slowdown
+      slowdown_ratio: 0.4
+      min_points: 3
+      visualize: true
+      polygon_pub_topic: polygon_slowdown
+      enabled: true
+      holonomic: false
+      velocity_polygons: ["forward", "other"]
+      forward:
+        points: "[[0.55, 0.16], [0.55, -0.16], [0.12, -0.16], [0.12, 0.16]]"
+        linear_min: 0.03
+        linear_max: 2.0
+        theta_min: -4.0
+        theta_max: 4.0
+      other:                          # in-place turns / reversing: a 1 cm sliver = effectively off
+        points: "[[0.125, 0.005], [0.125, -0.005], [0.12, -0.005], [0.12, 0.005]]"
+        linear_min: -2.0
+        linear_max: 0.03
+        theta_min: -4.0
+        theta_max: 4.0
+    FootprintApproach:
+      type: polygon
+      points: "[[0.14, 0.135], [0.14, -0.135], [-0.14, -0.135], [-0.14, 0.135]]"   # = Nav2 footprint
+      action_type: approach
+      time_before_collision: 1.0
+      simulation_time_step: 0.1
+      min_points: 3
+      visualize: false
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: scan
+      topic: /scan_filtered
+      min_height: 0.0
+      max_height: 2.0
+      enabled: true

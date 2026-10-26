@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Pi CycloneDDS config (~/cyclonedds.xml). Peers = the laptop on each network we use
+     (Student Wifi, PC hotspot host, AI-Jamea) and the Mac. Unreachable peers are harmless. -->
+<CycloneDDS xmlns="https://cdds.io/config">
+    <Domain id="any">
+        <General>
+            <AllowMulticast>true</AllowMulticast>
+        </General>
+        <Discovery>
+            <ParticipantIndex>auto</ParticipantIndex>
+            <MaxAutoParticipantIndex>50</MaxAutoParticipantIndex>
+            <Peers>
+                <Peer Address="172.16.0.135"/>
+                <Peer Address="192.168.137.1"/>
+                <Peer Address="172.16.0.183"/>
+            </Peers>
+        </Discovery>
+    </Domain>
+</CycloneDDS>

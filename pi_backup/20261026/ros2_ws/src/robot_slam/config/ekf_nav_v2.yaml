@@ -1,0 +1,44 @@
+# EKF v2 (final stack, switch `loc_v2`): rf2o forward speed + gyro yaw rate (online-unbiased) + ABSOLUTE yaw from
+# the square course walls (wall_heading). world_frame odom: the EKF's odom starts aligned with the map (start
+# (0,0,0) facing east), so the wall yaw (map frame) is valid here. No commanded PWM goes into this filter.
+ekf_loc:                 # = the node name in stack_common.loc_v2 (under ekf_filter_node it was ignored: sim 26 Oct)
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.3
+    two_d_mode: true
+    publish_tf: false
+    print_diagnostics: false
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # Order: x y z, roll pitch yaw, vx vy vz, vroll vpitch vyaw, ax ay az
+    odom0: /odom_rf2o_loc        # loc_v2's own rf2o instance (stack_common.loc_v2)
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, false,
+                   false, false, false]
+    odom0_queue_size: 10
+
+    imu0: /imu/data_raw_unbiased
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_queue_size: 20
+    imu0_remove_gravitational_acceleration: false
+
+    imu1: /wall_heading/imu
+    imu1_config: [false, false, false,
+                  false, false, true,
+                  false, false, false,
+                  false, false, false,
+                  false, false, false]
+    imu1_queue_size: 5
+    imu1_differential: false
+    imu1_relative: false
+    imu1_remove_gravitational_acceleration: false
+    imu1_rejection_threshold: 3.0      # Mahalanobis: a bad wall reading (clutter) is ignored

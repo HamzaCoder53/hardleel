@@ -1,0 +1,31 @@
+<!--
+  hardleel mission behaviour tree for NavigateToPose (Nav2 Jazzy, BehaviorTree.CPP v4).
+  Default Nav2 recovery = clear costmaps, SPIN, wait, back up: a spin in a 0.7 m corridor next to a worker wastes
+  seconds and can hit walls. This tree: replan at 1 Hz; on a planner/controller failure clear that costmap once;
+  then the recovery loop is only "clear local costmap + wait 1 s" and try again (re-check whether the way is free).
+  The mission node decides when to stop waiting (obstacle_max_wait_s, goal_timeout_s, path switch).
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionNavigateToPose">
+  <BehaviorTree ID="MissionNavigateToPose">
+    <RecoveryNode number_of_retries="1000" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
+        <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
+        <RateController hz="2.0">   <!-- workers move: replan twice a second -->
+          <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+            <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="{selected_controller}" error_code_id="{follow_path_error_code}"/>
+          <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+      </PipelineSequence>
+      <Sequence name="WaitAndRecheck">
+        <ClearEntireCostmap name="ClearLocalCostmap-Recovery" service_name="local_costmap/clear_entirely_local_costmap"/>
+        <Wait wait_duration="1.0"/>
+      </Sequence>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

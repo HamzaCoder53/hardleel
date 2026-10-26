@@ -1,0 +1,35 @@
+# Course facts (squared course frame = map frame: start (0, 0) facing east, x east, y north). Team, 26 Oct.
+# ONE place for geometry used by the scan gate, wall-heading, checkpoints, map tidy-up, ramp dash and supervisor.
+# "approx" values are +/- 0.3 m; replace them when measured.
+field:                      # one rectangle, 5.75 x 3.05 m (inner wall faces)
+  x_min: -4.65
+  x_max: 1.10
+  y_min: -2.65
+  y_max: 0.40
+  size_tol_m: 0.15          # map tidy-up: fitted rectangle must match within this, else skip the tidy-up
+wall_angles_deg: [0, 90]    # every wall is axis-aligned (heading correction modulo 90 deg)
+ramp_zones:                 # dirt ramp strip: full height of the field
+  - name: dirt_ramp
+    x_min: -4.60
+    x_max: -3.88
+    y_min: -2.65
+    y_max: 0.40
+    axis: y                 # the robot drives along y on it
+corridors:                  # back corridors, approx
+  gated:  {x_min: -3.88, x_max: -2.05, y_min: -0.25, y_max: 0.37, approx: true}
+  gravel: {x_min: -3.88, x_max: -2.05, y_min: -0.87, y_max: -0.25, approx: true}
+end_room:
+  main:   {x_min: -2.05, x_max: -0.19, y_min: -0.87, y_max: 0.37, approx: true}
+  alcove: {x_min: -1.66, x_max: -0.70, y_min: -1.85, y_max: -0.92, approx: true}
+screen: {x: 1.10, y: 0.0, note: "against the east wall, ~1 m straight ahead of the start"}
+docks:
+  column_x: [0.03, 0.38]
+  E3_y: -1.50               # measured
+  E2_y: -0.95               # ESTIMATED
+  E4_y: -2.31               # ESTIMATED
+# Unknowns (stay in mission/supervisor config, not here): gate wait time, dock -> waste type, bin + finish
+# positions, loading protocol, judges' data format, autonomous mapping allowed?, robot moved back to start
+# between phases? and the gap length.
+maps:
+  reference: maps/course/course_reference.yaml      # measured walls only: alignment + checks
+  full_approx: maps/course/course_full_approx.yaml  # + approximate back half: planning + sim

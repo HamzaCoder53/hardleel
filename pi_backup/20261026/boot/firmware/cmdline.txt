@@ -1,0 +1,1 @@
+console=serial0,115200 multipath=off dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc cfg80211.ieee80211_regdom=KE ds=nocloud;i=rpi-imager-1790601576821

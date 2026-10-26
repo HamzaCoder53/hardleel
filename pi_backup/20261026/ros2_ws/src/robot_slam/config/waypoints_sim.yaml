@@ -1,0 +1,25 @@
+# SIM test waypoints for rdj2026_sim (Figure 1 copy). In that world the start area (right corridor + the
+# lower-right room with the loading bar) has NO opening to the rest of the field, so every stage is placed in
+# the reachable part. Map frame = start pose (x = arena +y, y = arena -x). Right corridor centre: y = -0.14.
+# Loading channel (between the fixture lines at map x 0.42 / 1.12) centre x = 0.77, approached from map -y.
+frame: map
+poses:
+  screen: {x: 1.0, y: -0.14, yaw_deg: 0.0, conf: "sim", note: "right corridor"}
+  loading_plastic: {x: 0.77, y: 1.55, yaw_deg: 90.0, conf: "sim", note: "loading channel, east end"}
+  loading_metal: {x: 0.77, y: 1.70, yaw_deg: 90.0, conf: "sim", note: "loading channel"}
+  loading_organic: {x: 0.77, y: 1.85, yaw_deg: 90.0, conf: "sim", note: "loading channel"}
+  terrain_1: {x: 1.6, y: -0.14, yaw_deg: 0.0, conf: "sim", note: "right corridor"}
+  terrain_2: {x: 2.6, y: -0.14, yaw_deg: 0.0, conf: "sim", note: "right corridor"}
+  junction: {x: 3.3, y: -0.14, yaw_deg: 0.0, conf: "sim", note: "right corridor, top part"}
+  gate_check: {x: 3.6, y: -0.14, yaw_deg: 0.0, conf: "sim", note: "faces the top wall ~0.95 m away = gate 'closed'"}
+  path2_1: {x: 4.0, y: -0.14, yaw_deg: 0.0, conf: "sim", note: "corridor end"}
+  path1_1: {x: 2.6, y: -0.14, yaw_deg: 180.0, conf: "sim", note: "back down the corridor"}
+  path1_2: {x: 1.6, y: -0.14, yaw_deg: 180.0, conf: "sim", note: "back down the corridor"}
+  bin_plastic: {x: 1.49, y: 1.6, yaw_deg: 90.0, conf: "sim", note: "room, between fixture line and wall"}
+  bin_organic: {x: 1.49, y: 2.2, yaw_deg: 90.0, conf: "sim", note: "room"}
+  bin_metal: {x: 1.49, y: 2.8, yaw_deg: 90.0, conf: "sim", note: "room"}
+  finish: {x: 0.1, y: 0.7, yaw_deg: -90.0, conf: "sim", note: "near the start"}
+sequences:
+  terrain: [terrain_1, terrain_2]
+  path1: [path1_1, path1_2]
+  path2: [path2_1]
