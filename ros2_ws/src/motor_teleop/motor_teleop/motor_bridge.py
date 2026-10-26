@@ -59,7 +59,7 @@ class MotorBridge(Node):
         self.declare_parameter('esp32_hold_ms', 400)   # motor_code: each drive command runs this long (the timeout)
         self.declare_parameter('max_speed', 1.0)     # Twist value (m/s) that maps to max_pwm
         self.declare_parameter('turn_gain', 0.5)     # wheel speed per rad/s of angular.z
-        self.declare_parameter('max_pwm', 255)       # hard cap, 0..255
+        self.declare_parameter('max_pwm', 75)        # hard cap, 0..255 (team 26 Oct: 75 on the real robot)
         self.declare_parameter('min_pwm', 0)         # lift small non-zero commands above stall (0 = allow full fine control down to 0)
         self.declare_parameter('min_turn', 0.0)      # rad/s: smallest in-place spin threshold (0 = no forced floor)
         # ESP32 + BTS7960 wiring, checked on the robot 26 Oct (wheels up, teleop): the LEFT side runs reversed.

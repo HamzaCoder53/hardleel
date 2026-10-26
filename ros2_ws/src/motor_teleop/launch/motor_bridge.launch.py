@@ -20,7 +20,7 @@ def default_esp32_port():
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('port', default_value=default_esp32_port()),
-        DeclareLaunchArgument('max_pwm', default_value='255'),
+        DeclareLaunchArgument('max_pwm', default_value='75'),
         Node(package='motor_teleop', executable='motor_bridge', name='motor_bridge',
              output='screen',
              parameters=[{

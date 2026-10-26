@@ -68,7 +68,7 @@ def generate_launch_description():
         # motors stop 0.3-0.4 s after the last /cmd_vel.
         Node(package='motor_teleop', executable='motor_bridge', name='motor_bridge', output='screen',
              condition=IfCondition(L('motors')),
-             parameters=[{'port': L('pico_port'), 'send_rate': 10.0, 'max_pwm': 255, 'cmd_timeout': L('cmd_timeout'),
+             parameters=[{'port': L('pico_port'), 'send_rate': 10.0, 'max_pwm': 75, 'cmd_timeout': L('cmd_timeout'),
                           'yaw_feedback': ParameterValue(L('yaw_feedback'), value_type=bool),
                           'dash_input': ParameterValue(L('ramp_dash'), value_type=bool)}]),
         # final stack item 5: the dash controller runs HERE on the Pi (control loop never crosses Wi-Fi)

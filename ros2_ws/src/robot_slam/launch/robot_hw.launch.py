@@ -44,7 +44,7 @@ def generate_launch_description():
         Node(
             package='motor_teleop', executable='motor_bridge', name='motor_bridge', output='screen',
             condition=IfCondition(LaunchConfiguration('motors')),
-            parameters=[{'port': LaunchConfiguration('pico_port'), 'send_rate': 10.0, 'max_pwm': 255}],
+            parameters=[{'port': LaunchConfiguration('pico_port'), 'send_rate': 10.0, 'max_pwm': 75}],
         ),
         # Pi Camera Module 3 -> /camera/image_raw/compressed
         ExecuteProcess(
