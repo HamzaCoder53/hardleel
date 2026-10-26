@@ -10,14 +10,15 @@ worker standing on the same spot would not count as "unexpected" for the obstacl
 Anything still really there is marked live by the costmaps' obstacle layers (lidar, clears itself) and is logged as
 an obstacle. The frozen map is re-sent every republish_s.
 Params: blob_max_m (0.45), blob_gap_m (0.15), occupied (65), republish_s (2.0), clean_blobs (true).
-Topics: in /map (OccupancyGrid), /mission/start (Empty); out /map_nav (OccupancyGrid, transient local).
+Topics: in /map (OccupancyGrid), /mission/start (Empty), /mission/state (String; anything but WAIT_START also
+freezes, in case the start message went to another subscriber only); out /map_nav (OccupancyGrid, transient local).
 """
 import numpy as np
 import rclpy
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty, String
 
 
 def _label(mask):
@@ -89,12 +90,19 @@ class MapFreezer(Node):
         self.pub = self.create_publisher(OccupancyGrid, '/map_nav', latched)
         self.create_subscription(OccupancyGrid, '/map', self.on_map, 1)
         self.create_subscription(Empty, '/mission/start', self.on_start, 1)
+        # backup trigger: a single `topic pub --once` reaches only the first matched subscriber (sim 25 Oct: the
+        # mission started, this node never froze -> the worker got mapped and was never "unexpected")
+        self.create_subscription(String, '/mission/state', self.on_state, 10)
         self.create_timer(float(p('republish_s', 2.0).value), self.republish)
 
     def on_map(self, m):
         if not self.frozen:
             self.last = m
             self.pub.publish(m)
+
+    def on_state(self, m):
+        if m.data and m.data != 'WAIT_START':
+            self.on_start(None)
 
     def on_start(self, _):
         if self.frozen:

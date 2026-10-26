@@ -12,8 +12,9 @@ renice -n 19 $$ >/dev/null   # lowest CPU priority: the real robot stack may be 
 unset CYCLONEDDS_URI ZENOH_CONFIG_OVERRIDE
 for d in jazzy humble; do [ -f /opt/ros/$d/setup.bash ] && { source /opt/ros/$d/setup.bash; break; }; done
 WS="${WS:-$HOME/hardleel_ws}"; source "$WS/install/setup.bash"
-WORKER=0; LOC=0; RAMP=0; COURSE=0; GATE=0; EXPLORE=0; WREMOVE=75
+WORKER=0; PREMAP=; LOC=0; RAMP=0; COURSE=0; GATE=0; EXPLORE=0; WREMOVE=75
 for a in "$@"; do [ "$a" = worker ] && WORKER=center; [ "${a%%=*}" = worker ] && [ "$a" != worker ] && WORKER=${a#worker=}; [ "${a%%=*}" = worker_remove ] && WREMOVE=${a#worker_remove=}; [ "$a" = localization ] && LOC=1; [ "${a%%=*}" = ramp ] && RAMP=${a#ramp=}
+  [ "${a%%=*}" = worker_premap ] && PREMAP=${a#worker_premap=}   # x,y (world): worker stands there while mapping
   [ "$a" = course ] && COURSE=1; [ "$a" = gate_closed ] && GATE=1; [ "${a%%=*}" = explore ] && EXPLORE=${a#explore=}; done
 WORLD=rdj2026; [ $COURSE = 1 ] && WORLD=course
 WP="$WS/src/robot_slam/config/waypoints_sim.yaml"
@@ -32,6 +33,11 @@ if [ $GATE = 1 ]; then      # course only: the gate closed for the whole run (to
 fi
 if [ "$RAMP" != 0 ]; then   # ramp in the walled part of the right corridor, arena (6352, 3000) = map x 2.13-3.27, end-on
   ros2 run ros_gz_sim create -world rdj2026 -name ramp -x 6.352 -y 3.0 -z 0 -Y 1.5708 -string "$(python3 "$HERE/ramp_sdf.py" $RAMP)" > $L/ramp.log 2>&1
+fi
+if [ -n "$PREMAP" ]; then
+  [ "$WORKER" = 0 ] && WORKER=center
+  ros2 run ros_gz_sim create -world rdj2026 -name worker -x ${PREMAP%,*} -y ${PREMAP#*,} -z 0.2 -string \
+    '<sdf version="1.6"><model name="worker"><static>true</static><link name="l"><collision name="c"><geometry><cylinder><radius>0.125</radius><length>0.4</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.125</radius><length>0.4</length></cylinder></geometry></visual></link></model></sdf>' > $L/worker.log 2>&1
 fi
 NAV2=true
 if [ "$EXPLORE" != 0 ]; then   # phase 1 rehearsal: auto mapping (Nav2 + frontier explorer, returns to start)
@@ -56,8 +62,12 @@ fi
 ros2 launch robot_slam laptop_mission.launch.py sim:=true classifier:=stub stub_class:=metal waypoints:=$WP nav2:=$NAV2 > $L/mission.log 2>&1 &
 sleep 40
 echo "--- topics"; python3 "$HERE/topic_probe.py" 4 /scan /scan_filtered /map /odom 2>&1 | grep Hz
-echo "--- GO $(date +%T)"; ros2 topic pub --once -w 1 /mission/start std_msgs/msg/Empty "{}" >/dev/null
-if [ "$WORKER" != 0 ]; then   # arena (6352, 2350) = map (2.05, -0.14): between terrain_1 and terrain_2; spawned at GO
+echo "--- GO $(date +%T)"; ros2 topic pub --times 3 -r 5 -w 1 /mission/start std_msgs/msg/Empty "{}" >/dev/null
+if [ -n "$PREMAP" ]; then     # worker was in the scan: move it to the run position (map_freezer must drop the old blob)
+  set -- $WXY
+  $GZ service -s /world/rdj2026/set_pose --reqtype $MSG.Pose --reptype $MSG.Boolean --timeout 2000 \
+    --req "name: \"worker\" position: {x: $1 y: $2 z: 0.2}" >> $L/worker.log 2>&1; echo "worker moved $(date +%T)" >> $L/worker.log
+elif [ "$WORKER" != 0 ]; then   # arena (6352, 2350) = map (2.05, -0.14): between terrain_1 and terrain_2; spawned at GO
   set -- $WXY
   ros2 run ros_gz_sim create -world rdj2026 -name worker -x $1 -y $2 -z 0.2 -string \
     '<sdf version="1.6"><model name="worker"><static>true</static><link name="l"><collision name="c"><geometry><cylinder><radius>0.125</radius><length>0.4</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.125</radius><length>0.4</length></cylinder></geometry></visual></link></model></sdf>' > $L/worker.log 2>&1

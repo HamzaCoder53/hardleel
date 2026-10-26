@@ -674,6 +674,8 @@ class CompetitionMission(Node):
                     self.log_row(state, 'switch_to_path1', 'obstacle')
                     state = 'GO_PATH'
                 except SkipToDeposit:
+                    if state == 'TERRAIN':                  # the rulebook timestamp must still appear (as skipped)
+                        self.event('terrain_complete', result='skipped', reason='soft deadline')
                     left = self.deadline.remaining(self.now())
                     self.log_row(state, 'skip_to_deposit', f'{left:.0f} s left < deposit_reserve_s '
                                                            f'{self.g("deposit_reserve_s")}')
