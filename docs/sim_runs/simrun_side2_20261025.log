@@ -1,0 +1,102 @@
+--- topics
+/scan: 5.8 Hz
+/scan_filtered: 5.8 Hz
+/map: 2.0 Hz
+/odom: 27.8 Hz
+--- GO 21:20:52
+--- end 21:24:13 after 195 s
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+[  48.6s] wp:terrain_2: obstacle blocked, no alternative here: waiting and re-checking
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+[  59.1s] wp:terrain_2: obstacle blocked, no alternative here: waiting and re-checking
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+[  69.5s] wp:terrain_2: obstacle blocked, no alternative here: waiting and re-checking
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+[  80.0s] wp:terrain_2: obstacle blocked, no alternative here: waiting and re-checking
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+[  90.5s] wp:terrain_2: obstacle blocked, no alternative here: waiting and re-checking
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+[ 101.0s] wp:terrain_2: obstacle blocked, no alternative here: waiting and re-checking
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+[INFO] [1792952457.051023064] [ros_gz_sim]: Entity creation successful.
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 5.611 ok class=metal confidence=1.0
+loading_complete 19.62 ok 
+terrain_complete None MISSING 
+obstacle_detected 5.861 ok 
+obstacle_response 6.69 ok action=wait response_s=0.83
+gate_decision None MISSING 
+gate_wait_time None MISSING 
+deposit_complete None MISSING 
+finish 196.536 ok 
+total_run_time None 196.536 
+EXIT 0

@@ -1,0 +1,34 @@
+Summary: 5 packages finished [6.42s]
+/tf: tf2_msgs/msg/TFMessage pubs=['cartographer_node', 'imu_filter_madgwick_node', 'robot_state_publisher'] reliability=['1']
+/scan_filtered: sensor_msgs/msg/LaserScan pubs=['sensor_prep'] reliability=['2']
+/tf: 71.0 Hz
+/scan_filtered: 5.3 Hz
+=== deadband
+cmd 0.10 m/s: without compensation 0.000 m/s, with 60/70 0.096 m/s (yaw drift 0.001 rad/s)
+PASS
+=== yaw
+cmd 0.8 rad/s spin: feedback off 1.510, on 0.919 rad/s
+PASS
+=== calibrate_turn
+/motor/calibrate_turn: turn thresholds: left 80, right 80 -> min_turn_pwm 85 (saved: ok [motor_calibrator]; live min_turn_pwm=85 (ok)); yaw rate at PWM 110 (left): 0.92 rad/s, at PWM 110 (right): 0.85 rad/s
+PASS
+=== calibrate_speed
+/motor/calibrate_speed: max_speed 0.685 m/s (k=0.00360 m/s per PWM, min_pwm 65, rms 0.089, n=3) (saved: ok [motor_calibrator]; live max_speed=0.6848796067605627 (ok)) | PWM 100: 14 poses, v=0.181 m/s; PWM 160: 14 poses, v=0.459 m/s; PWM 220: 14 poses, v=0.475 m/s
+PASS
+--- calib file
+max_speed: 0.6848796067605627
+meta:
+min_pwm_left: 60
+min_pwm_right: 70
+min_turn_pwm: 85.0
+=== speed governor
+0.20 m/s in the slow zone (x0.6): governor off 0.141, on 0.214 m/s
+PASS
+=== fit_speed_from_bag (true max_speed 0.9)
+1792935192.5 1792935195.0    153    0.248
+1792935196.3 1792935199.9    153    0.247
+1792935206.1 1792935209.3    188    0.303
+1792935211.2 1792935214.4    188    0.201
+segments: 17 found, 15 usable
+max_speed = 0.580 m/s  (k=0.00305, rms residual 0.076 m/s, n=15)
+(dry run; use --apply to save)

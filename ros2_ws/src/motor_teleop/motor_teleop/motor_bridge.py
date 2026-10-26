@@ -1,42 +1,23 @@
 #!/usr/bin/env python3
-"""cmd_vel -> Pico serial motor bridge (for the open-loop motor test firmware).
+"""cmd_vel -> ESP32 serial motor bridge (BTS7960 + Dual Servos).
 
 Subscribes : cmd_vel (geometry_msgs/Twist)   e.g. from teleop_twist_keyboard
 Publishes  : encoders (std_msgs/Int32MultiArray)
              data = [lf, lr, rf, rr, v_lf, v_lr, v_rf, v_rr]   (ticks, ticks/s)
 
-Pico protocol used (newline terminated; firmware "Motor + servo firmware", 25 Oct):
-  STBY,0,1        enable both TB6612 drivers
-  M,<id>,<pwm>    id 0=LF 1=LR 2=RF 3=RR, pwm -255..255
-  STOP            all motors off
-  SV,<deg>,<dps>  both drop servos (Pico GP12 + GP13, same angle) to <deg>, slewing at <dps> (0 = jump)
-Pico replies read here: ENC,... / STAT,... / ERR,... / WD,stopped / SV,moving,<deg> / SV,done,<deg>
-The Pico's own command watchdog (default 200 ms) brakes the motors if this node stops sending (it sends
-every 1/send_rate = 100 ms). Servos: /motor/servo_cmd (Int32MultiArray [deg] or [deg, dps]) -> SV line;
-the Pico's SV replies are republished on /motor/servo_state (String "moving,<deg>" / "done,<deg>"). This
-node owns the serial port, so the drop_servo node (backend pico) goes through these two topics.
-
-Ramping: the PWM sent to the Pico changes at most <surface>_ramp (speeding up) or
-ramp_decel (slowing down) PWM units per second. A direction reversal passes
-through zero first. Set a ramp parameter to 0 to disable that limit.
-
-Surface profiles (max PWM cap / speed-up ramp in PWM per second): FLAT 220/600, SAND 150/250,
-GRAVEL 180/300. The profile only caps and slews the PWM; the m/s -> PWM scale stays max_speed/max_pwm.
-Surface state: FLAT, or ramp_surface (default GRAVEL) while the relative pitch from /imu/data_lpf is armed
-(> arm_deg on, < release_deg off); optional IMU vibration also selects GRAVEL. /surface_override
-(std_msgs/String: FLAT | SAND | GRAVEL | AUTO) lets the mission set the surface by map zone.
-Gravity feedforward: while armed and both wheels drive the same physical way, the PWM magnitude is raised
-by gravity_ff * sin(uphill slope) (lowered when going downhill), clamped to +/-gravity_ff_max, never
-reversing a wheel and never applied at standstill.
-
-Deadband (25 Oct): min_pwm_left / min_pwm_right are an OFFSET, |pwm| -> min + |pwm| * (max_pwm - min) / max_pwm,
-so small commands still move the wheel and the scale stays continuous (0 = off). min_turn_pwm is a floor for
-in-place spins. Values come from calib_file (written by deadband_calibrate / motor_calibrator) and can be set live.
-Test/calibration input: /motor/pwm_test (Int32MultiArray [left, right], + = forward) is obeyed only while
-allow_pwm_test is true. /motor/pwm_state publishes what was sent ([left, right], + = forward).
-Feedback (all OFF by default): yaw_feedback corrects the turn rate with the gyro (/imu/data_raw z, PI);
-speed_scale_enabled multiplies linear speed by /motor/speed_scale (from the laptop's speed_governor).
+ESP32 protocol used (newline terminated; firmware esp32_pi_bridge.ino):
+  M <left> <right>  side speeds (-255..255, positive = forward)
+  S <angle>         both drop servos to angle (0..180)
+  X                 stop motors
+  P                 ping -> replies PONG
+ESP32 replies read here: READY, PONG, ERR <reason>, WATCHDOG STOP.
+The ESP32 firmware watchdog (500 ms) brakes the motors if no M command arrives.
+While driving, this bridge resends M at least every 100 ms (10 Hz).
+The Pi safety watchdog stops the motors if no cmd_vel arrives for 300 ms.
+Servos: /motor/servo_cmd (Int32MultiArray [deg] or [deg, dps]) -> S <angle>;
+republished on /motor/servo_state (String "moving,<deg>" / "done,<deg>") with timed confirmation.
 """
+import glob
 import math
 import os
 import threading
@@ -50,6 +31,8 @@ from rcl_interfaces.msg import SetParametersResult
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32, Int32MultiArray, String
+
+from motor_teleop.esp32_link import Esp32Motors
 
 LIVE = ('min_pwm_left', 'min_pwm_right', 'min_turn_pwm', 'max_speed', 'allow_pwm_test', 'yaw_feedback', 'yaw_kp',
         'yaw_ki', 'speed_scale_enabled', 'dash_input')
@@ -69,7 +52,7 @@ SURFACES = ('FLAT', 'SAND', 'GRAVEL')
 class MotorBridge(Node):
     def __init__(self):
         super().__init__('motor_bridge')
-        self.declare_parameter('port', '/dev/pico')
+        self.declare_parameter('port', '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0')
         self.declare_parameter('max_speed', 1.0)     # Twist value (m/s) that maps to max_pwm
         self.declare_parameter('turn_gain', 0.5)     # wheel speed per rad/s of angular.z
         self.declare_parameter('max_pwm', 255)       # hard cap, 0..255
@@ -78,8 +61,8 @@ class MotorBridge(Node):
         self.declare_parameter('invert_left', False)
         self.declare_parameter('invert_right', False)
         self.declare_parameter('invert_linear', True)   # flips forward/backward only; turning is unchanged
-        self.declare_parameter('send_rate', 50.0)    # Hz, also keeps the Pico watchdog fed
-        self.declare_parameter('cmd_timeout', 0.4)   # s without cmd_vel -> stop
+        self.declare_parameter('send_rate', 10.0)    # Hz: resends M every 100 ms to feed ESP32 500ms watchdog
+        self.declare_parameter('cmd_timeout', 0.3)   # s without cmd_vel -> stop (300 ms Pi safety watchdog)
         self.declare_parameter('flat_max_pwm', 220)    # per-surface PWM cap
         self.declare_parameter('flat_ramp', 600.0)     # per-surface speed-up slew, PWM units/s (0 = no limit)
         self.declare_parameter('sand_max_pwm', 150)
@@ -156,17 +139,30 @@ class MotorBridge(Node):
         send_rate = float(g('send_rate'))
         self.dt = 1.0 / send_rate
         port = g('port')
+        if not os.path.exists(port):
+            for pattern in ('/dev/serial/by-id/*CP210*', '/dev/serial/by-id/*CH340*',
+                            '/dev/serial/by-id/*1a86_USB_Serial*', '/dev/serial/by-id/*Silicon_Labs*',
+                            '/dev/serial/by-id/*Espressif*', '/dev/serial/by-id/*USB-Serial*',
+                            '/dev/esp32'):
+                matches = sorted(glob.glob(pattern))
+                if matches:
+                    self.get_logger().info(f'Port {port} not found; auto-detected ESP32 at {matches[0]}')
+                    port = matches[0]
+                    break
 
-        try:
-            self.ser = serial.Serial(port, 115200, timeout=0.1)   # baud ignored on USB-CDC
-        except serial.SerialException as e:
-            self.get_logger().fatal(
-                f'Cannot open {port}: {e}. Check the cable, that the port is not '
-                f'open in screen/minicom, and that you are in the "dialout" group.')
-            raise
-
+        self.last_servo_deg = 90
         self.lock = threading.Lock()
         self.running = True
+        self.esp32 = Esp32Motors(
+            port=port,
+            baudrate=115200,
+            timeout=0.1,
+            auto_connect=True,
+            on_error=self.on_esp32_error,
+            on_watchdog=self.on_esp32_watchdog,
+            on_connect=self.on_esp32_connect,
+            on_disconnect=self.on_esp32_disconnect,
+        )
         self.left_pwm = 0          # target
         self.right_pwm = 0         # target
         self.cur_l = 0.0           # ramped value actually sent
@@ -206,13 +202,23 @@ class MotorBridge(Node):
         self.create_subscription(Int32MultiArray, '/motor/servo_cmd', self.on_servo_cmd, 10)
         self.create_timer(self.dt, self.tick)
 
-        self.thread = threading.Thread(target=self.read_loop, daemon=True)
-        self.thread.start()
         self.get_logger().info(
-            f'Connected to {port}. max_pwm={self.max_pwm}, cmd_timeout={self.cmd_timeout}s, '
+            f'Bridge ready. port={port}, max_pwm={self.max_pwm}, cmd_timeout={self.cmd_timeout}s, '
             f'profiles={self.profiles}, ramp_decel={self.ramp_decel}, send_rate={send_rate}Hz, '
             f'deadband L/R={self.min_l}/{self.min_r}, min_turn_pwm={self.min_turn_pwm}, max_speed={self.max_speed}, '
             f'yaw_feedback={self.yaw_feedback}, speed_scale={self.speed_scale_enabled}')
+
+    def on_esp32_error(self, err_msg):
+        self.get_logger().warn(f'ESP32 {err_msg}', throttle_duration_sec=1.0)
+
+    def on_esp32_watchdog(self):
+        self.get_logger().warn('ESP32 WATCHDOG STOP: firmware cut motor power', throttle_duration_sec=1.0)
+
+    def on_esp32_connect(self):
+        self.get_logger().info(f'ESP32 connected successfully on {self.esp32.port}')
+
+    def on_esp32_disconnect(self):
+        self.get_logger().error(f'ESP32 disconnected from {self.esp32.port}; reconnecting every 1s...', throttle_duration_sec=2.0)
 
     # ------------------------------------------------------------- calibration / live params
     def load_calib(self, path):
@@ -315,7 +321,7 @@ class MotorBridge(Node):
         sl, sr = self.to_sent(l, r)
         self.dir_l, self.dir_r = (l > 0) - (l < 0), (r > 0) - (r < 0)
         self.cur_l, self.cur_r = float(sl), float(sr)      # the normal ramp continues from here after the dash
-        self.write(f'STBY,0,1\nM,0,{sl}\nM,1,{sl}\nM,2,{sr}\nM,3,{sr}\n')
+        self.esp32.drive(sl, sr)
         self.pwm_pub.publish(Int32MultiArray(data=[l, r]))
 
     def on_speed_scale(self, m):
@@ -439,11 +445,9 @@ class MotorBridge(Node):
 
     # ----------------------------------------------------------------- serial
     def write(self, text):
-        try:
-            with self.lock:
-                self.ser.write(text.encode())
-        except (serial.SerialException, OSError) as e:
-            self.get_logger().error(f'Serial write failed: {e}', throttle_duration_sec=2.0)
+        """Legacy helper for direct text sending."""
+        if hasattr(self, 'esp32') and self.esp32:
+            self.esp32._send_command(text.strip())
 
     def tick(self):
         self.update_surface()
@@ -473,47 +477,32 @@ class MotorBridge(Node):
             self.get_logger().info(f'left={l} right={r}')
             self.last_sent = (l, r)
 
-        # STBY is resent every tick so a rebooted Pico recovers by itself
-        self.write(f'STBY,0,1\nM,0,{l}\nM,1,{l}\nM,2,{r}\nM,3,{r}\n')
+        if l == 0 and r == 0:
+            self.esp32.stop()
+        else:
+            self.esp32.drive(l, r)
+
         self.pwm_pub.publish(Int32MultiArray(data=self.physical(l, r)))
 
-    def read_loop(self):
-        while self.running and rclpy.ok():
-            try:
-                line = self.ser.readline().decode(errors='ignore').strip()
-            except (serial.SerialException, OSError) as e:
-                if self.running:
-                    self.get_logger().error(f'Serial read failed: {e}')
-                break
-            if line.startswith('ENC,'):
-                try:
-                    v = [int(x) for x in line.split(',')[1:]]
-                except ValueError:
-                    continue
-                if len(v) == 9:                      # t_ms + 4 counts + 4 velocities
-                    self.enc_pub.publish(Int32MultiArray(data=v[1:]))
-            elif line.startswith('ERR,'):
-                self.get_logger().warn(f'Pico: {line}', throttle_duration_sec=1.0)
-            elif line.startswith('WD,'):
-                self.get_logger().warn('Pico watchdog stopped the motors', throttle_duration_sec=1.0)
-            elif line.startswith('SV,'):                 # SV,moving,<deg> / SV,done,<deg>
-                self.servo_pub.publish(String(data=line[3:]))
-
     def on_servo_cmd(self, m):
-        """[deg] or [deg, dps] -> 'SV,<deg>[,<dps>]' (firmware: deg 0..180, dps >= 0, 0 = jump)."""
+        """[deg] or [deg, dps] -> 'S <deg>' (firmware: deg 0..180)."""
         if not m.data:
             return
         deg = max(0, min(180, int(m.data[0])))
-        line = f'SV,{deg}' if len(m.data) < 2 or m.data[1] < 0 else f'SV,{deg},{int(m.data[1])}'
-        self.write(line + '\n')
-        self.get_logger().info(f'servo -> {line}')
+        dps = int(m.data[1]) if len(m.data) >= 2 and m.data[1] > 0 else 240
+        self.esp32.servos(deg)
+        delta = abs(deg - self.last_servo_deg)
+        slew_s = (delta / float(dps) if dps > 0 else 0.0) + 0.15
+        self.last_servo_deg = deg
+        self.servo_pub.publish(String(data=f'moving,{deg}'))
+        threading.Timer(slew_s, lambda: self.servo_pub.publish(String(data=f'done,{deg}'))).start()
+        self.get_logger().info(f'servo -> S {deg} (slew {slew_s:.2f}s)')
 
     def shutdown(self):
         self.running = False
-        self.write('STOP\nSTBY,0,0\n')
-        self.thread.join(timeout=0.5)
         try:
-            self.ser.close()
+            self.esp32.stop()
+            self.esp32.close()
         except Exception:
             pass
 

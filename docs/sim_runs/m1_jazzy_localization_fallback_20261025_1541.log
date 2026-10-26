@@ -1,0 +1,21 @@
+--- topics
+/scan: 5.5 Hz
+/scan_filtered: 5.5 Hz
+/map: 2.0 Hz
+/odom: 26.2 Hz
+--- GO 15:41:24
+--- end 15:43:46 after 135 s
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 4.235 ok class=metal confidence=1.0
+loading_complete 18.272 ok 
+terrain_complete 40.643 ok 
+obstacle_detected 41.594 ok 
+obstacle_response 44.348 ok action=avoided response_s=2.75
+gate_decision 46.547 ok decision=path2
+gate_wait_time None 0.41 
+deposit_complete 112.008 ok bin=bin_metal dropped=False
+finish 134.607 ok 
+total_run_time None 134.607 
+[ros2-9] cartographer_ros_msgs.srv.StartTrajectory_Response(status=cartographer_ros_msgs.msg.StatusResponse(code=0, message='Success.'), trajectory_id=1)

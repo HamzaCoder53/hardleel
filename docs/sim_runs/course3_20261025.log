@@ -1,0 +1,27 @@
+--- phase 1: exploration finished (returned to start) after 21 s after 55 s
+--- topics
+/scan: 4.5 Hz
+/scan_filtered: 4.2 Hz
+/map: 2.0 Hz
+/odom: 20.5 Hz
+--- GO 17:16:48
+--- end 17:19:12 after 140 s
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 5.322 ok class=metal confidence=1.0
+loading_complete 21.403 ok 
+terrain_complete 96.083 ok 
+obstacle_detected None MISSING 
+obstacle_response None MISSING 
+gate_decision 109.001 ok decision=path2
+gate_wait_time None 0.61 
+deposit_complete 131.458 ok bin=bin_metal dropped=False
+finish 139.032 ok 
+total_run_time None 139.032 
+--- ramp check
+0
+[bt_navigator-13] [INFO] [1792937694.151024639] [bt_navigator]: Creating navigator id navigate_to_pose of type nav2_bt_navigator::NavigateToPoseNavigator
+[bt_navigator-13] [INFO] [1792937694.765448268] [bt_navigator]: Creating navigator id navigate_through_poses of type nav2_bt_navigator::NavigateThroughPosesNavigator
+[frontier_explorer-16] [INFO] [1792937715.469244032] [frontier_explorer]: waiting for /map, TF and navigate_to_pose
+NAV2 READY

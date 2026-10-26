@@ -1,0 +1,32 @@
+--- topics
+/scan: 5.5 Hz
+/scan_filtered: 5.2 Hz
+/map: 2.0 Hz
+/odom: 24.8 Hz
+--- GO 06:49:59
+MISSION STARTED (GO_SCREEN) after 7 start message(s) 06:50:08
+--- end 06:53:23 after 190 s
+LOC_EVAL n=362 pos mean 0.042 p95 0.073 max 0.093 final 0.051 m | yaw mean 0.44 max 3.09 deg | events {}
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 4.521 ok class=metal confidence=1.0
+loading_complete 25.449 ok 
+terrain_complete 106.176 ok 
+obstacle_detected 54.693 ok 
+obstacle_response 54.867 ok action=wait response_s=0.12
+gate_decision 128.513 ok decision=path1
+gate_wait_time None 0.0 
+deposit_complete None MISSING 
+finish 196.56 ok 
+total_run_time None 196.56 

@@ -1,0 +1,83 @@
+--- topics
+/behavior_server/transition_event /bond /clock /cmd_vel /cmd_vel_mux /cmd_vel_nav /cmd_vel_smoothed /cmd_vel_teleop /controller_server/transition_event /ground_truth /imu/data_raw /joint_states /local_costmap/costmap /local_costmap/costmap_raw /local_costmap/costmap_updates /local_costmap/footprint /local_costmap/local_costmap/transition_event /local_costmap/published_footprint /lookahead_collision_arc /lookahead_point /mission/event /mission/state /odom /parameter_events /preempt_teleop /received_global_plan /rosout /scan /scan_filtered /speed_limit /tf /tf_static /velocity_smoother/transition_event 
+--- lifecycle
+collision_monitor: active [3]
+velocity_smoother: active [3]
+controller_server: active [3]
+planner_server: active [3]
+bt_navigator: active [3]
+/scan: 5.8 Hz
+/scan_filtered: 5.8 Hz
+/map: 2.0 Hz
+/odom: 27.8 Hz
+--- GO 13:49:31
+--- end 13:52:29 after 175 s
+15 poses from /home/hamza/hardleel_m1_ws/src/robot_slam/config/waypoints_sim.yaml; log /home/hamza/logs/mission_20261025_134830.csv
+Waiting for /mission/start
+[   0.0s] WAIT_START: waiting 
+[   0.0s] EVENT:autonomous_start: event {}
+[   0.1s] WAIT_START: started class=unknown bay= gate=
+[   4.0s] wp:screen: ok 
+[   4.2s] GO_SCREEN: ok class=unknown bay= gate=
+[   4.4s] EVENT:waste_detected: event {"class": "metal"; "confidence": 1.0; "source": "stub"}
+[   4.5s] CLASSIFY: stub class=metal bay= gate=
+[  12.5s] wp:loading_metal: ok 
+[  12.5s] GO_LOADING: ok class=metal bay= gate=
+[  18.8s] EVENT:loading_complete: event {"result": "waited"; "detail": "stub: waited 6.0 s"}
+[  18.8s] LOAD: waited class=metal bay= gate=
+Failed to make progress
+[  46.5s] wp:terrain_1: ok 
+[  53.2s] wp:terrain_2: ok 
+[  53.5s] EVENT:terrain_complete: event {"result": "ok"}
+[  53.5s] TERRAIN: ok class=metal bay= gate=
+[  53.6s] OBSTACLES: ok class=metal bay= gate=
+[  57.1s] wp:junction: ok 
+[  59.4s] wp:gate_check: ok 
+[  59.7s] JUNCTION: ok class=metal bay= gate=
+[  60.4s] EVENT:gate_decision: event {"decision": "path2"; "wait_s": 0.41; "last_median_m": 1.15}
+[  60.5s] GATE_DECISION: path2 class=metal bay= gate=path2
+[  63.0s] wp:path2_1: ok 
+[  63.1s] GO_PATH: path2:ok class=metal bay= gate=path2
+Failed to make progress
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Failed to make progress
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Failed to get result for backup in node halt!
+bin_metal: timeout (attempt 1) -> retry
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Failed to make progress
+Controller patience exceeded
+Controller patience exceeded
+Controller patience exceeded
+Failed to get result for follow_path in node halt!
+bin_metal: timeout (attempt 2) -> skip
+[ 154.6s] wp:bin_metal: skipped 
+[ 156.9s] EVENT:deposit_complete: event {"bin": "bin_metal"; "colour": "black"; "reached": "skipped"; "dropped": false; "detail": "no drop bin"}
+[ 157.0s] DEPOSIT: bin_metal:skipped:no drop bin class=metal bay=black gate=path2
+Failed to make progress
+[ 173.9s] wp:finish: ok 
+[ 174.1s] EVENT:finish: event {"result": "ok"}
+[ 174.1s] FINISH: ok class=metal bay=black gate=path2
+[ 174.2s] DONE: mission finished class=metal bay=black gate=path2
+--- event_logger summary
+run_20261025_134825_HARDLEEL.csv
+run_20261025_134825_HARDLEEL.json
+{'field': 'robot_id', 'wall_iso': '', 't_rel': None, 'value': 'HARDLEEL', 'extra': ''}
+{'field': 'autonomous_start', 'wall_iso': '2026-10-25T13:49:34.182', 't_rel': 0.0, 'value': 'ok', 'extra': ''}
+{'field': 'waste_detected', 'wall_iso': '2026-10-25T13:49:38.594', 't_rel': 4.412, 'value': 'ok', 'extra': 'class=metal confidence=1.0'}
+{'field': 'loading_complete', 'wall_iso': '2026-10-25T13:49:52.959', 't_rel': 18.778, 'value': 'ok', 'extra': ''}
+{'field': 'terrain_complete', 'wall_iso': '2026-10-25T13:50:27.652', 't_rel': 53.471, 'value': 'ok', 'extra': ''}
+{'field': 'obstacle_detected', 'wall_iso': 'MISSING', 't_rel': None, 'value': 'MISSING', 'extra': ''}
+{'field': 'obstacle_response', 'wall_iso': 'MISSING', 't_rel': None, 'value': 'MISSING', 'extra': ''}
+{'field': 'gate_decision', 'wall_iso': '2026-10-25T13:50:34.603', 't_rel': 60.422, 'value': 'ok', 'extra': 'decision=path2'}
+{'field': 'gate_wait_time', 'wall_iso': '', 't_rel': None, 'value': 0.41, 'extra': ''}
+{'field': 'deposit_complete', 'wall_iso': '2026-10-25T13:52:11.067', 't_rel': 156.885, 'value': 'ok', 'extra': 'bin=bin_metal dropped=False'}
+{'field': 'finish', 'wall_iso': '2026-10-25T13:52:28.232', 't_rel': 174.05, 'value': 'ok', 'extra': ''}
+{'field': 'total_run_time', 'wall_iso': '', 't_rel': None, 'value': 174.05, 'extra': ''}

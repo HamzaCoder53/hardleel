@@ -14,6 +14,7 @@ ros2_ws/log/
 .ros/log/
 # Logs, local backup copies, autosave duplicates
 *.log
+!docs/sim_runs/**
 launch_backup_*/
 maps/*_autosave.*
 

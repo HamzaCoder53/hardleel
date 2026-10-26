@@ -1,0 +1,23 @@
+--- phase 1:  after 180 s
+--- topics
+/scan: 5.2 Hz
+/scan_filtered: 5.2 Hz
+/map: 0.0 Hz
+/odom: 24.2 Hz
+--- GO 07:18:02
+MISSION DID NOT START: state 'WAIT_START' after 90 s (158 sent) - is laptop_mission running and idle?
+--- end 07:22:13 after 155 s
+LOC_EVAL no samples (no /ground_truth or no map TF)
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 4.876 ok class=metal confidence=1.0
+loading_complete 12.263 ok 
+terrain_complete 17.012 ok 
+obstacle_detected None MISSING 
+obstacle_response None MISSING 
+gate_decision 24.587 ok decision=path1
+gate_wait_time None 5.08 
+deposit_complete 31.319 ok bin=bin_metal dropped=False
+finish 32.534 ok 
+total_run_time None 32.534 

@@ -1,0 +1,23 @@
+--- phase 1: exploration finished (returned to start) after 21 s after 55 s
+--- topics
+/scan: 4.8 Hz
+/scan_filtered: 4.8 Hz
+/map: 2.0 Hz
+/odom: 23.0 Hz
+--- GO 07:02:49
+MISSION STARTED (GO_SCREEN) after 7 start message(s) 07:02:56
+--- end 07:05:22 after 145 s
+LOC_EVAL n=337 pos mean 0.033 p95 0.076 max 0.090 final 0.026 m | yaw mean 0.77 max 3.50 deg | events {}
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 5.624 ok class=metal confidence=1.0
+loading_complete 22.227 ok 
+terrain_complete 79.487 ok 
+obstacle_detected 84.986 ok 
+obstacle_response 85.914 ok action=wait response_s=0.89
+gate_decision 101.89 ok decision=path1
+gate_wait_time None 5.08 
+deposit_complete 137.856 ok bin=bin_metal dropped=False
+finish 146.319 ok 
+total_run_time None 146.319 

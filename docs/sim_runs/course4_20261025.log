@@ -1,0 +1,29 @@
+--- phase 1: exploration finished (returned to start) after 23 s after 55 s
+--- topics
+/scan: 3.8 Hz
+/scan_filtered: 3.8 Hz
+/map: 2.0 Hz
+/odom: 17.8 Hz
+--- GO 17:22:05
+--- end 17:25:35 after 195 s
+
+worker removed 17:23:31
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 5.408 ok class=metal confidence=1.0
+loading_complete 21.296 ok 
+terrain_complete 169.4 ok 
+obstacle_detected None MISSING 
+obstacle_response None MISSING 
+gate_decision None MISSING 
+gate_wait_time None MISSING 
+deposit_complete None MISSING 
+finish 199.232 ok 
+total_run_time None 199.232 
+--- ramp check
+0
+[bt_navigator-13] [INFO] [1792938320.412723514] [bt_navigator]: [navigate_to_pose] [ActionServer] Client requested to cancel the goal. Cancelling.
+[bt_navigator-13] [ERROR] [1792938331.159674331] [bt_navigator_navigate_to_pose_rclcpp_node]: Failed to get result for follow_path in node halt!
+[bt_navigator-13] [INFO] [1792938331.161253188] [bt_navigator]: [navigate_to_pose] [ActionServer] Client requested to cancel the goal. Cancelling.
+NAV2 READY

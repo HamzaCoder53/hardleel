@@ -1,0 +1,22 @@
+--- topics
+/scan: 5.5 Hz
+/scan_filtered: 5.5 Hz
+/map: 2.0 Hz
+/odom: 27.8 Hz
+--- GO 22:07:21
+--- end 22:12:27 after 300 s
+[INFO] [1792955246.158425772] [ros_gz_sim]: Entity creation successful.
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start None MISSING 
+waste_detected None MISSING 
+loading_complete None MISSING 
+terrain_complete None MISSING 
+obstacle_detected None MISSING 
+obstacle_response None MISSING 
+gate_decision None MISSING 
+gate_wait_time None MISSING 
+deposit_complete None MISSING 
+finish None MISSING 
+total_run_time None MISSING 
+EXIT 0

@@ -1,0 +1,22 @@
+--- topics
+/scan: 6.0 Hz
+/scan_filtered: 6.0 Hz
+/odom: 27.8 Hz
+--- GO 16:01:26
+--- end 16:04:47 after 195 s
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 4.349 ok class=metal confidence=1.0
+loading_complete 18.635 ok 
+terrain_complete 95.44 ok 
+obstacle_detected 49.241 ok 
+obstacle_response 49.53 ok action=slowdown response_s=0.29
+gate_decision None MISSING 
+gate_wait_time None MISSING 
+deposit_complete None MISSING 
+finish 192.353 ok 
+total_run_time None 192.353 
+--- ramp check
+0
+NAV2 READY

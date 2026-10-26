@@ -1,0 +1,25 @@
+Summary: 1 package finished [6.98s]
+--- topics
+/scan: 5.0 Hz
+/scan_filtered: 5.0 Hz
+/map: 2.0 Hz
+/odom: 23.8 Hz
+--- GO 15:10:09
+--- end 15:12:52 after 150 s
+Failed to make progress
+Service call timed out
+worker removed 15:11:55
+--- event_logger
+robot_id None HARDLEEL 
+autonomous_start 0.0 ok 
+waste_detected 5.494 ok class=metal confidence=1.0
+loading_complete 26.814 ok 
+terrain_complete 73.531 ok 
+obstacle_detected 45.614 ok 
+obstacle_response 48.22 ok action=slowdown response_s=2.65
+gate_decision 95.803 ok decision=path2
+gate_wait_time None 0.51 
+deposit_complete 139.911 ok bin=bin_metal dropped=False
+finish 155.44 ok 
+total_run_time None 155.44 
+[competition_mission-9] [INFO] [1792930192.189322320] [competition_mission]: collision monitor: mission stop box
