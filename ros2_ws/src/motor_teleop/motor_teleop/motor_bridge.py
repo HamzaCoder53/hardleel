@@ -35,7 +35,7 @@ from std_msgs.msg import Float32, Int32MultiArray, String
 from motor_teleop.esp32_link import Esp32Motors
 
 LIVE = ('min_pwm_left', 'min_pwm_right', 'min_turn_pwm', 'max_speed', 'allow_pwm_test', 'yaw_feedback', 'yaw_kp',
-        'yaw_ki', 'speed_scale_enabled', 'dash_input')
+        'yaw_ki', 'speed_scale_enabled', 'dash_input', 'turn_gain')
 CALIB_KEYS = ('min_pwm_left', 'min_pwm_right', 'min_turn_pwm', 'max_speed')
 
 
@@ -62,9 +62,11 @@ class MotorBridge(Node):
         self.declare_parameter('max_pwm', 255)       # hard cap, 0..255
         self.declare_parameter('min_pwm', 0)         # lift small non-zero commands above stall (0 = allow full fine control down to 0)
         self.declare_parameter('min_turn', 0.0)      # rad/s: smallest in-place spin threshold (0 = no forced floor)
-        self.declare_parameter('invert_left', False)
+        # ESP32 + BTS7960 wiring, checked on the robot 26 Oct (wheels up, teleop): the LEFT side runs reversed.
+        # invert_linear was the Pico/TB6612 mapping (swapped + negated sides) - off for the ESP32.
+        self.declare_parameter('invert_left', True)
         self.declare_parameter('invert_right', False)
-        self.declare_parameter('invert_linear', True)   # flips forward/backward only; turning is unchanged
+        self.declare_parameter('invert_linear', False)
         self.declare_parameter('send_rate', 10.0)    # Hz: resends M every 100 ms to feed ESP32 500ms watchdog
         self.declare_parameter('cmd_timeout', 0.3)   # s without cmd_vel -> stop (300 ms Pi safety watchdog)
         self.declare_parameter('flat_max_pwm', 220)    # per-surface PWM cap
@@ -244,8 +246,10 @@ class MotorBridge(Node):
                 self.min_turn_pwm = int(v('min_turn_pwm'))
             if v('max_speed') is not None:
                 self.max_speed = float(v('max_speed'))
+            if v('turn_gain') is not None:
+                self.turn_gain = float(v('turn_gain'))
             self.get_logger().info(f'calib {path}: L/R {self.min_l}/{self.min_r}, turn {self.min_turn_pwm}, '
-                                   f'max_speed {self.max_speed}')
+                                   f'max_speed {self.max_speed}, turn_gain {self.turn_gain}')
         except Exception as e:                       # a broken file must never stop the motors working
             self.get_logger().error(f'calib file {path} unreadable ({e}): using params')
 
@@ -259,6 +263,8 @@ class MotorBridge(Node):
                 self.min_turn_pwm = max(0, min(255, int(p.value)))
             elif p.name == 'max_speed' and float(p.value) > 0.05:
                 self.max_speed = float(p.value)
+            elif p.name == 'turn_gain' and float(p.value) > 0.01:   # wheel m/s per rad/s: tune turning live
+                self.turn_gain = float(p.value)
             elif p.name == 'allow_pwm_test':
                 self.allow_pwm_test = bool(p.value)
                 self.pwm_test = None
