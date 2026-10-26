@@ -13,6 +13,7 @@ the repeat delay. The screen shows the command and the collision monitor (OBSTAC
     scripts/laptop/drive.sh
 """
 import curses
+import sys
 import time
 
 STEP = 0.05          # m/s per W/S press
@@ -57,13 +58,16 @@ MONITOR = {0: '', 1: 'OBSTACLE STOP - forward blocked (turn or reverse)', 2: 'sl
            3: 'approach: obstacle ahead'}
 
 
+DIRECT = '--direct' in sys.argv      # motor test: straight to /cmd_vel, NO collision monitor / smoother
+
+
 def run(scr):
     import rclpy
     from geometry_msgs.msg import Twist
     from nav2_msgs.msg import CollisionMonitorState
     rclpy.init()
     node = rclpy.create_node('drive_teleop')
-    pub = node.create_publisher(Twist, '/cmd_vel_teleop', 10)
+    pub = node.create_publisher(Twist, '/cmd_vel' if DIRECT else '/cmd_vel_teleop', 10)
     mon = {'action': 0, 't': None}
 
     def on_mon(m):
@@ -96,7 +100,10 @@ def run(scr):
             scr.addstr(2, 0, f'speed {v:+.2f} m/s  [{("<" if v < 0 else ">") * bar:<20}]')
             scr.addstr(3, 0, f'turn  {"LEFT " if w > 0 else "RIGHT" if w < 0 else "  -  "}  {w:+.1f} rad/s')
             warn = MONITOR.get(mon['action'], '')
-            if mon['t'] is None:
+            if DIRECT:
+                scr.addstr(5, 0, 'MOTOR TEST MODE: direct to /cmd_vel - NO obstacle stop. SPACE stops.',
+                           curses.A_REVERSE | curses.A_BOLD)
+            elif mon['t'] is None:
                 scr.addstr(5, 0, '(no collision monitor seen yet - is laptop_mapping running?)')
             elif warn:
                 scr.addstr(5, 0, warn, curses.A_REVERSE | curses.A_BOLD)
