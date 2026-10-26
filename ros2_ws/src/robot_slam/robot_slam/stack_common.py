@@ -48,7 +48,7 @@ def transforms():
     ]
 
 
-def lidar(lidar_port, scan_mode='Boost'):
+def lidar(lidar_port, scan_mode='Standard'):          # NOT Boost: it timed out on the robot (26 Oct)
     """RPLIDAR A1 driver + body TFs. A1 firmware 1.29 offers Standard (~360 points/rev), Express (~730)
     and Boost (~1450); on the Pi prefer scripts/pi/lidar_supervisor.sh, which also retries."""
     return [

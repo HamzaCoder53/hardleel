@@ -1,14 +1,14 @@
 #!/bin/bash
 # Keeps the RPLIDAR A1 publishing /scan. sllidar_node hangs (does not exit) after
 # "Can not start scan" / "operation time out" when the lidar's 5 V sags at motor start,
-# so watch its log and do stop -> lidar_reset.py -> restart. Tries the densest mode first
-# (A1 fw 1.29: Boost ~1450 pts/rev, Express ~730, Standard ~360) and falls back after 3 failures;
+# so watch its log and do stop -> lidar_reset.py -> restart. Standard first, Express after 3 failures
+# (A1 fw 1.29: Standard ~360 pts/rev, Express ~730; Boost ~1450 is NOT used: it timed out on the robot);
 # a mode the driver reports as unsupported is skipped at once.
 # usage: lidar_supervisor.sh   (env from robot_hw.sh)
 LOG=~/hwtest_logs/lidar.log; mkdir -p ~/hwtest_logs
 # by-id path: the FTDI adapter is ttyUSB0 or ttyUSB1 depending on plug order
 PORT=${LIDAR_PORT:-$(ls /dev/serial/by-id/usb-FTDI_* 2>/dev/null | head -1)}; PORT=${PORT:-/dev/ttyUSB0}
-MODES=(${LIDAR_MODES:-Boost Express Standard})
+MODES=(${LIDAR_MODES:-Standard Express})   # NO Boost (team, 26 Oct: Boost timed out); LIDAR_MODES overrides
 fails=0
 while true; do
   mode=${MODES[$(( (fails / 3) % ${#MODES[@]} ))]}
