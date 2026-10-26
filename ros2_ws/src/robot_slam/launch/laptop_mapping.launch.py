@@ -59,7 +59,10 @@ def setup(context):
     if truthy(context, 'rviz'):
         actions.append(Node(package='rviz2', executable='rviz2', name='rviz2', output='log',
                             arguments=['-d', os.path.join(cfg, 'brain.rviz')], parameters=[{'use_sim_time': sim}]))
-    if truthy(context, 'record_bag'):
+    if truthy(context, 'record_run'):                 # final stack: run folders, split by phase (replaces record_bag)
+        actions.append(Node(package='robot_slam', executable='run_recorder', name='run_recorder', output='screen',
+                            parameters=[{'role': 'laptop', 'use_sim_time': sim}]))
+    elif truthy(context, 'record_bag'):
         actions += sc.record_bag(context.launch_configurations['bag_dir'], 'mapping')
     return actions
 
@@ -73,6 +76,8 @@ def generate_launch_description():
         DeclareLaunchArgument('rviz', default_value='true'),
         DeclareLaunchArgument('record_bag', default_value='true'),
         DeclareLaunchArgument('bag_dir', default_value='~/hardleel_bags'),
+        DeclareLaunchArgument('record_run', default_value='false',
+                              description='NEW, off: run_recorder (~/runs/run_*, per phase, MCAP zstd)'),
         *sc.loc_launch_args(),
         OpaqueFunction(function=setup),
     ])

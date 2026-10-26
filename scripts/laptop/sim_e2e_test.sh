@@ -5,6 +5,8 @@
 #   worker        spawn a 0.25 m "worker" cylinder in the right corridor at GO, remove it 75 s later
 #   localization  phase 2 on laptop_localization (saved .pbstream) instead of the live mapping session
 #   ramp=<mm>     a 1.14 m ramp of that height in the walled right corridor (map x 2.1-3.3) before mapping
+#   maparg:<k>=<v>  extra laptop_mapping argument, e.g. maparg:loc_v2=true (final-stack localization)
+# Every run also logs the pose error vs /ground_truth (loc_eval.py): LOC_EVAL line at the end.
 # Private domain 42 and FastDDS: CycloneDDS over WSL loopback drops the sim's LaserScan messages (tested 25 Oct).
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export ROS_DOMAIN_ID=42 RMW_IMPLEMENTATION=rmw_fastrtps_cpp LIBGL_ALWAYS_SOFTWARE=1
@@ -12,9 +14,10 @@ renice -n 19 $$ >/dev/null   # lowest CPU priority: the real robot stack may be 
 unset CYCLONEDDS_URI ZENOH_CONFIG_OVERRIDE
 for d in jazzy humble; do [ -f /opt/ros/$d/setup.bash ] && { source /opt/ros/$d/setup.bash; break; }; done
 WS="${WS:-$HOME/hardleel_ws}"; source "$WS/install/setup.bash"
-WORKER=0; PREMAP=; LOC=0; RAMP=0; COURSE=0; GATE=0; EXPLORE=0; WREMOVE=75
+WORKER=0; PREMAP=; MAPARGS=; LOC=0; RAMP=0; COURSE=0; GATE=0; EXPLORE=0; WREMOVE=75
 for a in "$@"; do [ "$a" = worker ] && WORKER=center; [ "${a%%=*}" = worker ] && [ "$a" != worker ] && WORKER=${a#worker=}; [ "${a%%=*}" = worker_remove ] && WREMOVE=${a#worker_remove=}; [ "$a" = localization ] && LOC=1; [ "${a%%=*}" = ramp ] && RAMP=${a#ramp=}
   [ "${a%%=*}" = worker_premap ] && PREMAP=${a#worker_premap=}   # x,y (world): worker stands there while mapping
+  if [ "${a%%:*}" = maparg ]; then v=${a#maparg:}; MAPARGS="$MAPARGS ${v/=/:=}"; fi   # maparg:loc_v2=true -> laptop_mapping loc_v2:=true
   [ "$a" = course ] && COURSE=1; [ "$a" = gate_closed ] && GATE=1; [ "${a%%=*}" = explore ] && EXPLORE=${a#explore=}; done
 WORLD=rdj2026; [ $COURSE = 1 ] && WORLD=course
 WP="$WS/src/robot_slam/config/waypoints_sim.yaml"
@@ -41,13 +44,13 @@ if [ -n "$PREMAP" ]; then
 fi
 NAV2=true
 if [ "$EXPLORE" != 0 ]; then   # phase 1 rehearsal: auto mapping (Nav2 + frontier explorer, returns to start)
-  ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=true bag_dir:=~/hardleel_bags_sim mapping_mode:=auto > $L/mapping.log 2>&1 &
+  ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=true bag_dir:=~/hardleel_bags_sim mapping_mode:=auto $MAPARGS > $L/mapping.log 2>&1 &
   NAV2=false
   for i in $(seq 1 $((EXPLORE / 5))); do sleep 5; grep -q "exploration finished" $L/mapping.log && break; done
   sleep 15                      # return-to-start goal
   echo "--- phase 1: $(grep -m1 -oE 'exploration finished.*' $L/mapping.log) after $((i * 5)) s"
 else
-  ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=true bag_dir:=~/hardleel_bags_sim > $L/mapping.log 2>&1 &
+  ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=true bag_dir:=~/hardleel_bags_sim $MAPARGS > $L/mapping.log 2>&1 &
   sleep 15
 fi
 if [ $LOC = 1 ]; then      # save the map, restart as pure localization from the start pose (robot is still there)
@@ -59,10 +62,12 @@ if [ $LOC = 1 ]; then      # save the map, restart as pure localization from the
   ros2 launch robot_slam laptop_localization.launch.py sim:=true rviz:=false record_bag:=true bag_dir:=~/hardleel_bags_sim pbstream:=$L/sim.pbstream > $L/localization.log 2>&1 &
   sleep 15
 fi
+python3 "$HERE/loc_eval.py" $L/loc_eval.csv > $L/loc_eval.log 2>&1 &   # pose error vs /ground_truth all run
+EVAL=$!
 ros2 launch robot_slam laptop_mission.launch.py sim:=true classifier:=stub stub_class:=metal waypoints:=$WP nav2:=$NAV2 > $L/mission.log 2>&1 &
 sleep 40
 echo "--- topics"; python3 "$HERE/topic_probe.py" 4 /scan /scan_filtered /map /odom 2>&1 | grep Hz
-echo "--- GO $(date +%T)"; ros2 topic pub --times 3 -r 5 -w 1 /mission/start std_msgs/msg/Empty "{}" >/dev/null
+echo "--- GO $(date +%T)"; python3 "$HERE/mission_go.py" 90     # closed loop: until the mission leaves WAIT_START
 if [ -n "$PREMAP" ]; then     # worker was in the scan: move it to the run position (map_freezer must drop the old blob)
   set -- $WXY
   $GZ service -s /world/rdj2026/set_pose --reqtype $MSG.Pose --reptype $MSG.Boolean --timeout 2000 \
@@ -76,6 +81,8 @@ elif [ "$WORKER" != 0 ]; then   # arena (6352, 2350) = map (2.05, -0.14): betwee
 fi
 for i in $(seq 1 60); do sleep 5; grep -q "DONE: mission finished\|ABORTED" $L/mission.log && break; done
 echo "--- end $(date +%T) after $((i*5)) s"
+kill -TERM $EVAL 2>/dev/null; sleep 2; grep LOC_EVAL $L/loc_eval.log
+grep -hE "checkpoint|recovery|relocalize|verify_start" $L/mapping.log | sed 's/.*\]: //' | cut -c1-200 | head -20
 grep -E "\] \[ *[0-9.]+s\]|blocked|Controller patience|Failed to make progress" $L/mission.log | sed 's/.*\]: //' | head -80
 tail -2 $L/worker.log 2>/dev/null
 echo "--- event_logger"; f=$(ls -t ~/logs/runs/*.json 2>/dev/null | head -1)

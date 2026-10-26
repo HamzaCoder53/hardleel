@@ -40,6 +40,7 @@ setup(
             'imu_bias = robot_slam.imu_bias:main',
             'wall_heading = robot_slam.wall_heading:main',
             'loc_monitor = robot_slam.loc_monitor:main',
+            'run_recorder = robot_slam.run_recorder:main',
         ]
     },
 )

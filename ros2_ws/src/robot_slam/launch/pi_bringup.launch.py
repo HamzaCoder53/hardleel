@@ -40,6 +40,7 @@ def generate_launch_description():
         DeclareLaunchArgument('motors', default_value='true'),
         DeclareLaunchArgument('drop', default_value='true'),
         DeclareLaunchArgument('yaw_feedback', default_value='false'),   # NEW, off: gyro turn-rate loop in motor_bridge
+        DeclareLaunchArgument('record', default_value='false'),         # NEW, off: run_recorder role pi (~/runs/run_*)
 
         Node(package='robot_slam', executable='imu_serial_node', name='imu_serial_node', output='screen',
              parameters=[{'port': L('imu_port'), 'frame_id': 'imu_link', 'gyro_calib_s': 3.0}]),
@@ -59,4 +60,7 @@ def generate_launch_description():
             condition=IfCondition(L('camera')), output='screen'),
         Node(package='robot_slam', executable='drop_servo_node', name='drop_servo', output='screen',
              condition=IfCondition(L('drop')), parameters=[os.path.join(cfg, 'drop_servo.yaml')]),
+        # final stack: Pi-side recording (lowest priority; stops itself on heat / throttling / < 3 GB disk)
+        Node(package='robot_slam', executable='run_recorder', name='run_recorder', output='screen',
+             condition=IfCondition(L('record')), parameters=[{'role': 'pi'}]),
     ])

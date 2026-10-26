@@ -1,0 +1,25 @@
+# Final stack item 2: what each side records (run_recorder role pi | laptop). MCAP + zstd, split by phase.
+pi:
+  topics: [/scan, /imu/data_raw, /imu/data, /imu/calib_status, /cmd_vel, /motor/pwm_state, /motor/servo_state,
+           /motor/servo_cmd, /motor/dash_pwm, /ramp_dash/log, /ramp_dash/state, /ramp_dash/result, /surface_state,
+           /battery_state, /camera/frame_info, /camera/still_info, /tf_static]
+  nice: 19                  # lowest CPU priority (+ ionice idle class)
+  stop_temp_c: 80.0         # stop recording above this SoC temperature
+  stop_on_throttle: true    # vcgencmd get_throttled: current under-voltage / throttling bits
+  min_free_gb: 3.0          # stop when the disk has less free space
+  check_s: 5.0
+laptop:
+  topics: [/tf, /tf_static, /tracked_pose, /odom, /odom_loc, /odom_rf2o, /odom_rf2o_loc, /map, /map_nav,
+           /scan_filtered, /scan_gate/state, /imu/data_lpf, /imu/data_v2, /imu/bias, /wall_heading/state,
+           /plan, /cmd_vel_nav, /cmd_vel_teleop, /cmd_vel_mux, /cmd_vel_smoothed, /speed_limit,
+           /collision_monitor_state, /mission/state, /mission/event, /classifier/result,
+           /localization/confidence, /localization/state, /localization/event, /localization/recovering,
+           /exploration/state, /run/phase, /rosout]
+  nice: 10
+  stop_temp_c: 0.0          # 0 = no temperature check (laptop)
+  stop_on_throttle: false
+  min_free_gb: 3.0
+  check_s: 10.0
+storage_preset: zstd_fast   # ros2 bag record -s mcap --storage-preset-profile
+runs_dir: ~/runs
+run_id_wait_s: 15.0         # the Pi waits this long for the laptop's /run/id before naming the run itself
