@@ -16,3 +16,6 @@ ros2_ws/log/
 *.log
 launch_backup_*/
 maps/*_autosave.*
+
+# Claude Code local settings
+.claude/settings.local.json
