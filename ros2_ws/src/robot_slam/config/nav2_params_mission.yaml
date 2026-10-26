@@ -321,7 +321,7 @@ velocity_smoother:
     - 0.0
     - 0.0
     - 0.0
-    velocity_timeout: 1.0
+    velocity_timeout: 0.3   # team 26 Oct: 1.0 kept driving ~1 s after a teleop key was released
 collision_monitor:
   ros__parameters:
     base_frame_id: base_link
