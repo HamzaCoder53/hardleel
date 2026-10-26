@@ -7,6 +7,7 @@ again (up to calib_max_attempts, then it keeps the stillest attempt). /imu/recal
 reruns it on demand; /imu/calib_status (String, latched) reports the result.
 """
 import math
+import threading
 import time
 
 import rclpy
@@ -71,9 +72,10 @@ class ImuSerialNode(Node):
         self.declare_parameter('calib_max_attempts', 5)
 
         self.frame_id = self.get_parameter('frame_id').value
-        self.ser = serial.Serial(self.get_parameter('port').value,
-                                 self.get_parameter('baud').value, timeout=0)
-        self.buf = b''
+        self.port, self.baud = self.get_parameter('port').value, self.get_parameter('baud').value
+        # blocking reads in a thread: the old 5 ms polling timer with non-blocking reads used ~70 % of a Pi 4 core.
+        # The port is opened by the reader thread and retried, so a missing / resetting Arduino is not fatal.
+        self.ser = None
 
         self.imu_pub = self.create_publisher(Imu, 'imu/data_raw', 20)
         self.mag_pub = self.create_publisher(MagneticField, 'imu/mag', 10)
@@ -89,7 +91,9 @@ class ImuSerialNode(Node):
         self.bias = None
         self.start_calibration()
 
-        self.create_timer(0.005, self.poll)
+        self.running = True
+        self.reader = threading.Thread(target=self.read_loop, daemon=True)
+        self.reader.start()
 
     def start_calibration(self, attempt=1, best=None):
         self.calib_start = time.monotonic()
@@ -130,15 +134,27 @@ class ImuSerialNode(Node):
         self.get_logger().info(
             f'Gyro bias (deg/s): {self.bias[0]:.3f}, {self.bias[1]:.3f}, {self.bias[2]:.3f} ({detail}). Publishing.')
 
-    def poll(self):
-        try:
-            self.buf += self.ser.read(self.ser.in_waiting or 1)
-        except (serial.SerialException, OSError) as e:
-            self.get_logger().error(f'Serial error: {e}', throttle_duration_sec=2.0)
-            return
-        while b'\n' in self.buf:
-            line, self.buf = self.buf.split(b'\n', 1)
-            self.handle_line(line.decode(errors='ignore').strip())
+    def read_loop(self):
+        """Blocking line reads (sleeps until the Arduino sends). After a USB reset of the Arduino (seen on the
+        robot 26 Oct) the port is reopened instead of failing forever."""
+        while self.running and rclpy.ok():
+            try:
+                if self.ser is None:
+                    self.ser = serial.Serial(self.port, self.baud, timeout=0.2)
+                    self.get_logger().info(f'IMU serial open on {self.port}')
+                line = self.ser.readline()
+            except (serial.SerialException, OSError) as e:
+                self.get_logger().error(f'Serial error: {e} - reopening', throttle_duration_sec=2.0)
+                try:
+                    if self.ser is not None:
+                        self.ser.close()
+                except Exception:
+                    pass
+                self.ser = None
+                time.sleep(0.5)
+                continue
+            if line:
+                self.handle_line(line.decode(errors='ignore').strip())
 
     def handle_line(self, line):
         parts = line.split(',')
@@ -196,6 +212,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        node.running = False
+        node.reader.join(timeout=0.5)
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
