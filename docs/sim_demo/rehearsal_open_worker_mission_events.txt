@@ -1,0 +1,41 @@
+[INFO] [competition_mission-9]: process started with pid [44476]
+19 poses from /Users/StoreOperations/hardleel/ros2_ws/src/robot_slam/config/waypoints_course.yaml; log /Users/StoreOperations/logs/mission_20261026_072422.csv
+Waiting for /mission/start
+[   0.0s] WAIT_START: waiting 
+collision monitor: mission stop box
+NAV2 READY
+[   0.0s] EVENT:autonomous_start: event {}
+[   1.8s] START_NUDGE: done moved 0.16 m
+[   1.8s] WAIT_START: started class=unknown bay= gate=
+[   1.8s] wp:screen: ok 
+[   1.8s] GO_SCREEN: ok class=unknown bay= gate=
+[   1.8s] EVENT:waste_detected: event {"class": "metal"; "confidence": 1.0; "source": "stub"}
+[   1.8s] CLASSIFY: stub class=metal bay= gate=
+[  10.8s] wp:loading_metal: ok 
+[  10.8s] GO_LOADING: ok class=metal bay= gate=
+[  16.8s] EVENT:loading_complete: event {"result": "waited"; "detail": "stub: waited 6.0 s"}
+[  16.8s] LOAD: waited class=metal bay= gate=
+[  46.7s] wp:terrain_1: ok 
+[  65.8s] wp:terrain_2: ok 
+[  83.7s] wp:terrain_3: ok 
+[  91.1s] wp:terrain_4: ok 
+[  91.1s] EVENT:terrain_complete: event {"result": "ok"}
+[  91.1s] TERRAIN: ok class=metal bay= gate=
+[  91.1s] OBSTACLES: ok class=metal bay= gate=
+[  96.0s] wp:junction: ok 
+[ 103.8s] wp:gate_check: ok 
+[ 103.8s] JUNCTION: ok class=metal bay= gate=
+[ 105.2s] EVENT:gate_align: event {"yaw_err_deg": -0.2}
+[ 105.6s] EVENT:gate_decision: event {"decision": "path2"; "wait_s": 0.41; "wait_budget_s": 5.0; "remaining_s": 71.2; "last_median_m": 3.78}
+[ 105.6s] GATE_DECISION: path2 class=metal bay= gate=path2
+[ 111.3s] wp:path2_1: ok 
+[ 115.1s] wp:path2_2: ok 
+[ 115.1s] GO_PATH: path2:ok class=metal bay= gate=path2
+[ 124.6s] wp:bin_metal: ok 
+[ 126.6s] EVENT:deposit_complete: event {"bin": "bin_metal"; "colour": "black"; "reached": "ok"; "dropped": false; "detail": "no drop bin"}
+[ 126.6s] DEPOSIT: bin_metal:ok:no drop bin class=metal bay=black gate=path2
+[ 134.6s] wp:finish: ok 
+[ 134.6s] EVENT:finish: event {"result": "ok"}
+[ 134.6s] FINISH: ok class=metal bay=black gate=path2
+[ 134.6s] DONE: mission finished class=metal bay=black gate=path2
+[INFO] [competition_mission-9]: process has finished cleanly [pid 44476]

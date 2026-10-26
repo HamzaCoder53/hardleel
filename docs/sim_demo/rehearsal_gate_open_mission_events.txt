@@ -11,3 +11,31 @@ NAV2 READY
 [   1.8s] GO_SCREEN: ok class=unknown bay= gate=
 [   1.8s] EVENT:waste_detected: event {"class": "metal"; "confidence": 1.0; "source": "stub"}
 [   1.8s] CLASSIFY: stub class=metal bay= gate=
+[  10.8s] wp:loading_metal: ok 
+[  10.8s] GO_LOADING: ok class=metal bay= gate=
+[  16.8s] EVENT:loading_complete: event {"result": "waited"; "detail": "stub: waited 6.0 s"}
+[  16.8s] LOAD: waited class=metal bay= gate=
+[  24.8s] wp:terrain_1: ok 
+[  44.3s] wp:terrain_2: ok 
+[  62.1s] wp:terrain_3: ok 
+[  69.5s] wp:terrain_4: ok 
+[  69.5s] EVENT:terrain_complete: event {"result": "ok"}
+[  69.5s] TERRAIN: ok class=metal bay= gate=
+[  69.5s] OBSTACLES: ok class=metal bay= gate=
+[  74.1s] wp:junction: ok 
+[  82.5s] wp:gate_check: ok 
+[  82.5s] JUNCTION: ok class=metal bay= gate=
+[  84.1s] EVENT:gate_align: event {"yaw_err_deg": -0.6}
+[  84.5s] EVENT:gate_decision: event {"decision": "path2"; "wait_s": 0.4; "wait_budget_s": 5.0; "remaining_s": 92.5; "last_median_m": 3.79}
+[  84.5s] GATE_DECISION: path2 class=metal bay= gate=path2
+[  90.3s] wp:path2_1: ok 
+[  94.2s] wp:path2_2: ok 
+[  94.2s] GO_PATH: path2:ok class=metal bay= gate=path2
+[ 104.2s] wp:bin_metal: ok 
+[ 106.2s] EVENT:deposit_complete: event {"bin": "bin_metal"; "colour": "black"; "reached": "ok"; "dropped": false; "detail": "no drop bin"}
+[ 106.2s] DEPOSIT: bin_metal:ok:no drop bin class=metal bay=black gate=path2
+[ 114.1s] wp:finish: ok 
+[ 114.1s] EVENT:finish: event {"result": "ok"}
+[ 114.1s] FINISH: ok class=metal bay=black gate=path2
+[ 114.1s] DONE: mission finished class=metal bay=black gate=path2
+[INFO] [competition_mission-9]: process has finished cleanly [pid 43303]

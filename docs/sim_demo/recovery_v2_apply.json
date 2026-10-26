@@ -5,40 +5,40 @@
     {
       "goal": "loading_metal",
       "status": "SUCCEEDED",
-      "seconds": 9.4,
-      "true_dist_to_goal_m": 0.154,
-      "loc_error_end_m": 0.031,
-      "loc_error_worst_m": 0.04
+      "seconds": 10.0,
+      "true_dist_to_goal_m": 0.166,
+      "loc_error_end_m": 0.068,
+      "loc_error_worst_m": 0.089
     },
     {
       "goal": "terrain_1",
       "status": "SUCCEEDED",
-      "seconds": 7.4,
-      "true_dist_to_goal_m": 0.151,
-      "loc_error_end_m": 0.033,
-      "loc_error_worst_m": 0.058
+      "seconds": 11.6,
+      "true_dist_to_goal_m": 0.067,
+      "loc_error_end_m": 0.123,
+      "loc_error_worst_m": 0.148
     },
     {
       "goal": "_recovery_standing_still",
       "status": "RECOVERED",
-      "seconds": 75.5,
-      "loc_error_end_m": 0.027124041192554505
+      "seconds": 26.2,
+      "loc_error_end_m": 0.04250322196004235
     },
     {
       "goal": "terrain_2",
       "status": "SUCCEEDED",
-      "seconds": 27.2,
-      "true_dist_to_goal_m": 0.202,
-      "loc_error_end_m": 0.044,
-      "loc_error_worst_m": 0.055
+      "seconds": 29.8,
+      "true_dist_to_goal_m": 0.116,
+      "loc_error_end_m": 0.111,
+      "loc_error_worst_m": 0.137
     },
     {
       "goal": "junction",
       "status": "SUCCEEDED",
-      "seconds": 20.0,
-      "true_dist_to_goal_m": 0.174,
-      "loc_error_end_m": 0.042,
-      "loc_error_worst_m": 0.054
+      "seconds": 21.4,
+      "true_dist_to_goal_m": 0.214,
+      "loc_error_end_m": 0.112,
+      "loc_error_worst_m": 0.121
     }
   ]
 }
