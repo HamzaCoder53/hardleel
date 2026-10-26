@@ -1,6 +1,6 @@
 {
   "map": "docs/sim_demo/mapping_course.yaml",
-  "truth": "/Users/StoreOperations/hardleel/scripts/sim/../../maps/course/course_full_approx.yaml",
+  "truth": "/Users/StoreOperations/hardleel/scripts/sim/../../maps/truth/course_truth.yaml",
   "wall_distance_raw": {
     "mean_m": 0.006165228205309255,
     "median_m": 0.0,

@@ -1,0 +1,54 @@
+{
+  "succeeded": 6,
+  "total": 6,
+  "results": [
+    {
+      "goal": "a",
+      "status": "SUCCEEDED",
+      "seconds": 5.8,
+      "true_dist_to_goal_m": 0.145,
+      "loc_error_end_m": 0.052,
+      "loc_error_worst_m": 0.093
+    },
+    {
+      "goal": "b",
+      "status": "SUCCEEDED",
+      "seconds": 11.2,
+      "true_dist_to_goal_m": 0.15,
+      "loc_error_end_m": 0.039,
+      "loc_error_worst_m": 0.064
+    },
+    {
+      "goal": "c",
+      "status": "SUCCEEDED",
+      "seconds": 10.0,
+      "true_dist_to_goal_m": 0.171,
+      "loc_error_end_m": 0.041,
+      "loc_error_worst_m": 0.049
+    },
+    {
+      "goal": "d",
+      "status": "SUCCEEDED",
+      "seconds": 10.0,
+      "true_dist_to_goal_m": 0.192,
+      "loc_error_end_m": 0.032,
+      "loc_error_worst_m": 0.055
+    },
+    {
+      "goal": "e",
+      "status": "SUCCEEDED",
+      "seconds": 12.7,
+      "true_dist_to_goal_m": 0.107,
+      "loc_error_end_m": 0.108,
+      "loc_error_worst_m": 0.117
+    },
+    {
+      "goal": "f",
+      "status": "SUCCEEDED",
+      "seconds": 10.6,
+      "true_dist_to_goal_m": 0.245,
+      "loc_error_end_m": 0.122,
+      "loc_error_worst_m": 0.137
+    }
+  ]
+}

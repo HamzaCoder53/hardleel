@@ -1,0 +1,47 @@
+{
+  "map": "docs/sim_demo/mapping_maze.yaml",
+  "truth": "maps/truth/maze_truth.yaml",
+  "wall_distance_raw": {
+    "mean_m": 0.0508879795110698,
+    "median_m": 0.05000000074505806,
+    "p95_m": 0.15000000596046448,
+    "max_m": 0.15000000596046448,
+    "n": 732
+  },
+  "wall_distance_aligned": {
+    "mean_m": 0.026707650671199047,
+    "median_m": 0.0,
+    "p95_m": 0.10000000149011612,
+    "max_m": 0.10000000149011612,
+    "n": 732
+  },
+  "alignment": {
+    "dx_m": 0.06731824417009602,
+    "dy_m": 0.020096021947873792,
+    "yaw_deg": -0.20277518675411865
+  },
+  "coverage_of_true_walls_within_10cm": 0.9016949152542373,
+  "size": {
+    "mapped_free_bbox_m": [
+      5.75,
+      3.9
+    ],
+    "truth_free_bbox_m": [
+      5.9,
+      3.9
+    ],
+    "rulebook_inner_m": [
+      5.75,
+      3.05
+    ],
+    "error_vs_rulebook_m": [
+      0.0,
+      0.85
+    ],
+    "error_vs_truth_map_m": [
+      -0.15,
+      0.0
+    ],
+    "note": "the truth map itself is 1 cell (5 cm) per side smaller than the rulebook inner size"
+  }
+}

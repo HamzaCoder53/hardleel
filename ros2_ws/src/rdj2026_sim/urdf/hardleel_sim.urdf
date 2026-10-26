@@ -85,6 +85,15 @@
     <parent link="base_link"/><child link="imu_link"/><origin xyz="0 0 0.05"/>
   </joint>
 
+  <!-- Pi Camera Module 3, forward, same mount as robot_slam.stack_common (CAM_X/Y/Z, nominal) -->
+  <link name="camera">
+    <visual><geometry><box size="0.02 0.05 0.03"/></geometry><material name="lidar"/></visual>
+    <inertial><mass value="0.01"/><inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/></inertial>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/><child link="camera"/><origin xyz="0.10 0 0.20" rpy="0 0 0"/>
+  </joint>
+
   <gazebo reference="caster_front"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
   <gazebo reference="caster_back"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
   <gazebo reference="left_wheel"><mu1>1.2</mu1><mu2>1.2</mu2></gazebo>
@@ -106,12 +115,40 @@
     </sensor>
   </gazebo>
 
+  <gazebo reference="camera">
+    <sensor name="camera" type="camera">
+      <topic>camera/image_raw</topic>
+      <ignition_frame_id>camera</ignition_frame_id>
+      <update_rate>10</update_rate>            <!-- real: 30 fps; 10 keeps the sim real-time (PLACEHOLDER) -->
+      <always_on>1</always_on>
+      <camera>
+        <horizontal_fov>1.152</horizontal_fov>  <!-- Pi Camera Module 3 standard lens, 66 deg (placeholder: check wide/standard) -->
+        <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+        <clip><near>0.05</near><far>10</far></clip>
+      </camera>
+    </sensor>
+  </gazebo>
+
+  <!-- IMU: the real Arduino Nano 33 BLE gyro has a raw bias of about -12.4 deg/s which imu_serial_node calibrates away at
+       start; what the stack sees is the RESIDUAL (~1.3 deg/min = 3.8e-4 rad/s) plus noise. All values are PLACEHOLDERS. -->
   <gazebo reference="imu_link">
     <sensor name="imu" type="imu">
       <topic>imu/data_raw</topic>
       <ignition_frame_id>imu_link</ignition_frame_id>
       <update_rate>93</update_rate>
       <always_on>1</always_on>
+      <imu>
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev><bias_mean>0.00038</bias_mean><bias_stddev>0.0001</bias_stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
     </sensor>
   </gazebo>
 

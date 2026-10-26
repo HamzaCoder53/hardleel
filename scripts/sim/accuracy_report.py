@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Virtual SLAM step 2: accuracy of a saved map against the ground-truth wall map.
 
-    accuracy_report.py MAP.yaml [--truth maps/course/course_full_approx.yaml] [--start 0.06,0] [--out PREFIX]
+    accuracy_report.py MAP.yaml [--truth maps/truth/course_truth.yaml]   (exported from the world SDF by export_truth.py) [--start 0.06,0] [--out PREFIX]
 
 Reports (JSON next to the overlay PNG):
   * wall-distance error: every occupied cell of the saved map -> distance to the nearest true wall
@@ -98,7 +98,7 @@ def overlay(truth, mapped_pts, path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('map_yaml')
-    ap.add_argument('--truth', default=os.path.join(os.path.dirname(__file__), '../../maps/course/course_full_approx.yaml'))
+    ap.add_argument('--truth', default=os.path.join(os.path.dirname(__file__), '../../maps/truth/course_truth.yaml'))
     ap.add_argument('--start', default='0.06,0.0', help='x,y of the robot start in the truth frame (map frame origin)')
     ap.add_argument('--out', default=None)
     a = ap.parse_args()

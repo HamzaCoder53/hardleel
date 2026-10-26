@@ -47,7 +47,8 @@ def generate_launch_description():
     if HARMONIC:
         # the worlds use Fortress plugin names; Harmonic needs a rewritten copy (resource path keeps the includes)
         world = PythonExpression(["'", for_distro(os.path.join(pkg, 'worlds', 'rdj2026.sdf')), "' if '", W,
-                                  "' == 'rdj2026' else '", for_distro(os.path.join(pkg, 'worlds', 'course.sdf')), "'"])
+                                  "' == 'rdj2026' else '", for_distro(os.path.join(pkg, 'worlds', 'course.sdf')), "' if '", W,
+                                  "' == 'course' else '", for_distro(os.path.join(pkg, 'worlds', 'maze.sdf')), "'"])
     urdf = open(for_distro(os.path.join(pkg, 'urdf', 'hardleel_sim.urdf'))).read()
     gz = ['gz', 'sim'] if HARMONIC else ['ign', 'gazebo']
     layout = yaml.safe_load(open(os.path.join(pkg, 'arena', 'arena_layout.yaml')))
@@ -123,8 +124,8 @@ def generate_launch_description():
         TimerAction(period=4.0, actions=[
             Node(package='ros_gz_sim', executable='create', output='screen',
                  arguments=['-world', 'rdj2026', '-name', 'hardleel', '-topic', 'robot_description',
-                            '-x', PythonExpression(["'0.06' if '", W, f"' == 'course' else '{sx / 1000.0}'"]),   # course: 6 cm off the start-box wall (sim only)
-                            '-y', PythonExpression(["'0.0' if '", W, f"' == 'course' else '{sy / 1000.0}'"]), '-z', '0.04', '-Y', PythonExpression(["'0.0' if '", W, f"' == 'course' else '{math.radians(syaw)}'"])]),
+                            '-x', PythonExpression(["'0.06' if '", W, f"' in ('course', 'maze') else '{sx / 1000.0}'"]),   # course: 6 cm off the start-box wall (sim only)
+                            '-y', PythonExpression(["'0.0' if '", W, f"' in ('course', 'maze') else '{sy / 1000.0}'"]), '-z', '0.04', '-Y', PythonExpression(["'0.0' if '", W, f"' in ('course', 'maze') else '{math.radians(syaw)}'"])]),
         ]),
 
         TimerAction(period=8.0, actions=[
