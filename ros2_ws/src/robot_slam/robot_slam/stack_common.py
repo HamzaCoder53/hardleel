@@ -314,9 +314,10 @@ def safety_chain(profile, nav2_params, use_sim_time=False):
              parameters=[monitor_params, sim], remappings=TF_REMAP),
         Node(package='nav2_lifecycle_manager', executable='lifecycle_manager', name='lifecycle_manager_safety',
              output='screen',
-             # bond 10 s: with the 4 s default a busy startup (Cartographer + RViz) declared the smoother DOWN and
-             # deactivated the whole chain -> teleop silently did nothing (real robot, 26 Oct)
-             parameters=[{'autostart': True, 'node_names': ['velocity_smoother', monitor], 'bond_timeout': 10.0,
+             # bond OFF (0.0): even with 10 s the bond over rmw_zenoh failed, the manager deactivated the collision
+             # monitor and crashed -> teleop silently did nothing (real robot, 26 Oct, twice). Autostart still
+             # configures + activates both nodes; nothing deactivates them afterwards.
+             parameters=[{'autostart': True, 'node_names': ['velocity_smoother', monitor], 'bond_timeout': 0.0,
                           'attempt_respawn_reconnection': True, 'bond_respawn_max_duration': 15.0, **sim}]),
     ]
 
