@@ -223,6 +223,15 @@ def test_obstacle_episodes():
     assert e.update(6.0, True) == 'start'                         # a new worker: logged again
 
 
+def test_obstacle_episode_needs_confirmation():
+    e = core.ObstacleEpisodes(clear_s=3.0, confirm_n=2)
+    assert e.update(0.0, True) is None                            # one-scan flicker: nothing
+    assert e.update(0.2, False) is None
+    assert e.update(0.4, True) is None
+    assert e.update(0.6, True) == 'start'                         # two in a row: an obstacle
+    assert e.update(0.8, False) is None and e.update(1.0, True) is None   # inside the episode: no re-confirm
+
+
 def test_path_switch_only_where_an_alternative_exists():
     assert core.path_switch_possible('JUNCTION')
     assert core.path_switch_possible('GATE_DECISION')

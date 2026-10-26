@@ -1,3 +1,4 @@
+import pytest
 """Run sensor_prep as a real ROS node against synthetic IMU and scan data (no robot).
 
     source /opt/ros/<distro>/setup.bash
@@ -105,3 +106,13 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def test_footprint_filter_drops_body_near_far():
+    import numpy as np
+    sp = pytest.importorskip('robot_slam.sensor_prep')
+    ang = np.radians([0.0, 180.0, 90.0, 45.0, 0.0])
+    r = [0.05, 0.20, 0.5, 8.0, 1.0]           # too near / behind = inside the body box / ok / too far / ok
+    out = sp.footprint_filter(r, ang, 0.15, 7.0, (0.10, 0.0), [[-0.14, 0.14, -0.135, 0.135]])
+    assert np.isnan(out[0]) and np.isnan(out[1]) and np.isnan(out[3])
+    assert out[2] == pytest.approx(0.5) and out[4] == pytest.approx(1.0)

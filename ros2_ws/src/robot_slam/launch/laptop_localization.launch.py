@@ -28,7 +28,7 @@ def setup(context):
     pose = (float(lc['initial_x']), float(lc['initial_y']), float(lc['initial_yaw']))
     nav2_params = sc.nav2_params_for_distro(os.path.join(cfg, 'nav2_params_mission.yaml'), sim)
     actions = [] if sim else sc.transforms()
-    actions += sc.sensor_prep(sim)
+    actions += sc.sensor_prep(sim, sc.loc_options(context)["laser_filter"])
     opts = sc.loc_options(context)                    # final-stack localization switches, all off by default
     actions += sc.cartographer(localization=True, pbstream=pbstream, use_sim_time=sim, initial_pose=pose, opts=opts)
     actions += sc.loc_v2(opts, sim, localization=True)

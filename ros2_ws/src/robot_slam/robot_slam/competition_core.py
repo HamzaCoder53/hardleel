@@ -91,13 +91,18 @@ class ObstacleEpisodes:
     """Split detections into episodes: a new episode starts when an obstacle is seen after clear_s without one.
     update(t, seen) -> 'start' (log obstacle_detected), 'cleared' (episode over without any response yet), None."""
 
-    def __init__(self, clear_s=3.0):
+    def __init__(self, clear_s=3.0, confirm_n=1):
         self.clear_s = clear_s
+        self.confirm_n = max(1, int(confirm_n))   # consecutive detections before an episode starts (no flicker)
+        self.streak = 0
         self.active = False
         self.start_t = self.last_seen = None
         self.responded = False
 
     def update(self, t, seen):
+        self.streak = self.streak + 1 if seen else 0
+        if seen and not self.active and self.streak < self.confirm_n:
+            return None
         if seen:
             self.last_seen = t
             if not self.active:

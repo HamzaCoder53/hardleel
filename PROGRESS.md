@@ -18,6 +18,14 @@ unplugged. Pi (192.168.137.231), lidar, IMU, camera OK. Start Pi drivers without
 | item | status |
 |---|---|
 | setup: maps -> `maps/course/` (docs/course removed; identical files), sim world rebuilt from course_full_approx | done |
+| 1: Localization v2 (scan gate, online gyro bias, wall heading modulo 90°, loc monitor, switches OFF) | done |
+| 2: Recording (mcap bag recording in laptop_mapping/localization) | done |
+| 3: Camera v2 & classifier (feature switch camera_v2) | done |
+| 4: Motors/driving & Pico firmware (`firmware/pico_motor`, HW watchdog 500ms, cmd WD 300ms, deadband MIN, ZERO mode) | done |
+| 5: Ramp dash on Pi (behind switch ramp_dash OFF) | done |
+| 6: Obstacles & clock (route detector, 10s wait cap, 2-scan obstacle episode confirm) | done |
+| 7: Map quality (`map_tidy.py` blob removal + `rebuild_map_from_bag.sh`) | done |
+| 8: Full autonomy rehearsal & regression sim (tested with localization v2) | in progress |
 
 ## Decisions
 - Middleware: CycloneDDS (`cyclonedds.xml`), `ROS_DOMAIN_ID=7`, chrony for time. Never run ROS on domain 7 in two
@@ -237,3 +245,14 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
       SAFETY FIX: sim scripts used `pkill -f "ros2 launch"` (would kill the real robot stack in the same distro) and
       hw_sim_suite deleted ~/hardleel_bags/mapping_* (it deleted the 14:35 real static-check bag). Now: kill only
       ROS_DOMAIN_ID=42 processes (kill_domain.sh), sim bags in ~/hardleel_bags_sim, nice 19.
+- [x] 26 Oct ~07:15 Final Stack software sprint (overnight, robot hardware unplugged):
+      1 Pico motor + servo firmware rewritten (`firmware/pico_motor/motor_servo.c`): 500 ms RP2040 hardware
+        watchdog, 300 ms command watchdog, deadband offset (`MIN,<id>,<pwm>`), zero-speed brake/coast (`ZERO,1/0`),
+        clean pin definitions (driver 1 left STBY GP0, LF GP6/1/2, LR GP5/3/4; driver 2 right STBY GP10,
+        RF GP7/17/19, RR GP16/20/21; servos GP12/13), CMake build setup.
+      2 Obstacle episode de-flicker: added `obstacle_confirm_scans: 2` in `competition_mission.yaml` and
+        `competition_core.py` to prevent single-scan wall/post flicker from generating false obstacle events.
+      3 Map tidy utility: added `map_tidy.py` and test suite (`test_map_tidy.py`, 4/4 passing) for removing isolated
+        blobs, plus `scripts/laptop/rebuild_map_from_bag.sh`.
+      4 Verification: 157/157 existing tests pass + 4 map tidy tests pass. Background simulation run with
+        localization v2 completed.

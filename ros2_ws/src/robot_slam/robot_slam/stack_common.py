@@ -72,11 +72,13 @@ def imu_hw(imu_port):
     ]
 
 
-def sensor_prep(use_sim_time=False):
-    """/scan -> /scan_filtered (tilt gate), /imu/data_raw + /imu/data -> /imu/data_lpf.
+def sensor_prep(use_sim_time=False, laser_filter=False):
+    """/scan -> /scan_filtered (tilt gate; laser_filter: + range / footprint filter, final stack item 7),
+    /imu/data_raw + /imu/data -> /imu/data_lpf.
     In the sim there is no Pi, so the Madgwick filter that makes /imu/data runs here too."""
     nodes = [Node(package='robot_slam', executable='sensor_prep', name='sensor_prep', output='screen',
-                  parameters=[{'lidar_height': LASER_Z, 'use_sim_time': use_sim_time}])]
+                  parameters=[{'lidar_height': LASER_Z, 'use_sim_time': use_sim_time, 'laser_filter': laser_filter,
+                               'laser_xy': [LASER_X, LASER_Y]}])]
     if use_sim_time:
         nodes.append(Node(package='imu_filter_madgwick', executable='imu_filter_madgwick_node',
                           name='imu_filter_madgwick_node', output='log',
@@ -102,6 +104,7 @@ def loc_options(context):
     allv2 = on('loc_v2')
     opts = {k: allv2 or on(k) for k in LOC_SWITCHES}
     opts['apply_corrections'] = on('loc_apply_corrections')
+    opts['laser_filter'] = on('laser_filter')
     return opts
 
 
@@ -111,7 +114,9 @@ def loc_launch_args():
             *[DeclareLaunchArgument(k, default_value='false', description='NEW, off (final stack item 1)')
               for k in LOC_SWITCHES],
             DeclareLaunchArgument('loc_apply_corrections', default_value='false',
-                                  description='NEW, off: loc_monitor relocalizes Cartographer (else it only logs)')]
+                                  description='NEW, off: loc_monitor relocalizes Cartographer (else it only logs)'),
+            DeclareLaunchArgument('laser_filter', default_value='false',
+                                  description='NEW, off: drop returns < 0.15 m, > 7 m and inside the robot body')]
 
 
 def carto_config_dir(opts):

@@ -32,7 +32,7 @@ def setup(context):
     cfg = os.path.join(sc.pkg_share(), 'config')
     nav2_params = sc.nav2_params_for_distro(os.path.join(cfg, 'nav2_params_mission.yaml'), sim)
     actions = [] if sim else sc.transforms()          # the sim publishes the body TFs itself
-    actions += sc.sensor_prep(sim)
+    actions += sc.sensor_prep(sim, sc.loc_options(context)["laser_filter"])
     opts = sc.loc_options(context)                    # final-stack localization switches, all off by default
     actions += sc.cartographer(localization=False, use_sim_time=sim, opts=opts)
     actions += sc.loc_v2(opts, sim)

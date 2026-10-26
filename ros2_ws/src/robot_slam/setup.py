@@ -42,6 +42,7 @@ setup(
             'loc_monitor = robot_slam.loc_monitor:main',
             'run_recorder = robot_slam.run_recorder:main',
             'ramp_dash = robot_slam.ramp_dash_node:main',
+            'map_tidy = robot_slam.map_tidy:main',
         ]
     },
 )

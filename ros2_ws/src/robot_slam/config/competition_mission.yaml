@@ -51,6 +51,7 @@ competition_mission:
     obstacle_switch_path: true
     obstacle_min_move_m: 0.10
     obstacle_clear_s: 3.0      # no detection this long = the episode is over (next one is logged again)
+    obstacle_confirm_scans: 2  # consecutive scans before an episode starts (sim: 1-scan flicker at walls/posts)
     # speeds
     mission_speed: 0.30        # Nav2 /speed_limit, m/s
     terrain_speed: 0.15

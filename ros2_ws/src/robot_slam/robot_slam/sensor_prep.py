@@ -55,6 +55,21 @@ class Hysteresis:
         return self.on
 
 
+def footprint_filter(ranges, angles, rmin, rmax, laser_xy, boxes, margin=0.02):
+    """Final stack item 7 (switch laser_filter): NaN for returns < rmin, > rmax, or whose end point lies inside any
+    robot-body box [x_min, x_max, y_min, y_max] in base_link (+ margin): the chassis, wheels, a mounted drop bin."""
+    r = np.asarray(ranges, dtype=np.float64)
+    with np.errstate(invalid='ignore'):
+        bad = ~np.isfinite(r) | (r < rmin) | (r > rmax)
+        x = laser_xy[0] + r * np.cos(angles)
+        y = laser_xy[1] + r * np.sin(angles)
+        for b in boxes:
+            bad |= (x >= b[0] - margin) & (x <= b[1] + margin) & (y >= b[2] - margin) & (y <= b[3] + margin)
+    out = r.copy()
+    out[bad] = np.nan
+    return out.astype(np.float32)
+
+
 class SensorPrep(Node):
     def __init__(self):
         super().__init__('sensor_prep')
@@ -69,7 +84,17 @@ class SensorPrep(Node):
         p('boot_samples', 200)         # still IMU samples used for the gyro bias and the boot pitch/roll
         p('boot_max_gyro_std', 0.05)   # rad/s; a noisier window means the robot moved, so it restarts
         p('lpf_alpha', 0.2)            # 0..1, higher = less smoothing (0.2 at 100 Hz = about 4 Hz cutoff)
+        # final stack item 7 (OFF): range + footprint filter on EVERY scan (also flat ground)
+        p('laser_filter', False)
+        p('filter_range_min', 0.15); p('filter_range_max', 7.0)
+        p('laser_xy', [0.0, 0.0])      # laser position in base_link (stack_common LASER_X, LASER_Y)
+        p('footprint_box', [-0.14, 0.14, -0.135, 0.135])
+        p('extra_box', [0.0, 0.0, 0.0, 0.0])   # drop bin once mounted [x_min, x_max, y_min, y_max]; zeros = none
         g = lambda n: self.get_parameter(n).value
+        self.lf = bool(g('laser_filter'))
+        self.lf_rmin, self.lf_rmax = float(g('filter_range_min')), float(g('filter_range_max'))
+        self.laser_xy = list(g('laser_xy'))
+        self.boxes = [list(g('footprint_box'))] + ([list(g('extra_box'))] if any(g('extra_box')) else [])
         self.lidar_h = float(g('lidar_height')); self.robot_h = float(g('robot_height'))
         self.margin = float(g('ground_margin'))
         self.rmin = float(g('range_min')); self.rmax = float(g('range_max'))
@@ -139,6 +164,10 @@ class SensorPrep(Node):
         self.pub_imu.publish(out)
 
     def on_scan(self, scan):
+        if self.lf:                                   # final stack: drop body / too-near / too-far returns first
+            angles = scan.angle_min + np.arange(len(scan.ranges)) * scan.angle_increment
+            scan.ranges = footprint_filter(scan.ranges, angles, self.lf_rmin, self.lf_rmax, self.laser_xy,
+                                           self.boxes).tolist()
         if self.bias is None:                         # no reference pose yet: pass the scan through
             self.pub_scan.publish(scan)
             return

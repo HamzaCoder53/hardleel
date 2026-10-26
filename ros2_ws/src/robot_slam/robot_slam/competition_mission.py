@@ -115,6 +115,7 @@ class CompetitionMission(Node):
         p('obstacle_max_wait_s', 10.0)             # obstacle seen + no progress this long -> switch path or wait on
         p('obstacle_min_move_m', 0.10)
         p('obstacle_clear_s', 3.0)                 # this long without detections ends an obstacle episode
+        p('obstacle_confirm_scans', 2)             # consecutive scans before an episode starts (sim: 1-scan flicker)
         p('obstacle_map_topic', '/map_nav')        # walls-only map frozen at the start (map_freezer)
         p('obstacle_switch_path', True)            # blocked to the junction/gate check or on path2 -> path1
         p('mission_speed', 0.30)
@@ -180,7 +181,7 @@ class CompetitionMission(Node):
         # obstacle bookkeeping: every episode logs obstacle_detected + obstacle_response; the event logger keeps
         # the first of each as the rulebook timestamp and stores the rest
         self.monitor_action, self.stop_since = 0, None
-        self.episodes = core.ObstacleEpisodes(float(g('obstacle_clear_s')))
+        self.episodes = core.ObstacleEpisodes(float(g('obstacle_clear_s')), int(g('obstacle_confirm_scans')))
         self.obst_seen_t = None                    # last time either detector saw something
         self.plan_xy = []                          # current Nav2 plan (map frame)
         self.current_path = ''                     # path1 / path2 while GO_PATH runs
