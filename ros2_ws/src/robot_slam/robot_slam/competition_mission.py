@@ -101,6 +101,8 @@ class CompetitionMission(Node):
         p('deposit_reserve_s', 35.0)               # less than this left before DEPOSIT -> skip ahead to deposit
         p('gate_center_deg', 0.0)                  # sector centre in the laser frame (0 = straight ahead)
         p('gate_half_width_deg', 10.0)
+        p('gate_align_heading', False)             # NEW, off: turn in place to the gate_check yaw before reading the sector
+        p('gate_align_tol_deg', 4.0)
         p('gate_open_threshold_m', 1.0)            # median range above this = open
         p('gate_open_confirm_n', 3)
         p('gate_poll_hz', 5.0)
@@ -634,6 +636,40 @@ class CompetitionMission(Node):
                                         float(self.g('gate_half_width_deg')), max(s.range_min, 0.12),
                                         min(s.range_max, 12.0))
 
+    def align_heading(self, target_yaw, tol_deg, timeout=12.0):
+        """Turn in place until within tol_deg of target_yaw (map frame). Nav2 accepts the final yaw within
+        yaw_goal_tolerance (0.4 rad) - more than the +-10 deg gate sector, so an arrival at 40 deg sees the lane
+        wall and an open gate reads as closed (found in the Mac sim, 26 Oct). The command goes through the
+        smoother/collision monitor, which lags ~0.4 s, so the robot keeps turning after the command stops: stop early
+        by that lead, let it settle, measure again and repeat (3 rounds max)."""
+        if getattr(self, 'pub_align', None) is None:       # through twist_mux / smoother / collision monitor, not raw /cmd_vel
+            self.pub_align = self.create_publisher(Twist, '/cmd_vel_nav', 1)
+        wrap = lambda a: (a + math.pi) % (2 * math.pi) - math.pi
+        t0, err = self.now(), float('nan')
+        for _ in range(3):
+            w = 0.0
+            while self.now() - t0 < timeout:
+                pose = self.pose_in_map()
+                if pose is None:
+                    self.pause(0.1)
+                    continue
+                err = wrap(target_yaw - pose[2])
+                if abs(err) < math.radians(tol_deg) + abs(w) * 0.4:          # lead for the command lag
+                    break
+                w = math.copysign(max(0.15, min(0.6, 1.2 * abs(err))), err)
+                cmd = Twist()
+                cmd.angular.z = w
+                self.pub_align.publish(cmd)
+                self.pause(0.1)
+            self.stop_robot()
+            self.pause(0.8)                                                  # settle, then measure the real heading
+            pose = self.pose_in_map()
+            if pose is not None:
+                err = wrap(target_yaw - pose[2])
+                if abs(err) < math.radians(tol_deg):
+                    break
+        self.event('gate_align', yaw_err_deg=round(math.degrees(err), 1))
+
     def do_gate_decision(self):
         """Wait for the gate up to gate_max_wait_s, but never into the time the rest of the run needs
         (gate_reserve_s). Budget 0 = take whatever is open now: an open gate -> path2, else path1 (always open)."""
@@ -642,6 +678,8 @@ class CompetitionMission(Node):
         confirm = int(self.g('gate_open_confirm_n'))
         if budget <= 0.0:
             confirm = 1                                             # no time: one reading decides
+        if self.g('gate_align_heading') and 'gate_check' in self.poses:
+            self.align_heading(self.poses['gate_check'][2], float(self.g('gate_align_tol_deg')))
         poller = gate_check.GatePoller(self.now(), budget, float(self.g('gate_open_threshold_m')), confirm)
         period = 1.0 / max(float(self.g('gate_poll_hz')), 0.5)
         decision = poller.update(self.now(), self.gate_median())   # budget 0: decided by this reading

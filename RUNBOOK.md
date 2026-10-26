@@ -259,3 +259,50 @@ Switch back: `.wslconfig` -> `networkingMode=nat`, `wsl --shutdown`, Pi `./robot
 | Speed fit from a mapping bag | `ros2 run motor_teleop fit_speed_from_bag ~/hardleel_bags/<mapping_...> --apply` |
 Commanded PWM is never used as odometry: Cartographer runs on lidar + IMU only.
 Ramps: their sides are invisible to the 15 cm lidar plane, so place waypoints so the robot meets a ramp end-on.
+
+---
+
+# Virtual SLAM simulation (Mac mini, native, no Docker) — added 26 Oct
+
+Everything below runs the REAL launch files (`laptop_mapping`, `laptop_localization`, `laptop_mission` with `sim:=true`)
+against a headless Gazebo Harmonic world of the course. Nothing in it talks to the robot.
+
+## One-time setup (macOS, Apple Silicon)
+```bash
+brew install pixi tmux
+cd ~/hardleel && git checkout feat/sim
+pixi install                                        # ROS 2 Jazzy (RoboStack) + Nav2 + Cartographer + Gazebo Harmonic + PyTorch, ~6 GB
+pixi run bash scripts/sim/mac/build_cartographer_overlay.sh   # RoboStack's cartographer_node is broken on macOS -> patched build in mac_ws/
+pixi run bash scripts/sim/mac/build_ws.sh                     # colcon build of ros2_ws (needs ros2_ws/src/sllidar_ros2/COLCON_IGNORE: Linux-only driver)
+touch ros2_ws/src/sllidar_ros2/COLCON_IGNORE && echo ros2_ws/src/sllidar_ros2/COLCON_IGNORE >> .git/info/exclude   # before build_ws.sh
+```
+Mac-specific things handled for you (see DECISIONS.md): CycloneDDS on localhost (`scripts/sim/mac/cyclonedds.xml`,
+`ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, domain 42), Lua `include` inlined at launch (`robot_slam/carto_lua.py`),
+no `DYLD_*` needed because everything starts through `pixi run`. Gazebo runs **server only** (`gz sim -r -s`); there is no
+GUI on macOS in automated runs — use Foxglove (below).
+
+## Demo commands (each is one command; run from `~/hardleel`)
+| step | command | output in `docs/sim_demo/` |
+|---|---|---|
+| 1 map the arena (scripted route incl. dirt ramp side) | `pixi run bash scripts/sim/mapping_demo.sh course mapping_course` | map `.pgm/.yaml`, `.pbstream`, bag |
+| 2 accuracy vs ground truth | `pixi run python scripts/sim/accuracy_report.py docs/sim_demo/mapping_course.yaml` | `*_accuracy.json`, `*_overlay.png` |
+| 3 localize on the saved map + Nav2 goals | `pixi run bash scripts/sim/localization_demo.sh course docs/sim_demo/mapping_course.pbstream` | `nav_course.json` |
+| 4 teleport / relocalization test | `TELEPORT_AFTER=2 TELEPORT_TO=-4.25,-1.0,90 EXTRA_LOC='loc_v2:=true loc_apply_corrections:=true' NAV_NAME=recovery_v2_apply pixi run bash scripts/sim/localization_demo.sh course docs/sim_demo/mapping_course.pbstream loading_metal terrain_1 terrain_2 junction` | `recovery_*.json` |
+| 5 mission rehearsal | `pixi run bash scripts/sim/mission_demo.sh NAME gate=open\|closed\|timed:2 worker=none\|x,y,remove_after_s` (set `EXTRA_MISSION='gate_align_heading:=true'`) | `NAME_*.txt` |
+|   whole matrix | `pixi run bash scripts/sim/rehearsal_all.sh` | `rehearsal_*` |
+| stop everything | `bash scripts/sim/kill_sim.sh` | |
+
+Run long jobs in tmux (`tmux new -s sim "cd ~/hardleel && pixi run bash scripts/sim/<script>"`), not in a plain shell.
+
+## Watching it in Foxglove
+1. Start any demo (or just the sim: `pixi run bash -c 'source scripts/sim/lib.sh; sim_start course odom_tf:=false; sleep 100000'`).
+2. In another terminal: `pixi run bash scripts/sim/foxglove.sh` (bridge on `ws://localhost:8765`, localhost only).
+3. Foxglove app → *Open connection* → *Foxglove WebSocket* → `ws://localhost:8765`.
+4. Layout menu → *Import from file…* → `foxglove/hardleel_sim_layout.json`: 3D (map, robot model, lidar, plan,
+   ground-truth pose), localization-confidence plot, mission/localization state, true position.
+
+## On the Windows laptop (WSL2, Ubuntu 24.04, Jazzy via apt)
+The same `sim.launch.py` and the three real launch files run unchanged there (Harmonic `gz` names are selected from
+`ROS_DISTRO`). Differences: no pixi (use `/opt/ros/jazzy` + `~/hardleel_ws`), no Lua/Cartographer patches (the apt package is
+fine), no `scripts/sim/mac/*`; `scripts/sim/lib.sh` skips the CycloneDDS file there. The older WSL-only harness
+`scripts/laptop/sim_e2e_test.sh` still works. Not re-tested on the laptop in this session (no access).

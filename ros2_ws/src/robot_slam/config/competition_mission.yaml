@@ -31,6 +31,8 @@ competition_mission:
     deposit_reserve_s: 35.0    # any stage before DEPOSIT with less than this left -> skip ahead to deposit + finish
     gate_center_deg: 0.0       # sector centre in the laser frame, 0 = straight ahead
     gate_half_width_deg: 10.0
+    gate_align_heading: false  # NEW, off: turn to the gate_check yaw first (Nav2 yaw tolerance 0.4 rad > the +-10 deg sector)
+    gate_align_tol_deg: 4.0
     gate_open_threshold_m: 1.5 # median range above this = open. Course map: gate_check ~0.9 m from the closed gate,
                                # open lane ~3.7 m deep. PLACEHOLDER: re-check with the real gate
     gate_open_confirm_n: 3     # consecutive open polls needed

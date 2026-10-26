@@ -27,3 +27,5 @@ docs/sim_demo/*_bag/
 docs/sim_demo/*.mcap
 docs_md.out
 docs/sim_demo/*.pbstream
+docs/sim_demo/*.out
+docs_*.out

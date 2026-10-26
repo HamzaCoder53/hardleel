@@ -1,0 +1,10 @@
+# Waypoints for the unrelated maze test world (frame map = start pose, x east, y north).
+frame: map
+poses:
+  a: {x: 1.0, y: 0.0, yaw_deg: 90.0}
+  b: {x: 1.0, y: 2.7, yaw_deg: 0.0}
+  c: {x: 2.7, y: 3.2, yaw_deg: -90.0}
+  d: {x: 2.7, y: 1.0, yaw_deg: 0.0}
+  e: {x: 4.6, y: 0.4, yaw_deg: 90.0}
+  f: {x: 4.6, y: 2.4, yaw_deg: 0.0}
+sequences: {}

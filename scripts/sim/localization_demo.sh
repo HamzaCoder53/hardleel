@@ -10,6 +10,6 @@ LOGNAME_=localization bg ros2 launch robot_slam laptop_localization.launch.py si
 LOGNAME_=mission bg ros2 launch robot_slam laptop_mission.launch.py sim:=true classifier:=stub waypoints:=$REPO/ros2_ws/src/robot_slam/config/waypoints_course.yaml
 sleep 30
 NAME="${NAV_NAME:-nav_$WORLD}"
-LOGNAME_=bag bg ros2 bag record -s mcap -o "$OUT/${NAME}_bag" /scan_filtered /tf /tf_static /clock /ground_truth /map /cmd_vel /plan /local_plan
+record_bag "$NAME" /scan_filtered /tf /tf_static /clock /ground_truth /map /cmd_vel /plan /local_plan
 TP=(); [ -n "$TELEPORT_AFTER" ] && TP=(--teleport-after "$TELEPORT_AFTER" ${TELEPORT_TO:+--teleport-to="$TELEPORT_TO"})
 PYTHONPATH="$REPO/scripts/sim:$PYTHONPATH" python "$REPO/scripts/sim/nav_goals.py" $GOALS --out "$OUT/$NAME.json" --waypoints "${WAYPOINTS:-$REPO/ros2_ws/src/robot_slam/config/waypoints_course.yaml}" "${TP[@]}" | tee -a "$OUT/$NAME.log"

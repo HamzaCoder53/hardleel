@@ -1,0 +1,41 @@
+[INFO] [competition_mission-9]: process started with pid [32636]
+19 poses from /Users/StoreOperations/hardleel/ros2_ws/src/robot_slam/config/waypoints_course.yaml; log /Users/StoreOperations/logs/mission_20261026_054313.csv
+Waiting for /mission/start
+[   0.0s] WAIT_START: waiting 
+collision monitor: mission stop box
+NAV2 READY
+[   0.0s] EVENT:autonomous_start: event {}
+[   1.8s] START_NUDGE: done moved 0.16 m
+[   1.8s] WAIT_START: started class=unknown bay= gate=
+[   1.8s] wp:screen: ok 
+[   1.8s] GO_SCREEN: ok class=unknown bay= gate=
+[   1.8s] EVENT:waste_detected: event {"class": "metal"; "confidence": 1.0; "source": "stub"}
+[   1.8s] CLASSIFY: stub class=metal bay= gate=
+[   5.4s] EVENT:obstacle_detected: event {"detector": "route"; "points": 6; "state": "GO_LOADING"}
+[   9.5s] EVENT:obstacle_response: event {"action": "wait"; "response_s": 4.0}
+[  10.5s] wp:loading_metal: ok 
+[  10.5s] GO_LOADING: ok class=metal bay= gate=
+[  16.5s] EVENT:loading_complete: event {"result": "waited"; "detail": "stub: waited 6.0 s"}
+[  16.5s] LOAD: waited class=metal bay= gate=
+[  24.2s] wp:terrain_1: ok 
+[  28.1s] EVENT:obstacle_detected: event {"detector": "route"; "points": 5; "state": "TERRAIN"}
+[  28.2s] EVENT:obstacle_response: event {"action": "wait"; "response_s": 0.02}
+terrain_2: timeout (attempt 1) -> retry
+[  61.8s] wp:terrain_2: ok 
+[  78.2s] wp:terrain_3: ok 
+[  87.0s] wp:terrain_4: ok 
+[  87.0s] EVENT:terrain_complete: event {"result": "ok"}
+[  87.0s] TERRAIN: ok class=metal bay= gate=
+[  87.0s] OBSTACLES: ok class=metal bay= gate=
+[  91.8s] wp:junction: ok 
+[ 100.8s] wp:gate_check: ok 
+[ 100.8s] JUNCTION: ok class=metal bay= gate=
+[ 101.6s] EVENT:gate_align: event {"yaw_err_deg": -3.5}
+[ 102.0s] EVENT:gate_decision: event {"decision": "path2"; "wait_s": 0.41; "wait_budget_s": 5.0; "remaining_s": 74.2; "last_median_m": 3.77}
+[ 102.0s] GATE_DECISION: path2 class=metal bay= gate=path2
+[ 107.7s] wp:path2_1: ok 
+[ 111.6s] wp:path2_2: ok 
+[ 111.6s] GO_PATH: path2:ok class=metal bay= gate=path2
+[ 121.4s] wp:bin_metal: ok 
+[ 123.4s] EVENT:deposit_complete: event {"bin": "bin_metal"; "colour": "black"; "reached": "ok"; "dropped": false; "detail": "no drop bin"}
+[ 123.4s] DEPOSIT: bin_metal:ok:no drop bin class=metal bay=black gate=path2

@@ -52,7 +52,8 @@ def setup(context):
         package='robot_slam', executable='competition_mission', name='competition_mission', output='screen',
         parameters=[os.path.join(cfg, 'competition_mission.yaml'),
                     {**simp, 'waypoints_file': waypoints, 'stub_class': stub,
-                     'auto_start': truthy(context, 'auto_start'), 'turn_calibration': turn_cal}],
+                     'auto_start': truthy(context, 'auto_start'), 'turn_calibration': turn_cal,
+                     'gate_align_heading': truthy(context, 'gate_align_heading')}],
         remappings=[('scan', '/scan_filtered')])]))
     return actions
 
@@ -65,6 +66,7 @@ def generate_launch_description():
         DeclareLaunchArgument('auto_start', default_value='false'),
         DeclareLaunchArgument('sim', default_value='false'),
         DeclareLaunchArgument('nav2', default_value='true', description='false if auto mapping already runs Nav2'),
+        DeclareLaunchArgument('gate_align_heading', default_value='false', description='NEW, off: face the gate before reading it'),
         DeclareLaunchArgument('turn_calibration', default_value='false', description='NEW, off: spin test at start'),
         DeclareLaunchArgument('speed_feedback', default_value='false', description='NEW, off: speed_governor'),
         OpaqueFunction(function=setup),

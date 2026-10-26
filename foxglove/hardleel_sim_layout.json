@@ -1,0 +1,59 @@
+{
+  "configById": {
+    "3D!map3d": {
+      "layers": {
+        "grid": { "layerId": "foxglove.Grid", "visible": true, "frameId": "map", "size": 12, "divisions": 12, "lineWidth": 1, "color": "#248eff", "position": [0, 0, 0], "rotation": [0, 0, 0], "order": 1 },
+        "urdf": { "layerId": "foxglove.Urdf", "visible": true, "sourceType": "topic", "topicName": "/robot_description", "label": "hardleel", "fallbackColor": "#ffb300", "order": 2 }
+      },
+      "cameraState": { "perspective": false, "distance": 9.0, "phi": 0, "thetaOffset": 0, "targetOffset": [-1.9, -1.1, 0], "target": [0, 0, 0], "targetOrientation": [0, 0, 0, 1], "fovy": 45, "near": 0.5, "far": 5000 },
+      "followMode": "follow-none",
+      "followTf": "map",
+      "scene": { "enableStats": false, "backgroundColor": "#1e1e1e", "transforms": { "showLabel": false, "editable": false, "axisScale": 0.25 } },
+      "transforms": {},
+      "topics": {
+        "/map": { "visible": true, "colorMode": "map", "alpha": 0.9 },
+        "/map_nav": { "visible": false },
+        "/scan_filtered": { "visible": true, "pointSize": 4, "pointShape": "circle", "colorMode": "flat", "flatColor": "#ff3b30", "decayTime": 0 },
+        "/plan": { "visible": true, "lineWidth": 0.04, "gradient": ["#00e676", "#00e676"] },
+        "/local_plan": { "visible": true, "lineWidth": 0.03, "gradient": ["#ffeb3b", "#ffeb3b"] },
+        "/ground_truth": { "visible": true, "type": "arrow", "arrowSize": [0.35, 0.08, 0.08], "color": "#ffffff" },
+        "/local_costmap/costmap": { "visible": false },
+        "/global_costmap/costmap": { "visible": false }
+      },
+      "publish": { "type": "pose", "poseTopic": "/goal_pose", "pointTopic": "/clicked_point", "poseEstimateTopic": "/initialpose", "poseEstimateXDeviation": 0.5, "poseEstimateYawDeviation": 0.26 },
+      "imageMode": {}
+    },
+    "Plot!conf": {
+      "paths": [
+        { "value": "/localization/confidence.data", "enabled": true, "timestampMethod": "receiveTime", "label": "localization confidence" }
+      ],
+      "minYValue": 0, "maxYValue": 1, "showXAxisLabels": true, "showYAxisLabels": true, "showLegend": true,
+      "showPlotValuesInLegend": false, "isSynced": true, "xAxisVal": "timestamp", "sidebarDimension": 240
+    },
+    "StateTransitions!state": {
+      "paths": [
+        { "value": "/mission/state.data", "timestampMethod": "receiveTime", "label": "mission" },
+        { "value": "/localization/state.data", "timestampMethod": "receiveTime", "label": "localization" }
+      ],
+      "isSynced": true
+    },
+    "RawMessages!pose": {
+      "topicPath": "/ground_truth.pose.pose.position",
+      "diffEnabled": false, "diffMethod": "custom", "diffTopicPath": "", "showFullMessageForDiff": false
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": { "speed": 1 },
+  "layout": {
+    "first": "3D!map3d",
+    "second": {
+      "first": "Plot!conf",
+      "second": { "first": "StateTransitions!state", "second": "RawMessages!pose", "direction": "column" },
+      "direction": "column",
+      "splitPercentage": 40
+    },
+    "direction": "row",
+    "splitPercentage": 68
+  }
+}

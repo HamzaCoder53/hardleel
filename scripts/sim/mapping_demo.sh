@@ -8,7 +8,7 @@ ROUTE="${ROUTE:-0.5,0.0, 0.8,-0.6, 0.8,-2.3, -2.0,-2.3, -4.2,-2.3, -4.2,-1.0, -4
 sim_start "$WORLD" odom_tf:=false || exit 1
 LOGNAME_=mapping bg ros2 launch robot_slam laptop_mapping.launch.py sim:=true rviz:=false record_bag:=false $MAPARGS
 sleep 15
-LOGNAME_=bag bg ros2 bag record -s mcap -o "$OUT/${NAME}_bag" /scan /scan_filtered /imu/data /tf /tf_static /clock /ground_truth /map /cmd_vel
+record_bag "$NAME" /scan /scan_filtered /imu/data /tf /tf_static /clock /ground_truth /map /cmd_vel
 ros2 run rdj2026_sim route_driver.py --ros-args -p use_sim_time:=true -p speed:=0.3 -r cmd_vel:=/cmd_vel_teleop \
    -p route:="[${ROUTE//[[:space:]]/}]" 2>&1 | tee -a "$OUT/route.log" | tail -3
 sleep 3

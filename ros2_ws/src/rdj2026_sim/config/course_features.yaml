@@ -1,0 +1,60 @@
+# Course features spawned on top of the generated walls (world frame = course_full_approx map frame; the robot starts at
+# x = +0.06). EVERY number here is a PLACEHOLDER until measured on the real course (see SIM_MEASUREMENTS_NEEDED.md).
+# Used by scripts/sim/world_features.py   (a feature with `enabled: false` is not spawned)
+wall_height_m: 0.45
+dirt_ramp:                    # strip x -4.60..-3.88, drive along y: up-slope, rough middle, down-slope (ramp_sdf style)
+  enabled: true
+  x: -4.24
+  y_center: -1.10
+  length_m: 1.20
+  height_m: 0.07              # PLACEHOLDER (rulebook Fig. 2 text says ~70 mm)
+  width_m: 0.70
+  rough_bumps: 5              # small cylinders (bumps) on the plateau = "rough middle section"
+  bump_height_m: 0.012
+gravel_ramp:                  # in the gravel corridor y -0.87..-0.25, drive along x
+  enabled: true
+  x_center: -3.00
+  y: -0.56
+  length_m: 1.14
+  height_m: 0.08              # PLACEHOLDER (~80 mm)
+  width_m: 0.50
+  rough_bumps: 4
+  bump_height_m: 0.012
+gate:                         # timed gate across the gated lane (y -0.25..0.37), see scripts/sim/mission_demo.sh
+  x: -3.02
+  y: 0.07
+  width_m: 0.60
+  height_m: 0.40
+  open_after_s: 2.0           # PLACEHOLDER: closed -> opens ~2 s after the mission asks
+workers:                      # moving obstacles: name, radius, path (map-frame x,y list), seconds per stop
+  - {name: worker1, enabled: false, radius_m: 0.125, height_m: 0.40, period_s: 20.0,
+     path: [[-1.0, -2.27], [-3.0, -2.27]]}
+cylinders:                    # static cylinders placed by "judges"
+  - {name: cyl1, enabled: false, x: -2.2, y: -2.27, radius_m: 0.055, height_m: 0.30}
+docks:                        # thin panels in the column x 0.03..0.38 (E3 measured, E2/E4 ESTIMATED)
+  enabled: true
+  x_min: 0.03
+  x_max: 0.38
+  thickness_m: 0.03
+  height_m: 0.20
+  y: {E2: -0.95, E3: -1.50, E4: -2.31}
+screen:                       # ~1 m straight ahead of the start, against the east wall (x 1.10)
+  enabled: true
+  x: 1.09
+  y: 0.0
+  width_m: 0.40
+  height_m: 0.30
+  z_center_m: 0.22            # camera height (placeholder)
+  default_image: metal        # plastic | metal | organic  (picture from ../../test_photos / waste_files)
+bins:                         # blue / white / black, END ROOM (placeholder positions, ~ the course waypoints)
+  enabled: true
+  size_m: 0.18
+  height_m: 0.20
+  positions: {blue: [-1.45, -1.75], white: [-1.20, -1.75], black: [-0.95, -1.75]}
+finish: {x: -1.2, y: -0.35}
+grass_strip:                  # OFF by default
+  enabled: false
+  x_min: -3.0
+  x_max: -2.2
+  y_center: -2.27
+  width_m: 0.6
