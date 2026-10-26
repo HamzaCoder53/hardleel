@@ -44,7 +44,8 @@ def generate_launch_description():
             '/dev/serial/by-id/*USB-Serial*',
             '/dev/serial/by-id/*Raspberry_Pi_Pico*',
         ], '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0')),
-        DeclareLaunchArgument('cmd_timeout', default_value='0.2'),   # team 26 Oct: no smoother any more, bridge timeout = stop time
+        # team 26 Oct: raw /cmd_vel (no ramps) but keep the 200 ms stop watchdog (0 = off)
+        DeclareLaunchArgument('cmd_timeout', default_value='0.2'),
         DeclareLaunchArgument('madgwick', default_value='false'),     # /imu/data orientation filter, off since 26 Oct
         DeclareLaunchArgument('camera', default_value='true'),
         DeclareLaunchArgument('camera_fps', default_value='5.0'),
@@ -72,6 +73,7 @@ def generate_launch_description():
         Node(package='motor_teleop', executable='motor_bridge', name='motor_bridge', output='screen',
              condition=IfCondition(L('motors')),
              parameters=[{'port': L('pico_port'), 'send_rate': 10.0, 'max_pwm': 75, 'cmd_timeout': L('cmd_timeout'),
+                          'flat_ramp': 0.0, 'sand_ramp': 0.0, 'gravel_ramp': 0.0, 'ramp_decel': 0.0,   # raw, no slew
                           'yaw_feedback': ParameterValue(L('yaw_feedback'), value_type=bool),
                           'dash_input': ParameterValue(L('ramp_dash'), value_type=bool)}]),
         # final stack item 5: the dash controller runs HERE on the Pi (control loop never crosses Wi-Fi)

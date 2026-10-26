@@ -477,7 +477,7 @@ class MotorBridge(Node):
         if self.pwm_test is not None and self.allow_pwm_test and \
                 (now - self.pwm_test[2]).nanoseconds * 1e-9 <= self.cmd_timeout:
             tl, tr = self.test_targets()             # calibration: raw PWM, no feedforward/cap/feedback
-        elif age > self.cmd_timeout:
+        elif self.cmd_timeout > 0 and age > self.cmd_timeout:   # cmd_timeout <= 0: no watchdog (team 26 Oct)
             tl = tr = 0
             self.yaw_i = 0.0
         else:
