@@ -271,3 +271,5 @@ Next: TEST_TONIGHT.md on the real robot (step 0 deploy already done; up.ps1 now 
 # SIM BRANCH `feat/sim` (26 Oct, Mac mini) - STOPPED EARLY on the disk floor
 - Done: pixi installed (brew), `pixi.toml` + `pixi.lock` (resolves), BLOCKERS/DECISIONS/SIM_MEASUREMENTS_NEEDED.
 - Blocked: env install (19 GiB free < 20 GB floor). See BLOCKERS.md B1. Resume with `pixi install` once space exists.
+- 26 Oct: env INSTALLED (floor lifted). colcon build OK (sllidar skipped). Headless Gazebo Harmonic + lidar OK, RTF 0.99.
+  Next: foxglove layout, world features (ramps/gate/workers/docks/screen/bins), GT map export, demo scripts.

@@ -114,7 +114,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/noarch/rosdistro-1.1.0-pyhd8ed1ab_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/rospkg-1.6.3-pyh5ded981_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/scikit-build-core-1.1.1-pyhcb39dcd_0.conda
-      - conda: https://prefix.dev/conda-forge/noarch/setuptools-84.2.1-pyhe730653_0.conda
+      - conda: https://prefix.dev/conda-forge/noarch/setuptools-79.0.1-pyhff2d567_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/snowballstemmer-3.1.1-pyhd8ed1ab_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/sympy-1.14.0-pyh2585a3b_106.conda
@@ -546,6 +546,8 @@ environments:
       - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-laser-filters-2.0.9-h60d57d3_21.conda
       - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-nav2-bringup-1.3.12-h60d57d3_21.conda
       - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-navigation2-1.3.12-h60d57d3_21.conda
+      - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-opennav-docking-1.3.12-h60d57d3_21.conda
+      - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-opennav-docking-bt-1.3.12-h60d57d3_21.conda
       - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-rcpputils-2.11.4-h60d57d3_25.conda
       - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-rcutils-6.7.6-h60d57d3_25.conda
       - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-rmw-7.3.3-np2py312haf4906a_21.conda
@@ -2194,16 +2196,16 @@ packages:
   run_exports: {}
   size: 365250
   timestamp: 1790997173721
-- conda: https://prefix.dev/conda-forge/noarch/setuptools-84.2.1-pyhe730653_0.conda
-  sha256: 17add609d1a31c874e39a03935072be59bcafb06d42383eceabea746d12e6025
-  md5: d41f95b8f1553165b2cc2f37162dac9c
+- conda: https://prefix.dev/conda-forge/noarch/setuptools-79.0.1-pyhff2d567_0.conda
+  sha256: 5ebc4bb71fbdc8048b08848519150c8d44b8eb18445711d3258c9d402ba87a2c
+  md5: fa6669cc21abd4b7b6c5393b7bc71914
   depends:
-  - python >=3.11
+  - python >=3.9
   license: MIT
   license_family: MIT
   run_exports: {}
-  size: 567436
-  timestamp: 1792571495729
+  size: 787541
+  timestamp: 1745484086827
 - conda: https://prefix.dev/conda-forge/noarch/six-1.17.0-pyhe01879c_1.conda
   sha256: 458227f759d5e3fcec5d9b7acce54e10c9e1f4f4b7ec978f3bfd54ce4ee9853d
   md5: 3339e3b65d58accf4ca4fb8748ab16b3
@@ -8962,6 +8964,22 @@ packages:
   run_exports: {}
   size: 2006
   timestamp: 1788467872628
+- conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-opennav-docking-1.3.12-h60d57d3_21.conda
+  sha256: 66cbeb1361684fcc90e24be7da4e64f7b2ca9a798c5f96567e090ba38a0dc6e9
+  md5: 50b48adb2386955b9206a9dff102d7df
+  depends:
+  - ros2-opennav-docking ==1.3.12
+  run_exports: {}
+  size: 2039
+  timestamp: 1788467538126
+- conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-opennav-docking-bt-1.3.12-h60d57d3_21.conda
+  sha256: 9c3a03ffc1e55f70d736b5102335ec92880080b10a0f084973eb5e4a90bef6ab
+  md5: fddd03577cd31fb471b3f022ffa90028
+  depends:
+  - ros2-opennav-docking-bt ==1.3.12
+  run_exports: {}
+  size: 2048
+  timestamp: 1788466319578
 - conda: https://prefix.dev/robostack-jazzy/osx-arm64/ros-jazzy-rcpputils-2.11.4-h60d57d3_25.conda
   sha256: 4255b96974c088b50b635a64517c8ff2c071c2a1170fbb0bfe0b9fa2c42ae618
   md5: c5d66aba0e8ff9d7343237f9efbf98f1

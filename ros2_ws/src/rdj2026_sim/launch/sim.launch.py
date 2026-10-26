@@ -6,6 +6,7 @@ Jazzy. The world/URDF/bridge files are written with Fortress names; on Jazzy the
 """
 import math
 import os
+import sys
 
 import yaml
 from ament_index_python.packages import get_package_share_directory
@@ -29,6 +30,7 @@ def for_distro(path, hardware=False):
     text = open(path).read()
     if HARMONIC:
         text = text.replace('ignition.msgs.', 'gz.msgs.').replace('ignition_frame_id', 'gz_frame_id')
+        text = text.replace('ignition-gazebo-', 'gz-sim-').replace('ignition::gazebo::', 'gz::sim::')
     if hardware:
         text = text.replace('ros_topic_name: /cmd_vel\n', 'ros_topic_name: /sim_cmd_vel\n')
     out = tempfile.NamedTemporaryFile('w', suffix=os.path.splitext(path)[1], delete=False)
@@ -42,6 +44,10 @@ def generate_launch_description():
     # world:=rdj2026 (rulebook Figure 1) | course (the real course drawn by the team, start (0,0) facing east)
     W = LaunchConfiguration('world')
     world = [pkg, '/worlds/', W, '.sdf']
+    if HARMONIC:
+        # the worlds use Fortress plugin names; Harmonic needs a rewritten copy (resource path keeps the includes)
+        world = PythonExpression(["'", for_distro(os.path.join(pkg, 'worlds', 'rdj2026.sdf')), "' if '", W,
+                                  "' == 'rdj2026' else '", for_distro(os.path.join(pkg, 'worlds', 'course.sdf')), "'"])
     urdf = open(for_distro(os.path.join(pkg, 'urdf', 'hardleel_sim.urdf'))).read()
     gz = ['gz', 'sim'] if HARMONIC else ['ign', 'gazebo']
     layout = yaml.safe_load(open(os.path.join(pkg, 'arena', 'arena_layout.yaml')))
@@ -66,7 +72,7 @@ def generate_launch_description():
             cmd=gz + ['-r', world],
             condition=IfCondition(gui), output='screen'),
         ExecuteProcess(
-            cmd=gz + ['-r', '-s', '--headless-rendering', world],
+            cmd=gz + ['-r', '-s'] + ([] if sys.platform == 'darwin' else ['--headless-rendering']) + [world],
             condition=IfCondition(PythonExpression(["'", gui, "' != 'true'"])), output='screen'),
 
         Node(package='robot_state_publisher', executable='robot_state_publisher',
