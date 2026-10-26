@@ -52,7 +52,7 @@ from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32, Int32MultiArray, String
 
 LIVE = ('min_pwm_left', 'min_pwm_right', 'min_turn_pwm', 'max_speed', 'allow_pwm_test', 'yaw_feedback', 'yaw_kp',
-        'yaw_ki', 'speed_scale_enabled')
+        'yaw_ki', 'speed_scale_enabled', 'dash_input')
 CALIB_KEYS = ('min_pwm_left', 'min_pwm_right', 'min_turn_pwm', 'max_speed')
 
 
@@ -110,6 +110,10 @@ class MotorBridge(Node):
         self.declare_parameter('yaw_i_max', 1.5)       # rad/s clamp on the integral term
         self.declare_parameter('gyro_topic', '/imu/data_raw')
         self.declare_parameter('speed_scale_enabled', False)
+        # ramp dash (final stack, OFF): /motor/dash_pwm [left, right] physical PWM straight to the Pico, top priority,
+        # no surface cap / speed scale / deadband / slew; written as it arrives (max dash_max_hz), resent each tick
+        self.declare_parameter('dash_input', False)
+        self.declare_parameter('dash_max_hz', 50.0)
 
         g = lambda n: self.get_parameter(n).value
         self.max_speed = float(g('max_speed'))
@@ -124,6 +128,10 @@ class MotorBridge(Node):
         self.yaw_feedback = bool(g('yaw_feedback'))
         self.yaw_kp, self.yaw_ki, self.yaw_i_max = float(g('yaw_kp')), float(g('yaw_ki')), float(g('yaw_i_max'))
         self.speed_scale_enabled = bool(g('speed_scale_enabled'))
+        self.dash_input = bool(g('dash_input'))
+        self.dash_min_dt = 1.0 / max(float(g('dash_max_hz')), 1.0)
+        self.dash = None                    # (left, right, stamp) physical PWM from /motor/dash_pwm
+        self.dash_written = 0.0
         self.load_calib(os.path.expanduser(str(g('calib_file'))))
         self.invert_left = bool(g('invert_left'))
         self.min_turn = float(g('min_turn'))
@@ -184,6 +192,7 @@ class MotorBridge(Node):
         self.pwm_pub = self.create_publisher(Int32MultiArray, '/motor/pwm_state', 10)
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd_vel, 10)
         self.create_subscription(Int32MultiArray, '/motor/pwm_test', self.on_pwm_test, 10)
+        self.create_subscription(Int32MultiArray, '/motor/dash_pwm', self.on_dash, 10)
         self.create_subscription(Float32, '/motor/speed_scale', self.on_speed_scale, 10)
         self.create_subscription(Imu, g('gyro_topic'), self.on_gyro,
                                  QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -248,6 +257,8 @@ class MotorBridge(Node):
                 self.yaw_ki = float(p.value)
             elif p.name == 'speed_scale_enabled':
                 self.speed_scale_enabled, self.speed_scale = bool(p.value), 1.0
+            elif p.name == 'dash_input':
+                self.dash_input, self.dash = bool(p.value), None
             else:
                 continue
             self.get_logger().info(f'param {p.name} = {p.value}')
@@ -281,6 +292,31 @@ class MotorBridge(Node):
             return
         l, r = (max(-self.max_pwm, min(self.max_pwm, int(v))) for v in m.data)
         self.pwm_test = (l, r, self.get_clock().now())
+
+    def on_dash(self, m):
+        """Ramp dash PWM: written to the Pico at once (rate-limited), bypassing every cap and filter."""
+        if not self.dash_input or len(m.data) != 2:
+            if len(m.data) == 2 and any(m.data):
+                self.get_logger().warn('dash PWM ignored: dash_input is false', throttle_duration_sec=5.0)
+            return
+        l, r = (max(-self.max_pwm, min(self.max_pwm, int(v))) for v in m.data)
+        now = self.get_clock().now()
+        self.dash = (l, r, now)
+        t = now.nanoseconds * 1e-9
+        if t - self.dash_written >= self.dash_min_dt or (l, r) == (0, 0):
+            self.dash_written = t
+            self.send_dash(l, r)
+
+    def dash_fresh(self):
+        return self.dash is not None and \
+            (self.get_clock().now() - self.dash[2]).nanoseconds * 1e-9 <= self.cmd_timeout
+
+    def send_dash(self, l, r):
+        sl, sr = self.to_sent(l, r)
+        self.dir_l, self.dir_r = (l > 0) - (l < 0), (r > 0) - (r < 0)
+        self.cur_l, self.cur_r = float(sl), float(sr)      # the normal ramp continues from here after the dash
+        self.write(f'STBY,0,1\nM,0,{sl}\nM,1,{sl}\nM,2,{sr}\nM,3,{sr}\n')
+        self.pwm_pub.publish(Int32MultiArray(data=[l, r]))
 
     def on_speed_scale(self, m):
         self.speed_scale = max(0.5, min(2.0, float(m.data)))
@@ -411,6 +447,9 @@ class MotorBridge(Node):
 
     def tick(self):
         self.update_surface()
+        if self.dash_input and self.dash_fresh():       # dash has top priority; resend keeps the watchdog fed
+            self.send_dash(self.dash[0], self.dash[1])
+            return
         now = self.get_clock().now()
         age = (now - self.last_cmd).nanoseconds * 1e-9
         if self.pwm_test is not None and self.allow_pwm_test and \

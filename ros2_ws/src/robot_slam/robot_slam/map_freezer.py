@@ -46,6 +46,25 @@ def _label(mask):
         return lab, n
 
 
+def merge_frozen(frozen, f_origin, live, l_origin, resolution):
+    """Live-map geometry, frozen values wherever the frozen map KNOWS the cell (!= -1). So areas phase 1 never mapped
+    (outside the frozen bounds, or unknown in it) still come in from the live map: without this a short mapping run
+    left mission goals 'outside bounds' for the whole mission (sim, 26 Oct). Same resolution assumed."""
+    out = live.copy()
+    dc = int(round((f_origin[0] - l_origin[0]) / resolution))       # frozen (0, 0) cell inside the live grid
+    dr = int(round((f_origin[1] - l_origin[1]) / resolution))
+    fh, fw = frozen.shape
+    lh, lw = live.shape
+    r0, c0 = max(0, dr), max(0, dc)
+    r1, c1 = min(lh, dr + fh), min(lw, dc + fw)
+    if r1 <= r0 or c1 <= c0:
+        return out
+    f = frozen[r0 - dr:r1 - dr, c0 - dc:c1 - dc]
+    known = f != -1
+    out[r0:r1, c0:c1][known] = f[known]
+    return out
+
+
 def remove_free_standing_blobs(data, resolution, blob_max_m=0.45, gap_m=0.15, occupied=65):
     """data: 2D int8/int16 occupancy (-1 unknown, 0..100). Returns (cleaned copy, number of blobs removed).
     A blob = occupied component with bbox <= blob_max_m in both axes that has no cell of a BIGGER component within
@@ -85,6 +104,8 @@ class MapFreezer(Node):
         self.clean = bool(p('clean_blobs', True).value)
         self.frozen = False
         self.last = None
+        self.live = None
+        self.frozen_grid, self.frozen_origin = None, None
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
         self.pub = self.create_publisher(OccupancyGrid, '/map_nav', latched)
@@ -99,6 +120,8 @@ class MapFreezer(Node):
         if not self.frozen:
             self.last = m
             self.pub.publish(m)
+        else:
+            self.live = m                         # merged in at the next republish (areas phase 1 never saw)
 
     def on_state(self, m):
         if m.data and m.data != 'WAIT_START':
@@ -118,14 +141,29 @@ class MapFreezer(Node):
             cleaned, removed = remove_free_standing_blobs(grid, m.info.resolution, self.blob_max, self.blob_gap,
                                                           self.occupied)
             m.data = cleaned.astype(np.int8).ravel().tolist()
+        m = self.last
+        self.frozen_grid = np.asarray(m.data, dtype=np.int16).reshape(m.info.height, m.info.width)
+        self.frozen_origin = (m.info.origin.position.x, m.info.origin.position.y)
         self.republish()
         self.get_logger().info(f'mission started: /map_nav frozen, {removed} free-standing blob(s) removed '
                                f'(workers/cylinders from the scan; live ones come from the lidar)')
 
     def republish(self):
-        if self.frozen and self.last is not None:
-            self.last.header.stamp = self.get_clock().now().to_msg()
-            self.pub.publish(self.last)
+        if not self.frozen or self.last is None:
+            return
+        live = self.live
+        if live is not None and abs(live.info.resolution - self.last.info.resolution) < 1e-6:
+            self.live = None
+            lg = np.asarray(live.data, dtype=np.int16).reshape(live.info.height, live.info.width)
+            merged = merge_frozen(self.frozen_grid, self.frozen_origin, lg,
+                                  (live.info.origin.position.x, live.info.origin.position.y), live.info.resolution)
+            out = OccupancyGrid()
+            out.header.frame_id = live.header.frame_id
+            out.info = live.info
+            out.data = merged.astype(np.int8).ravel().tolist()
+            self.last = out
+        self.last.header.stamp = self.get_clock().now().to_msg()
+        self.pub.publish(self.last)
 
 
 def main():

@@ -34,6 +34,23 @@ def test_long_interior_wall_is_kept():
     assert n == 0 and (out[30, 10:50] == 100).all()
 
 
+def test_merge_keeps_frozen_known_cells_and_adds_new_area():
+    frozen = np.full((4, 4), -1, dtype=np.int16)
+    frozen[1:3, 1:3] = 0                               # known free square
+    frozen[1, 1] = 100                                 # a wall it saw
+    live = np.zeros((6, 8), dtype=np.int16)            # bigger live map, origin 1 cell left/below
+    live[2, 2] = 100                                   # a worker the live map now marks on a frozen FREE cell
+    live[5, 7] = 100                                   # new wall far outside the frozen bounds
+    out = mf.merge_frozen(frozen, (0.0, 0.0), live, (-0.05, -0.05), 0.05)
+    assert out.shape == live.shape
+    assert out[2, 2] == 100                            # frozen (1,1) wall -> live (2,2): frozen value kept
+    assert out[3, 3] == 0                              # frozen free cell wins over anything live
+    assert out[5, 7] == 100                            # new area comes from the live map
+    live2 = live.copy()
+    live2[3, 3] = 100                                  # worker on a cell the frozen map knows as free
+    assert mf.merge_frozen(frozen, (0.0, 0.0), live2, (-0.05, -0.05), 0.05)[3, 3] == 0
+
+
 def test_two_workers_and_unknown_cells():
     g = room()
     g[10:15, 10:15] = 100

@@ -36,6 +36,17 @@ class FakePico(Node):
         self.zone = list(p('slow_zone', [-1.0, -1.0, -1.0, -1.0]).value)   # world x0 y0 x1 y1 (sim frame)
         self.slow = float(p('slow_factor', 0.6).value)
         self.invert_linear = bool(p('invert_linear', True).value)
+        # ramp-dash disturbances (final stack): per-side efficiency = 1 + bias + slow random walk (std side_noise),
+        # e.g. one side slipping on gravel; bog_zone [x0 y0 x1 y1]: no forward progress there for the first
+        # bog_times entries (dirt bog-down), released once the robot has backed out of it
+        self.side_bias = float(p('side_bias', 0.0).value)
+        self.side_noise = float(p('side_noise', 0.0).value)
+        self.bog_zone = list(p('bog_zone', [-1.0, -1.0, -1.0, -1.0]).value)
+        self.bog_times = int(p('bog_times', 0).value)
+        self.bog_count, self.in_bog = 0, False
+        self.walk = [0.0, 0.0]
+        import random
+        self.rng = random.Random(int(p('seed', 1).value))
         self.master, slave = pty.openpty()
         tty.setraw(self.master)
         os.set_blocking(self.master, False)
@@ -120,6 +131,18 @@ class FakePico(Node):
         else:
             pl, pr = sl, sr
         vl, vr = self.wheel(pl, self.db_l), self.wheel(pr, self.db_r)
+        if self.side_noise or self.side_bias:
+            for i in (0, 1):
+                self.walk[i] = 0.98 * self.walk[i] + self.rng.gauss(0.0, self.side_noise)
+            vl *= max(0.0, 1.0 - self.side_bias / 2 + self.walk[0])
+            vr *= max(0.0, 1.0 + self.side_bias / 2 + self.walk[1])
+        x0, y0, x1, y1 = self.bog_zone
+        inside = bool(self.xy) and x0 <= self.xy[0] <= x1 and y0 <= self.xy[1] <= y1
+        if inside and self.bog_count < self.bog_times and (vl + vr) > 0:
+            self.in_bog = True
+            vl = vr = 0.0                                # wheels spin, the robot does not climb
+        elif self.in_bog and not inside:
+            self.in_bog, self.bog_count = False, self.bog_count + 1
         t = Twist()
         t.linear.x = (vl + vr) / 2.0
         t.angular.z = (vr - vl) / self.track

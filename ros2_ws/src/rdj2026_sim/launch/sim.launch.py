@@ -14,6 +14,7 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess, SetEnvironment
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 HARMONIC = os.environ.get('ROS_DISTRO', 'humble') != 'humble'
@@ -86,9 +87,18 @@ def generate_launch_description():
              condition=IfCondition(LaunchConfiguration('hardware')),
              parameters=[{'config_file': for_distro(os.path.join(pkg, 'config', 'bridge_noisy_odom.yaml'), True),
                           'use_sim_time': True}], output='screen'),
+        DeclareLaunchArgument('pico_side_noise', default_value='0.0', description='ramp-dash test: per-side slip noise'),
+        DeclareLaunchArgument('pico_side_bias', default_value='0.0', description='ramp-dash test: right-left efficiency'),
+        DeclareLaunchArgument('pico_bog_zone', default_value='-1,-1,-1,-1', description='x0,y0,x1,y1 (world)'),
+        DeclareLaunchArgument('pico_bog_times', default_value='0'),
         Node(package='rdj2026_sim', executable='fake_pico.py', name='fake_pico', output='screen',
              condition=IfCondition(LaunchConfiguration('hardware')),
-             parameters=[{'use_sim_time': True, 'slow_zone': [6.0, 1.3, 6.71, 2.4]}]),   # right corridor, map x 1-2.1
+             parameters=[{'use_sim_time': True, 'slow_zone': [6.0, 1.3, 6.71, 2.4],   # right corridor, map x 1-2.1
+                          'side_noise': ParameterValue(LaunchConfiguration('pico_side_noise'), value_type=float),
+                          'side_bias': ParameterValue(LaunchConfiguration('pico_side_bias'), value_type=float),
+                          'bog_zone': PythonExpression(["[float(v) for v in '", LaunchConfiguration('pico_bog_zone'),
+                                                        "'.split(',')]"]),
+                          'bog_times': ParameterValue(LaunchConfiguration('pico_bog_times'), value_type=int)}]),
         TimerAction(period=2.0, actions=[Node(
             package='motor_teleop', executable='motor_bridge', name='motor_bridge', output='screen',
             condition=IfCondition(LaunchConfiguration('hardware')),

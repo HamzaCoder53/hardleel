@@ -55,6 +55,10 @@ competition_mission:
     mission_speed: 0.30        # Nav2 /speed_limit, m/s
     terrain_speed: 0.15
     terrain_surface: ''        # e.g. SAND, published on /surface_override during TERRAIN; '' = off
+    ramp_dash: false           # NEW, off: the Pi's ramp_dash node climbs the dirt ramp (pi_bringup ramp_dash:=true)
+    ramp_dash_after: terrain_3 # foot of the ramp, facing up the strip
+    ramp_dash_skip: [terrain_4]
+    ramp_dash_timeout_s: 30.0
     cmd_vel_topic: /cmd_vel
     log_dir: ~/logs
     collision_monitor: /collision_monitor   # switched from the mapping stop box to the mission one at start-up

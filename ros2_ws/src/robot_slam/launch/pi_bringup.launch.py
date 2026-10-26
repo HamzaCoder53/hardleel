@@ -15,7 +15,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -41,6 +41,10 @@ def generate_launch_description():
         DeclareLaunchArgument('drop', default_value='true'),
         DeclareLaunchArgument('yaw_feedback', default_value='false'),   # NEW, off: gyro turn-rate loop in motor_bridge
         DeclareLaunchArgument('record', default_value='false'),         # NEW, off: run_recorder role pi (~/runs/run_*)
+        DeclareLaunchArgument('camera_v2', default_value='false'),      # NEW, off: pi_cam/camera_node.py (video+stills)
+        DeclareLaunchArgument('ramp_dash', default_value='false'),      # NEW, off: ramp_dash node + bridge dash_input
+        DeclareLaunchArgument('video_width', default_value='1920'),     # 1280 x 720 if the soak test shows heat
+        DeclareLaunchArgument('video_height', default_value='1080'),
 
         Node(package='robot_slam', executable='imu_serial_node', name='imu_serial_node', output='screen',
              parameters=[{'port': L('imu_port'), 'frame_id': 'imu_link', 'gyro_calib_s': 3.0}]),
@@ -52,12 +56,25 @@ def generate_launch_description():
         Node(package='motor_teleop', executable='motor_bridge', name='motor_bridge', output='screen',
              condition=IfCondition(L('motors')),
              parameters=[{'port': L('pico_port'), 'send_rate': 10.0, 'max_pwm': 255, 'cmd_timeout': L('cmd_timeout'),
-                          'yaw_feedback': ParameterValue(L('yaw_feedback'), value_type=bool)}]),
+                          'yaw_feedback': ParameterValue(L('yaw_feedback'), value_type=bool),
+                          'dash_input': ParameterValue(L('ramp_dash'), value_type=bool)}]),
+        # final stack item 5: the dash controller runs HERE on the Pi (control loop never crosses Wi-Fi)
+        Node(package='robot_slam', executable='ramp_dash', name='ramp_dash', output='screen',
+             condition=IfCondition(L('ramp_dash')), parameters=[os.path.join(cfg, 'ramp_dash.yaml')]),
         ExecuteProcess(
             cmd=['python3', os.path.expanduser('~/pi_cam/pi_cam_node.py'), '--ros-args',
                  '-p', ['fps:=', L('camera_fps')], '-p', ['width:=', L('camera_width')],
                  '-p', ['height:=', L('camera_height')], '-p', ['rotate_deg:=', L('camera_rotate_deg')]],
-            condition=IfCondition(L('camera')), output='screen'),
+            condition=IfCondition(PythonExpression(["'", L('camera'), "' == 'true' and '", L('camera_v2'),
+                                                    "' != 'true'"])), output='screen'),
+        # final stack item 3 (OFF): 1080p30 hardware H.264 video + the same lores stream + stills + frame times
+        ExecuteProcess(
+            cmd=['python3', os.path.expanduser('~/pi_cam/camera_node.py'), '--ros-args',
+                 '-p', ['lores_fps:=', L('camera_fps')], '-p', ['lores_width:=', L('camera_width')],
+                 '-p', ['lores_height:=', L('camera_height')], '-p', ['rotate_deg:=', L('camera_rotate_deg')],
+                 '-p', ['width:=', L('video_width')], '-p', ['height:=', L('video_height')]],
+            condition=IfCondition(PythonExpression(["'", L('camera'), "' == 'true' and '", L('camera_v2'),
+                                                    "' == 'true'"])), output='screen'),
         Node(package='robot_slam', executable='drop_servo_node', name='drop_servo', output='screen',
              condition=IfCondition(L('drop')), parameters=[os.path.join(cfg, 'drop_servo.yaml')]),
         # final stack: Pi-side recording (lowest priority; stops itself on heat / throttling / < 3 GB disk)

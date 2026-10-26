@@ -120,6 +120,10 @@ class CompetitionMission(Node):
         p('mission_speed', 0.30)
         p('terrain_speed', 0.15)
         p('terrain_surface', '')
+        p('ramp_dash', False)                      # NEW, off: Pi ramp_dash node climbs the dirt ramp (final item 5)
+        p('ramp_dash_after', 'terrain_3')          # waypoint at the foot of the ramp (facing up the strip)
+        p('ramp_dash_skip', ['terrain_4'])         # waypoints the dash replaces when it succeeds
+        p('ramp_dash_timeout_s', 30.0)
         p('cmd_vel_topic', '/cmd_vel')
         p('log_dir', '~/logs')
         p('collision_monitor', '/collision_monitor')   # node whose stop box is switched to the mission one
@@ -573,9 +577,44 @@ class CompetitionMission(Node):
     def do_terrain(self):
         self.set_speed(self.g('terrain_speed'))
         self.set_surface(str(self.g('terrain_surface')))
-        r = self.run_names(self.seqs.get('terrain', []))
+        names = list(self.seqs.get('terrain', []))
+        if self.g('ramp_dash') and str(self.g('ramp_dash_after')) in names:
+            k = names.index(str(self.g('ramp_dash_after')))
+            results = [self.run_names(names[:k + 1])]
+            dash = self.ramp_dash()
+            skip = set(self.g('ramp_dash_skip')) if dash.get('ok') else set()
+            rest = [n for n in names[k + 1:] if n not in skip]       # dash failed: Nav2 drives the rest as before
+            results.append(self.run_names(rest) if rest else 'ok')
+            r = 'ok' if all(x == 'ok' for x in results) and dash.get('ok') else 'partial'
+        else:
+            r = self.run_names(names)
         self.event('terrain_complete', result=r)
         return r
+
+    def ramp_dash(self):
+        """Hand the robot to the Pi's ramp_dash node; wait for /ramp_dash/result. Nav2 is idle meanwhile (no goal
+        active), and the dash drives the motors directly at top priority."""
+        if not hasattr(self, 'dash_pub'):
+            self.dash_pub = self.create_publisher(String, '/ramp_dash/start', 10)
+            self.dash_abort = self.create_publisher(Empty, '/ramp_dash/abort', 10)
+            self.create_subscription(String, '/ramp_dash/result',
+                                     lambda m: setattr(self, 'dash_result', json.loads(m.data)), 10)
+        self.dash_result = None
+        self.stop_robot()
+        self.log_row('RAMP_DASH', 'start')
+        for _ in range(3):                                           # same lesson as /mission/start
+            self.dash_pub.publish(String(data=''))
+            self.pause(0.1)
+        try:
+            got = self.wait(lambda: self.dash_result is not None, float(self.g('ramp_dash_timeout_s')))
+        except (DeadlineHit, SkipToDeposit):
+            self.dash_abort.publish(Empty())
+            raise
+        if not got:
+            self.dash_abort.publish(Empty())
+            self.dash_result = {'ok': False, 'reason': 'timeout (no result from the Pi)'}
+        self.event('ramp_dash', **self.dash_result)
+        return self.dash_result
 
     def do_obstacles(self):
         self.set_speed(self.g('mission_speed'))
