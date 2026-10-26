@@ -50,9 +50,16 @@ void writeSide(int rpwmPin, int lpwmPin, int speed) {
     ledcWrite(rpwmPin, 0);
     ledcWrite(lpwmPin, -speed);
   } else {
-    ledcWrite(rpwmPin, 0);   // both low = brake
+    ledcWrite(rpwmPin, 0);   // both low = brake while EN is high; coasting is done with EN (see updateEnable)
     ledcWrite(lpwmPin, 0);
   }
+}
+
+// COAST at zero (team, 26 Oct): both BTS7960 boards share EN_PIN, so when BOTH sides are at 0 the drivers are
+// disabled (outputs float, motors spin freely) instead of shorting the motors to ground (brake). When either side
+// is driving, EN is high (a side at 0 then brakes - one EN wire cannot coast one side alone).
+void updateEnable() {
+  digitalWrite(EN_PIN, (currentL != 0 || currentR != 0) ? HIGH : LOW);
 }
 
 void setServos(int angle) {
@@ -143,7 +150,7 @@ void setup() {
   setServos(90);
 
   delay(500);
-  digitalWrite(EN_PIN, HIGH);  // drivers on, motors held at stop
+  updateEnable();              // both sides at 0: drivers stay disabled (coast) until a motor command arrives
   Serial.println("Motor test ready");
   printHelp();
 }
@@ -171,5 +178,6 @@ void loop() {
     currentR = stepToward(currentR, targetR);
     writeSide(L_RPWM, L_LPWM, LEFT_INVERT ? -currentL : currentL);
     writeSide(R_RPWM, R_LPWM, RIGHT_INVERT ? -currentR : currentR);
+    updateEnable();
   }
 }
