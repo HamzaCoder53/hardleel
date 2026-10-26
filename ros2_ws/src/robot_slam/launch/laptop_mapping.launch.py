@@ -10,7 +10,7 @@ at the start pose.
     ros2 bag record (mcap) of scans, IMU, TF, commands -> ~/hardleel_bags (record_bag:=false to skip)
 
     ros2 launch robot_slam laptop_mapping.launch.py [rviz:=true] [sim:=false]
-        [loc_v2:=true | scan_gate:= imu_bias:= wall_heading:= carto_odom:= carto_stationary:= loc_monitor:=]
+        [loc_v2:=true | imu_bias:= wall_heading:= carto_odom:= carto_stationary:= loc_monitor:=]
         (final-stack localization, all OFF by default; loc_apply_corrections:=true lets loc_monitor relocalize)
     Save the map at the end of phase 1: scripts/laptop/save_map.sh <name>
 """

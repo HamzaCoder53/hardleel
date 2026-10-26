@@ -94,7 +94,9 @@ def imu_and_prep(imu_port):
 
 
 # Final-stack localization switches (all OFF by default; laptop launch args of the same name, loc_v2:=true = all).
-LOC_SWITCHES = ('scan_gate', 'imu_bias', 'wall_heading', 'carto_odom', 'carto_stationary', 'loc_monitor', 'ekf')
+# scan_gate REMOVED (26 Oct): its accel tilt check blocked 73-84 % of scans and Cartographer's pose ran away
+# (docs/mapping_diagnosis_20261026.md). Cartographer always gets every /scan_filtered scan.
+LOC_SWITCHES = ('imu_bias', 'wall_heading', 'carto_odom', 'carto_stationary', 'loc_monitor', 'ekf')
 
 
 def loc_options(context):
@@ -117,6 +119,8 @@ def loc_launch_args():
               for k in LOC_SWITCHES if k != 'ekf'],
             DeclareLaunchArgument('ekf', default_value='true',   # team 26 Oct: use the EKF; ekf:=false = old setup
                                   description='rf2o + gyro EKF owns odom -> base_link, Cartographer map -> odom'),
+            DeclareLaunchArgument('scan_gate', default_value='false',
+                                  description='REMOVED 26 Oct, ignored (kept so old commands still start)'),
             DeclareLaunchArgument('loc_apply_corrections', default_value='false',
                                   description='NEW, off: loc_monitor relocalizes Cartographer (else it only logs)'),
             DeclareLaunchArgument('laser_filter', default_value='false',
@@ -162,7 +166,7 @@ def cartographer(localization=False, pbstream='', use_sim_time=False, initial_po
     if localization:
         args += ['-load_state_filename', pbstream, '-load_frozen_state=true',
                  '-start_trajectory_with_default_topics=false']
-    remaps = [('scan', '/scan_mapping' if opts.get('scan_gate') else '/scan_filtered'),
+    remaps = [('scan', '/scan_filtered'),
               # raw (boot-bias-corrected) gyro + accel: Cartographer never used the Madgwick orientation, and the
               # team dropped Madgwick on 26 Oct
               ('imu', '/imu/data_v2' if opts.get('imu_bias') else '/imu/data_raw')]
@@ -199,9 +203,6 @@ def loc_v2(opts, use_sim_time=False, localization=False):
     cfg = os.path.join(pkg_share(), 'config')
     sim = {'use_sim_time': use_sim_time}
     nodes = []
-    if opts.get('scan_gate'):
-        nodes.append(Node(package='robot_slam', executable='scan_gate', name='scan_gate', output='screen',
-                          parameters=[sim]))
     if opts.get('imu_bias'):
         nodes += [Node(package='robot_slam', executable='imu_bias', name='imu_bias', output='screen', parameters=[sim]),
                   Node(package='imu_filter_madgwick', executable='imu_filter_madgwick_node', name='imu_madgwick_v2',
