@@ -154,7 +154,9 @@ def cartographer(localization=False, pbstream='', use_sim_time=False, initial_po
         args += ['-load_state_filename', pbstream, '-load_frozen_state=true',
                  '-start_trajectory_with_default_topics=false']
     remaps = [('scan', '/scan_mapping' if opts.get('scan_gate') else '/scan_filtered'),
-              ('imu', '/imu/data_v2' if opts.get('imu_bias') else '/imu/data')]
+              # raw (boot-bias-corrected) gyro + accel: Cartographer never used the Madgwick orientation, and the
+              # team dropped Madgwick on 26 Oct
+              ('imu', '/imu/data_v2' if opts.get('imu_bias') else '/imu/data_raw')]
     if opts.get('carto_odom'):
         remaps.append(('odom', '/odom_loc'))
     nodes = [

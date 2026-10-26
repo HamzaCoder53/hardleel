@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """scan_gate: the scans Cartographer may use. /scan_filtered -> /scan_mapping, BLOCKED while
   - the robot is inside a ramp zone (course_geometry.yaml ramp_zones, pose from TF map -> base_link),
-  - |pitch| or |roll| (relative to the boot pose, /imu/data) exceeds tilt_deg (3),
+  - |pitch| or |roll| (relative to the boot pose; tilt_source 'accel' = low-passed /imu/data_raw gravity vector,
+    'orientation' = /imu/data Madgwick quaternion) exceeds tilt_deg (3),
   - |yaw rate| (/imu/data_raw gyro z) exceeds max_yaw_rate_dps (turning: motion-blurred scans).
 It opens again only after settle_s (0.5) of level and steady. Nav2, the collision monitor and the ramp dash keep
 the raw scans. /scan_gate/state (String): 'open' or 'blocked:<reason>' on every change (logged).
@@ -24,6 +25,11 @@ def rp_from_quat(q):
     roll = math.atan2(2.0 * (q.w * q.x + q.y * q.z), 1.0 - 2.0 * (q.x * q.x + q.y * q.y))
     pitch = math.asin(max(-1.0, min(1.0, 2.0 * (q.w * q.y - q.z * q.x))))
     return roll, pitch
+
+
+def rp_from_accel(ax, ay, az):
+    """Roll/pitch (rad, REP-103 like rp_from_quat) from the gravity vector of a still or slowly moving IMU."""
+    return math.atan2(ay, az), math.atan2(-ax, math.sqrt(ay * ay + az * az))
 
 
 class GateLogic:
@@ -66,6 +72,12 @@ class ScanGate(Node):
             geo = os.path.join(get_package_share_directory('robot_slam'), 'config', 'course_geometry.yaml')
         self.zones = yaml.safe_load(open(geo)).get('ramp_zones', []) if bool(p('use_ramp_zones', True)) else []
         self.boot_n = int(p('boot_samples', 50))
+        # 'accel': tilt from the low-passed /imu/data_raw gravity vector (no Madgwick; team 26 Oct: its orientation
+        # drifted). 'orientation': the old /imu/data (Madgwick) quaternion.
+        self.tilt_source = str(p('tilt_source', 'accel'))
+        self.acc_tau = float(p('accel_tau_s', 0.3))   # low-pass time constant: ignores vibration and short bumps
+        self.acc_lp = None
+        self.acc_t = None
         self.logic = GateLogic(float(p('settle_s', 0.5)))
         self.boot, self.rp0 = [], None
         self.roll = self.pitch = 0.0
@@ -75,7 +87,8 @@ class ScanGate(Node):
         TransformListener(self.tf, self)
         self.pub = self.create_publisher(LaserScan, str(p('out_topic', '/scan_mapping')), qos_profile_sensor_data)
         self.state_pub = self.create_publisher(String, '/scan_gate/state', 10)
-        self.create_subscription(Imu, '/imu/data', self.on_imu, qos_profile_sensor_data)
+        if self.tilt_source == 'orientation':
+            self.create_subscription(Imu, '/imu/data', self.on_imu, qos_profile_sensor_data)
         self.create_subscription(Imu, '/imu/data_raw', self.on_raw, qos_profile_sensor_data)
         self.create_subscription(LaserScan, str(p('in_topic', '/scan_filtered')), self.on_scan, qos_profile_sensor_data)
         self.n_pass = self.n_block = 0
@@ -84,7 +97,9 @@ class ScanGate(Node):
     def on_imu(self, m):
         if m.orientation_covariance[0] < 0:
             return
-        r, pch = rp_from_quat(m.orientation)
+        self.feed_tilt(*rp_from_quat(m.orientation))
+
+    def feed_tilt(self, r, pch):
         if self.rp0 is None:
             self.boot.append((r, pch))
             if len(self.boot) >= self.boot_n:
@@ -94,6 +109,17 @@ class ScanGate(Node):
 
     def on_raw(self, m):
         self.yaw_rate = m.angular_velocity.z
+        if self.tilt_source == 'orientation':
+            return
+        a = m.linear_acceleration
+        t = self.get_clock().now().nanoseconds * 1e-9
+        if self.acc_lp is None:
+            self.acc_lp = [a.x, a.y, a.z]
+        else:
+            k = min(1.0, max(0.0, t - self.acc_t) / self.acc_tau) if self.acc_tau > 0 else 1.0
+            self.acc_lp = [lp + k * (v - lp) for lp, v in zip(self.acc_lp, (a.x, a.y, a.z))]
+        self.acc_t = t
+        self.feed_tilt(*rp_from_accel(*self.acc_lp))
 
     def reason(self):
         if self.rp0 is None:

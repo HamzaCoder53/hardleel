@@ -45,6 +45,7 @@ def generate_launch_description():
             '/dev/serial/by-id/*Raspberry_Pi_Pico*',
         ], '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0')),
         DeclareLaunchArgument('cmd_timeout', default_value='0.3'),
+        DeclareLaunchArgument('madgwick', default_value='false'),     # /imu/data orientation filter, off since 26 Oct
         DeclareLaunchArgument('camera', default_value='true'),
         DeclareLaunchArgument('camera_fps', default_value='5.0'),
         DeclareLaunchArgument('camera_width', default_value='320'),
@@ -61,7 +62,9 @@ def generate_launch_description():
 
         Node(package='robot_slam', executable='imu_serial_node', name='imu_serial_node', output='screen',
              parameters=[{'port': L('imu_port'), 'frame_id': 'imu_link', 'gyro_calib_s': 3.0}]),
+        # Madgwick OFF by default (team 26 Oct: its orientation drifted; Cartographer and scan_gate use /imu/data_raw)
         Node(package='imu_filter_madgwick', executable='imu_filter_madgwick_node', name='imu_filter_madgwick_node',
+             condition=IfCondition(L('madgwick')),
              output='screen', parameters=[{'use_mag': False, 'publish_tf': False, 'world_frame': 'enu', 'gain': 0.02}],
              remappings=[('imu/data_raw', '/imu/data_raw'), ('imu/data', '/imu/data')]),
         # send_rate 10 Hz: 50 Hz used 70 % of a Pi core. The bridge checks the command age every tick, so the
