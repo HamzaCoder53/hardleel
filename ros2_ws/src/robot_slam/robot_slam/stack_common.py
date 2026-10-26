@@ -94,7 +94,7 @@ def imu_and_prep(imu_port):
 
 
 # Final-stack localization switches (all OFF by default; laptop launch args of the same name, loc_v2:=true = all).
-LOC_SWITCHES = ('scan_gate', 'imu_bias', 'wall_heading', 'carto_odom', 'carto_stationary', 'loc_monitor')
+LOC_SWITCHES = ('scan_gate', 'imu_bias', 'wall_heading', 'carto_odom', 'carto_stationary', 'loc_monitor', 'ekf')
 
 
 def loc_options(context):
@@ -104,7 +104,7 @@ def loc_options(context):
     allv2 = on('loc_v2')
     # carto_odom is NOT part of loc_v2: Cartographer waits for /odom_loc, the EKF for rf2o, and rf2o for the odom
     # frame only Cartographer publishes -> nothing starts (sim 26 Oct). Separate switch until that loop is broken.
-    opts = {k: (allv2 and k != 'carto_odom') or on(k) for k in LOC_SWITCHES}
+    opts = {k: (allv2 and k not in ('carto_odom', 'ekf')) or on(k) for k in LOC_SWITCHES}
     opts['apply_corrections'] = on('loc_apply_corrections')
     opts['laser_filter'] = on('laser_filter')
     return opts
@@ -114,7 +114,9 @@ def loc_launch_args():
     from launch.actions import DeclareLaunchArgument
     return [DeclareLaunchArgument('loc_v2', default_value='false', description='NEW, off: all localization v2 parts'),
             *[DeclareLaunchArgument(k, default_value='false', description='NEW, off (final stack item 1)')
-              for k in LOC_SWITCHES],
+              for k in LOC_SWITCHES if k != 'ekf'],
+            DeclareLaunchArgument('ekf', default_value='true',   # team 26 Oct: use the EKF; ekf:=false = old setup
+                                  description='rf2o + gyro EKF owns odom -> base_link, Cartographer map -> odom'),
             DeclareLaunchArgument('loc_apply_corrections', default_value='false',
                                   description='NEW, off: loc_monitor relocalizes Cartographer (else it only logs)'),
             DeclareLaunchArgument('laser_filter', default_value='false',
@@ -124,7 +126,7 @@ def loc_launch_args():
 def carto_config_dir(opts):
     """Config dir for Cartographer: the package's, or a temp copy with the v2 changes patched in."""
     cfg = os.path.join(pkg_share(), 'config')
-    if not opts or not (opts.get('carto_odom') or opts.get('carto_stationary')):
+    if not opts or not (opts.get('carto_odom') or opts.get('carto_stationary') or opts.get('ekf')):
         return cfg
     import shutil
     import tempfile
@@ -138,6 +140,13 @@ def carto_config_dir(opts):
     if opts.get('carto_stationary'):                 # still scans inserted during stops (checkpoints, turns)
         text = text.replace('motion_filter.max_time_seconds = 2.0', 'motion_filter.max_time_seconds = 1.0')
     open(path, 'w').write(text)
+    if opts.get('ekf'):                              # EKF owns odom -> base_link, Cartographer only map -> odom
+        for f in ('cartographer_2d.lua', 'cartographer_2d_localization.lua'):
+            p = os.path.join(out, f)
+            t = open(p).read()
+            t = t.replace('published_frame = "base_link",', 'published_frame = "odom",')
+            t = t.replace('provide_odom_frame = true,', 'provide_odom_frame = false,')
+            open(p, 'w').write(t)
     return out
 
 
@@ -210,6 +219,15 @@ def loc_v2(opts, use_sim_time=False, localization=False):
                  parameters=[os.path.join(cfg, 'ekf_nav_v2.yaml'),
                              {'imu0': '/imu/data_raw_unbiased' if opts.get('imu_bias') else '/imu/data_raw', **sim}],
                  remappings=[('odometry/filtered', '/odom_loc')])]
+    if opts.get('ekf'):                              # mapping EKF (team 26 Oct): rf2o + gyro -> odom -> base_link TF
+        nodes += [
+            Node(package='rf2o_laser_odometry', executable='rf2o_laser_odometry_node', name='rf2o_ekf', output='log',
+                 parameters=[{'laser_scan_topic': '/scan_filtered', 'odom_topic': '/odom_rf2o_ekf', 'publish_tf': False,
+                              'base_frame_id': 'base_link', 'odom_frame_id': 'odom', 'init_pose_from_topic': '',
+                              'freq': 10.0, **sim}]),
+            Node(package='robot_localization', executable='ekf_node', name='ekf_mapping', output='log',
+                 parameters=[os.path.join(cfg, 'ekf_mapping.yaml'), sim],
+                 remappings=[('odometry/filtered', '/odom_ekf')])]
     if opts.get('wall_heading'):
         nodes.append(Node(package='robot_slam', executable='wall_heading', name='wall_heading', output='screen',
                           parameters=[{'odom_topic': '/odom_loc', **sim}]))

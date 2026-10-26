@@ -1,0 +1,31 @@
+# EKF for mapping (switch `ekf`, team 26 Oct): rf2o lidar odometry (forward speed + yaw rate) + raw gyro yaw rate.
+# Publishes odom -> base_link; Cartographer then publishes only map -> odom (provide_odom_frame false).
+ekf_mapping:             # = the node name in stack_common.loc_v2
+  ros__parameters:
+    frequency: 30.0
+    sensor_timeout: 0.3
+    two_d_mode: true
+    publish_tf: true
+    print_diagnostics: false
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # Order: x y z, roll pitch yaw, vx vy vz, vroll vpitch vyaw, ax ay az
+    odom0: /odom_rf2o_ekf
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 10
+
+    imu0: /imu/data_raw
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_queue_size: 20
+    imu0_remove_gravitational_acceleration: false
