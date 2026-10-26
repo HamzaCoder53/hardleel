@@ -30,6 +30,8 @@ const int  RAMP_STEP    = 5;      // duty change per ramp tick
 const unsigned long RAMP_INTERVAL_MS = 5;    // 0 to full speed in about 0.25 s
 const unsigned long DEFAULT_RUN_MS   = 1000;
 
+const char*    FW_VERSION = "motor_code coast-at-zero 2026-10-26";  // printed at boot and by 'h'
+
 const uint32_t MOTOR_FREQ = 20000;  // 20 kHz
 const uint8_t  MOTOR_RES  = 8;      // duty 0-255
 const uint32_t SERVO_FREQ = 50;     // standard 20 ms servo frame
@@ -77,6 +79,7 @@ int stepToward(int current, int target) {
 }
 
 void printHelp() {
+  Serial.println(FW_VERSION);
   Serial.println("Commands:");
   Serial.println("  m <left> <right> [ms]  speeds -255..255, run time in ms (default 1000, 0 = until stopped)");
   Serial.println("  s <angle>              both servos to 0-180 degrees");

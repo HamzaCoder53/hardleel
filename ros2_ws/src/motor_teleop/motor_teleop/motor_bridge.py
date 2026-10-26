@@ -56,7 +56,7 @@ class MotorBridge(Node):
         # which ESP32 sketch is flashed: motor_code = the team's firmware/esp32_motor_code/motor_code.ino (26 Oct,
         # lowercase m/s/x, timed runs); bridge = firmware/esp32_pi_bridge (M/S/X/P + 500 ms watchdog)
         self.declare_parameter('esp32_protocol', 'motor_code')
-        self.declare_parameter('esp32_hold_ms', 400)   # motor_code: each drive command runs this long (the timeout)
+        self.declare_parameter('esp32_hold_ms', 200)   # motor_code: each drive command runs this long (the timeout); team 26 Oct: 400 overshot turns
         self.declare_parameter('max_speed', 1.0)     # Twist value (m/s) that maps to max_pwm
         self.declare_parameter('turn_gain', 0.5)     # wheel speed per rad/s of angular.z
         self.declare_parameter('max_pwm', 75)        # hard cap, 0..255 (team 26 Oct: 75 on the real robot)
