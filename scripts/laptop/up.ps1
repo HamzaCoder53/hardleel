@@ -32,10 +32,11 @@ Write-Host "  Pi = $PiIp"
 Say "3/6 port proxy -> $PiIp`:7447"
 netsh interface portproxy delete v4tov4 listenport=7447 listenaddress=0.0.0.0 2>$null | Out-Null
 netsh interface portproxy add v4tov4 listenport=7447 listenaddress=0.0.0.0 connectport=7447 connectaddress=$PiIp | Out-Null
-if (-not (Get-NetFirewallRule -DisplayName "hardleel zenoh from WSL" -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName "hardleel zenoh from WSL" -Direction Inbound -Protocol TCP -LocalPort 7447 `
-        -InterfaceAlias "vEthernet (WSL (Hyper-V firewall))" -Action Allow | Out-Null
-}
+# Always recreate the rule: Windows can change the WSL adapter's interface ID (seen 31 Oct 2026, after an update), and an
+# old rule then silently blocks WSL -> 7447 ("NO PUBLISHER" for every Pi topic) while still looking present.
+Get-NetFirewallRule -DisplayName "hardleel zenoh from WSL" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -DisplayName "hardleel zenoh from WSL" -Direction Inbound -Protocol TCP -LocalPort 7447 `
+    -InterfaceAlias "vEthernet (WSL (Hyper-V firewall))" -Action Allow | Out-Null
 if ((Get-Service iphlpsvc).Status -ne "Running") { Start-Service iphlpsvc }
 
 # 4. Pi drivers (zenoh router + lidar + pi_bringup in tmux "hw")
