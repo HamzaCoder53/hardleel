@@ -3,6 +3,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -22,11 +23,14 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('lidar_port', default_value='/dev/ttyUSB0'),
+        # false when lidar_supervisor.sh runs the driver (start_slam.sh does that)
+        DeclareLaunchArgument('use_lidar', default_value='true'),
 
         # LiDAR driver
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(sllidar_pkg, 'launch', 'sllidar_a1_launch.py')),
+            condition=IfCondition(LaunchConfiguration('use_lidar')),
             launch_arguments={
                 'serial_port': LaunchConfiguration('lidar_port'),
                 'serial_baudrate': '115200',
