@@ -1,0 +1,4 @@
+# Recorded rosbags are large; keep the folder, ignore the contents.
+*
+!.gitkeep
+!.gitignore

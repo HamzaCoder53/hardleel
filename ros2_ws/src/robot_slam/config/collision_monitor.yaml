@@ -1,0 +1,77 @@
+# Nav2 collision_monitor, two profiles. The launch file starts the node under one of the names below.
+# Chain: twist_mux -> velocity_smoother (/cmd_vel_smoothed) -> collision_monitor -> /cmd_vel -> motor_bridge.
+#
+# Polygons are circles around base_link (robot radius 0.17 m), so a 0.30 m stop circle stops the robot 13 cm
+# before touching anything in any direction. Invariant: stop radius < inflation radius < ramp standoff
+#   mapping: 0.30 < 0.35 < 0.50      mission: 0.40 < 0.45 < 0.50 (see coverage_mission.yaml)
+# The slowdown circle scales the speed by slowdown_ratio.
+
+collision_monitor_mapping:          # 0.18 m/s
+  ros__parameters:
+    base_frame_id: base_link
+    odom_frame_id: odom
+    cmd_vel_in_topic: cmd_vel_smoothed
+    cmd_vel_out_topic: cmd_vel
+    state_topic: collision_monitor_state
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+    polygons: ["StopZone", "SlowZone"]
+    StopZone:
+      type: circle
+      radius: 0.30
+      action_type: stop
+      min_points: 4
+      visualize: true
+      enabled: true
+    SlowZone:
+      type: circle
+      radius: 0.42
+      action_type: slowdown
+      slowdown_ratio: 0.4
+      min_points: 4
+      visualize: true
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: scan
+      topic: /scan_filtered
+      min_height: 0.0
+      max_height: 2.0
+      enabled: true
+
+collision_monitor_mission:          # 0.30 m/s
+  ros__parameters:
+    base_frame_id: base_link
+    odom_frame_id: odom
+    cmd_vel_in_topic: cmd_vel_smoothed
+    cmd_vel_out_topic: cmd_vel
+    state_topic: collision_monitor_state
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+    polygons: ["StopZone", "SlowZone"]
+    StopZone:
+      type: circle
+      radius: 0.40
+      action_type: stop
+      min_points: 4
+      visualize: true
+      enabled: true
+    SlowZone:
+      type: circle
+      radius: 0.52
+      action_type: slowdown
+      slowdown_ratio: 0.4
+      min_points: 4
+      visualize: true
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: scan
+      topic: /scan_filtered
+      min_height: 0.0
+      max_height: 2.0
+      enabled: true
