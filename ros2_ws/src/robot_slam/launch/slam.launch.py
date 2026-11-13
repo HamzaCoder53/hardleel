@@ -43,6 +43,8 @@ def generate_launch_description():
         static_tf(0.0, 0.0, 0.15, 3.14159, 'base_link', 'laser', 'base_to_laser'),
 
         # odom -> base_link: fixed at zero because there are no encoders
+        # (SLAM Toolbox drops every scan without this transform)
+        static_tf(0.0, 0.0, 0.0, 0.0, 'odom', 'base_link', 'odom_to_base'),
 
         # SLAM Toolbox publishes map -> odom
         IncludeLaunchDescription(
