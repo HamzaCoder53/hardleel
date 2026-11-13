@@ -3,6 +3,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -17,11 +18,14 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('lidar_port', default_value='/dev/ttyUSB0'),
+        # false when ~/lidar_supervisor.sh runs the lidar driver (reset + restart on timeouts)
+        DeclareLaunchArgument('use_lidar', default_value='true'),
 
         # LiDAR driver (if you added scan_mode to slam.launch.py, add it here too)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(sllidar_pkg, 'launch', 'sllidar_a1_launch.py')),
+            condition=IfCondition(LaunchConfiguration('use_lidar')),
             launch_arguments={
                 'serial_port': LaunchConfiguration('lidar_port'),
                 'serial_baudrate': '115200',
@@ -34,6 +38,12 @@ def generate_launch_description():
              arguments=['--x', str(LASER_X), '--y', str(LASER_Y), '--z', str(LASER_Z),
                         '--yaw', str(LASER_YAW), '--pitch', '0', '--roll', '0',
                         '--frame-id', 'base_link', '--child-frame-id', 'laser']),
+
+        # odom -> base_link fixed at zero: cartographer_2d.lua expects it from an EKF, which this
+        # launch does not run (no encoders). base_link -> imu_link comes from imu.launch.py.
+        Node(package='tf2_ros', executable='static_transform_publisher', name='odom_to_base',
+             arguments=['--x', '0', '--y', '0', '--z', '0', '--yaw', '0', '--pitch', '0', '--roll', '0',
+                        '--frame-id', 'odom', '--child-frame-id', 'base_link']),
 
         # Cartographer: SLAM (publishes map -> odom)
         Node(package='cartographer_ros', executable='cartographer_node',
