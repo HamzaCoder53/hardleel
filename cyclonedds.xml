@@ -6,7 +6,7 @@
         </General>
         <Discovery>
             <Peers>
-                <Peer Address="192.168.137.1"/>  <!-- laptop on its Mobile Hotspot -->
+                <Peer Address="192.168.137.229"/>  <!-- laptop on the shared Wi-Fi -->
             </Peers>
         </Discovery>
     </Domain>

@@ -1,0 +1,61 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Reference Frame: <Fixed Frame>
+      Cell Size: 1
+      Plane Cell Count: 20
+    - Class: rviz_default_plugins/Map
+      Name: Map
+      Enabled: true
+      Topic:
+        Value: /map
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+        Depth: 1
+      Alpha: 0.8
+      Color Scheme: map
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Enabled: true
+      Topic:
+        Value: /scan
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Size (m): 0.04
+      Style: Flat Squares
+      Color Transformer: Intensity
+      Decay Time: 0
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+      Show Axes: true
+      Marker Scale: 0.5
+  Global Options:
+    Fixed Frame: map
+    Background Color: 48; 48; 48
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Measure
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Scale: 80
+      X: 0
+      Y: 0
+    Saved: ~
+Window Geometry:
+  Width: 1280
+  Height: 800
