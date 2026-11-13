@@ -39,11 +39,8 @@ def generate_launch_description():
                         '--yaw', str(LASER_YAW), '--pitch', '0', '--roll', '0',
                         '--frame-id', 'base_link', '--child-frame-id', 'laser']),
 
-        # odom -> base_link fixed at zero: cartographer_2d.lua expects it from an EKF, which this
-        # launch does not run (no encoders). base_link -> imu_link comes from imu.launch.py.
-        Node(package='tf2_ros', executable='static_transform_publisher', name='odom_to_base',
-             arguments=['--x', '0', '--y', '0', '--z', '0', '--yaw', '0', '--pitch', '0', '--roll', '0',
-                        '--frame-id', 'odom', '--child-frame-id', 'base_link']),
+        # odom -> base_link and base_link -> imu_link come from imu.launch.py (EKF + static TF):
+        # start imu.launch.py first.
 
         # Cartographer: SLAM (publishes map -> odom)
         Node(package='cartographer_ros', executable='cartographer_node',
