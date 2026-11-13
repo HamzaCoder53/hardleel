@@ -3,10 +3,6 @@
 # Standard mode then Express); slam.launch.py runs SLAM Toolbox without its own lidar driver.
 source /opt/ros/jazzy/setup.bash
 source ~/ros2_ws/install/setup.bash
-# Middleware: domain 0 + CycloneDDS (set here: tmux shells do not read .bashrc)
-export ROS_DOMAIN_ID=0
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export CYCLONEDDS_URI=file://$HOME/cyclonedds.xml
 bash ~/lidar_supervisor.sh > ~/lidar_supervisor.log 2>&1 &
 SUP=$!
 trap 'kill $SUP 2>/dev/null; pkill -KILL -x sllidar_node 2>/dev/null' EXIT
