@@ -16,9 +16,12 @@ ls /dev/serial/by-id/usb-Arduino* >/dev/null 2>&1 || ls /dev/ttyACM* >/dev/null 
 
 echo "1/2 starting IMU ..."
 tmux new -d -s robot -n imu "$RUN 'ros2 launch robot_slam imu.launch.py ${IMU_PORT:+imu_port:=$IMU_PORT} 2>&1 | tee ~/imu.log'"
-for ((t = 0; t < IMU_WAIT_S; t += 3)); do
-  if $RUN 'timeout 3 ros2 topic echo --once /imu/data_raw' >/dev/null 2>&1; then ok=1; break; fi
+# imu_serial_node logs "Publishing." after its gyro calibration; then confirm the topic
+# (a ros2 CLI call alone takes >3 s to start on the Pi, so give it 10 s)
+for ((t = 0; t < IMU_WAIT_S; t += 2)); do
+  grep -q "Publishing." ~/imu.log 2>/dev/null && break; sleep 2
 done
+$RUN 'timeout 10 ros2 topic echo --once /imu/data_raw' >/dev/null 2>&1 && ok=1
 if [ -z "$ok" ]; then
   echo "IMU did not publish /imu/data_raw within ${IMU_WAIT_S}s - see ~/imu.log; SLAM not started"; exit 1
 fi
