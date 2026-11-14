@@ -37,6 +37,11 @@ amcl:
     z_rand: 0.5
     z_short: 0.05
     scan_topic: scan
+    # Start from a default pose so map->odom exists at once: without it the planner's global
+    # costmap waited for map->base_link and planner_server failed to activate (14 Nov).
+    # Correct it with "2D Pose Estimate" in RViz.
+    set_initial_pose: true
+    initial_pose: {x: 0.0, y: 0.0, z: 0.0, yaw: 0.0}
 bt_navigator:
   ros__parameters:
     global_frame: map
