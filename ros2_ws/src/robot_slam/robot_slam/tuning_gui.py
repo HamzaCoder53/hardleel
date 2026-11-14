@@ -32,7 +32,8 @@ from robot_slam import tuning_store as ts
 
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
 HIDE_PARAMS = ('use_sim_time', 'qos_overrides.', 'start_type_description_service', 'tf_buffer')
-HIDE_NODES = ('_ros2cli', 'transform_listener_impl', 'launch_ros', 'hardleel_tuning_gui', 'rviz', 'teleop')
+HIDE_NODES = ('_ros2cli', 'transform_listener_impl', 'launch_ros', 'hardleel_tuning_gui', 'rviz',
+              'teleop_twist_keyboard')   # substrings: NOT plain 'teleop' (that hid esp32_teleop_bridge)
 # Nodes known to apply parameter changes while running; others usually need a restart (Save first).
 LIVE_NODES = ('esp32_teleop_bridge', 'controller_server', 'planner_server', 'local_costmap', 'global_costmap',
               'velocity_smoother', 'amcl', 'behavior_server', 'collision_monitor', 'smoother_server',
