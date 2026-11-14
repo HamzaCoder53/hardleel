@@ -1,12 +1,17 @@
 #!/bin/bash
 # Start the robot in order:  1) IMU  ->  wait until /imu/data_raw publishes
 #                            2) lidar (lidar_supervisor.sh) + Cartographer mapping (carto_mapping.launch.py)
-# Everything runs in tmux session "robot" (windows imu, lidar, carto); logs in ~/imu.log,
-# ~/lidar_supervisor.log, ~/carto.log. ROS settings (domain 0, CycloneDDS) come from ~/.bashrc,
-# so every command runs in an interactive shell (bash -ic). Keep the robot still while the IMU calibrates.
+#                            3) ESP32 motor bridge + tuning helper (for the laptop tuning GUI, htune)
+# Everything runs in tmux session "robot" (windows imu, lidar, carto, motors, tuning); logs in ~/imu.log,
+# ~/lidar_supervisor.log, ~/carto.log, ~/motors.log, ~/tuning.log. ROS settings (domain 0, CycloneDDS) come
+# from ~/.bashrc, so every command runs in an interactive shell (bash -ic). Keep the robot still while the
+# IMU calibrates.
+# Tuning: every run starts from the code defaults + values SAVED in the tuning GUI (~/.hardleel); live GUI
+# changes and Cartographer "Apply" values from the previous run are dropped here.
 # Stop:  tmux kill-session -t robot
 IMU_WAIT_S=${IMU_WAIT_S:-60}
 RUN='bash -ic'
+SAVED=~/.hardleel/saved_params.yaml
 
 if tmux has-session -t robot 2>/dev/null; then
   echo "tmux session 'robot' already running (stop it: tmux kill-session -t robot)"; exit 1
@@ -14,7 +19,11 @@ fi
 ls /dev/serial/by-id/usb-Arduino* >/dev/null 2>&1 || ls /dev/ttyACM* >/dev/null 2>&1 || {
   echo "IMU (Arduino Nano) not found on USB - plug it in and try again"; exit 1; }
 
-echo "1/2 starting IMU ..."
+rm -f ~/.hardleel/session_carto.yaml          # last run's unsaved Cartographer values
+[ -s "$SAVED" ] && echo "using saved tuning values: $SAVED" || SAVED=
+PFILE=${SAVED:+--ros-args --params-file $SAVED}
+
+echo "1/3 starting IMU ..."
 tmux new -d -s robot -n imu "$RUN 'ros2 launch robot_slam imu.launch.py ${IMU_PORT:+imu_port:=$IMU_PORT} 2>&1 | tee ~/imu.log'"
 # imu_serial_node logs "Publishing." after its gyro calibration; then confirm the topic
 # (a ros2 CLI call alone takes >3 s to start on the Pi, so give it 10 s)
@@ -27,7 +36,11 @@ if [ -z "$ok" ]; then
 fi
 echo "    /imu/data_raw is publishing"
 
-echo "2/2 starting lidar + Cartographer ..."
+echo "2/3 starting lidar + Cartographer ..."
 tmux new-window -t robot -n lidar "$RUN 'bash ~/lidar_supervisor.sh 2>&1 | tee ~/lidar_supervisor.log'"
 tmux new-window -t robot -n carto "$RUN 'ros2 launch robot_slam carto_mapping.launch.py use_lidar:=false 2>&1 | tee ~/carto.log'"
-echo "started: tmux attach -t robot   (windows: imu, lidar, carto)"
+
+echo "3/3 starting motor bridge + tuning helper ..."
+tmux new-window -t robot -n motors "$RUN 'ros2 run motor_teleop esp32_teleop_bridge $PFILE 2>&1 | tee ~/motors.log'"
+tmux new-window -t robot -n tuning "$RUN 'ros2 run robot_slam tuning_helper 2>&1 | tee ~/tuning.log'"
+echo "started: tmux attach -t robot   (windows: imu, lidar, carto, motors, tuning)"

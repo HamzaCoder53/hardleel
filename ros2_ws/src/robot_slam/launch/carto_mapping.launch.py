@@ -8,6 +8,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from robot_slam.tuning_store import effective_carto_dir   # lua + tuning GUI overrides (saved / this run)
+
 # Keep identical to slam.launch.py
 LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0   # yaw 0: lidar faces forward (was pi = reversed, 14 Nov)
 
@@ -46,7 +48,8 @@ def generate_launch_description():
         Node(package='cartographer_ros', executable='cartographer_node',
              name='cartographer_node', output='screen',
              parameters=[{'use_sim_time': False}],
-             arguments=['-configuration_directory', os.path.join(pkg, 'config'),
+             # default lua, or ~/.hardleel/carto/ = default + values saved/applied in the tuning GUI
+             arguments=['-configuration_directory', effective_carto_dir(os.path.join(pkg, 'config')),
                         '-configuration_basename', 'cartographer_2d.lua'],
              remappings=[('scan', '/scan'), ('imu', '/imu/data_raw')]),
 

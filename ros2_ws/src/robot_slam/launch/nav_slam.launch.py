@@ -73,7 +73,7 @@ def generate_launch_description():
                           'freq': 10.0}]),
 
         # EKF: odom -> base_link, output remapped to /odom for Nav2
-        Node(package='robot_localization', executable='ekf_node', name='ekf_filter_node',
+        Node(package='robot_localization', executable='ekf_node', name='ekf_nav_node',
              output='screen',
              parameters=[os.path.join(pkg, 'config', 'ekf_nav.yaml')],
              remappings=[('odometry/filtered', '/odom')]),

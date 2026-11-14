@@ -18,6 +18,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from robot_slam.tuning_store import merged_params_file, with_saved   # tuning GUI saved values (~/.hardleel)
+
 # Keep identical to slam.launch.py / carto_mapping.launch.py
 LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0   # yaw 0: lidar faces forward (was pi = reversed, 14 Nov)
 
@@ -28,8 +30,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('map', default_value=os.path.expanduser('~/maps/my_map.yaml')),
+        # nav2_params.yaml + values saved in the tuning GUI (merged into ~/.hardleel when anything is saved)
         DeclareLaunchArgument('params_file',
-                              default_value=os.path.join(pkg, 'config', 'nav2_params.yaml')),
+                              default_value=merged_params_file(os.path.join(pkg, 'config', 'nav2_params.yaml'))),
 
         # base_link -> laser (carto_mapping.launch.py published this during mapping)
         Node(package='tf2_ros', executable='static_transform_publisher', name='base_to_laser',
@@ -40,18 +43,18 @@ def generate_launch_description():
         # LiDAR odometry: publishes /odom_rf2o only (the EKF publishes the TF)
         Node(package='rf2o_laser_odometry', executable='rf2o_laser_odometry_node',
              name='rf2o_laser_odometry', output='screen',
-             parameters=[{'laser_scan_topic': '/scan',
-                          'odom_topic': '/odom_rf2o',
-                          'publish_tf': False,
-                          'base_frame_id': 'base_link',
-                          'odom_frame_id': 'odom',
-                          'init_pose_from_topic': '',
-                          'freq': 10.0}]),
+             parameters=with_saved({'laser_scan_topic': '/scan',
+                                    'odom_topic': '/odom_rf2o',
+                                    'publish_tf': False,
+                                    'base_frame_id': 'base_link',
+                                    'odom_frame_id': 'odom',
+                                    'init_pose_from_topic': '',
+                                    'freq': 10.0})),
 
         # EKF: odom -> base_link, output topic remapped to /odom for Nav2
-        Node(package='robot_localization', executable='ekf_node', name='ekf_filter_node',
+        Node(package='robot_localization', executable='ekf_node', name='ekf_nav_node',
              output='screen',
-             parameters=[os.path.join(pkg, 'config', 'ekf_nav.yaml')],
+             parameters=with_saved(os.path.join(pkg, 'config', 'ekf_nav.yaml')),
              remappings=[('odometry/filtered', '/odom')]),
 
         # Nav2: map server, AMCL, planner, controller, costmaps, behaviors

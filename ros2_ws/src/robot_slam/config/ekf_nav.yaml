@@ -1,4 +1,4 @@
-ekf_filter_node:
+ekf_nav_node:   # navigation EKF (rf2o + IMU); the mapping EKF in ekf.yaml is ekf_filter_node
   ros__parameters:
     frequency: 30.0
     sensor_timeout: 0.3

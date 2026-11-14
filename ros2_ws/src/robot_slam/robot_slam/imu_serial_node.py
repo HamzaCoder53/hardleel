@@ -37,7 +37,23 @@ class ImuSerialNode(Node):
         self.bias = None
         self.get_logger().info(f'Calibrating gyro for {self.calib_s:.0f} s: keep the robot still')
 
+        self.add_on_set_parameters_callback(self.on_params)
         self.create_timer(0.005, self.poll)
+
+    def on_params(self, params):
+        """Live tuning (tuning GUI): gyro_deadband_dps applies at once; the rest only at the next start."""
+        from rcl_interfaces.msg import SetParametersResult
+        for p in params:
+            if p.name == 'gyro_deadband_dps':
+                if not 0.0 <= float(p.value) <= 10.0:
+                    return SetParametersResult(successful=False, reason='gyro_deadband_dps must be 0..10')
+            elif p.name in ('port', 'baud', 'frame_id', 'gyro_calib_s'):
+                return SetParametersResult(successful=False,
+                                           reason=f'{p.name} is read at start only: Save, then restart the IMU')
+        for p in params:
+            if p.name == 'gyro_deadband_dps':
+                self.deadband = float(p.value)
+        return SetParametersResult(successful=True)
 
     def poll(self):
         try:

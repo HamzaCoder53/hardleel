@@ -20,5 +20,9 @@ setup(
     maintainer_email='you@example.com',
     description='LiDAR-only SLAM bringup (RPLIDAR A1 + SLAM Toolbox)',
     license='Apache-2.0',
-    entry_points={'console_scripts': ['imu_serial_node = robot_slam.imu_serial_node:main']},
+    entry_points={'console_scripts': [
+        'imu_serial_node = robot_slam.imu_serial_node:main',
+        'tuning_helper = robot_slam.tuning_helper:main',   # Pi side of the tuning GUI
+        'tuning_gui = robot_slam.tuning_gui:main',         # laptop: live parameter tuning
+    ]},
 )

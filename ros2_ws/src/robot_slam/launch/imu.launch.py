@@ -8,6 +8,8 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from robot_slam.tuning_store import with_saved   # values saved in the tuning GUI (~/.hardleel)
+
 # Where the Nano sits relative to base_link (metres) and how it is rotated (radians).
 # Board flat with components up: leave the angles at 0.
 # Board upside down (components down): IMU_ROLL = 3.14159
@@ -34,11 +36,11 @@ def generate_launch_description():
             executable='imu_serial_node',
             name='imu_serial_node',
             output='screen',
-            parameters=[{
+            parameters=with_saved({
                 'port': LaunchConfiguration('imu_port'),
                 'frame_id': 'imu_link',
                 'gyro_calib_s': 5.0,
-            }],
+            }),
         ),
 
         # base_link -> imu_link
@@ -57,7 +59,7 @@ def generate_launch_description():
             executable='ekf_node',
             name='ekf_filter_node',
             output='screen',
-            parameters=[os.path.join(pkg, 'config', 'ekf.yaml')],
+            parameters=with_saved(os.path.join(pkg, 'config', 'ekf.yaml')),
             condition=IfCondition(LaunchConfiguration('use_ekf')),
         ),
     ])

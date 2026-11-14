@@ -17,7 +17,23 @@ import time
 import rclpy
 import serial
 from geometry_msgs.msg import Twist
+from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.node import Node
+
+# name: (default, description, (min, max) or None)
+PARAMS = {
+    'port': ('', 'ESP32 serial port (start only)', None),
+    'max_speed': (0.5, 'wheel speed m/s that maps to max_pwm', (0.05, 3.0)),
+    'turn_gain': (0.5, 'wheel speed m/s per rad/s of angular.z', (0.05, 3.0)),
+    'max_pwm': (75, 'PWM cap (team 26 Oct: 75)', (0, 255)),
+    'min_pwm': (70, 'stall floor for non-zero commands (team calibration 26 Oct: 70)', (0, 255)),
+    'zero_speed': (0.02, 'wheel speeds below this m/s count as 0', (0.0, 0.5)),
+    'invert_left': (True, 'left side runs reversed (ESP32 + BTS7960 wiring)', None),
+    'invert_right': (False, 'right side runs reversed', None),
+    'hold_ms': (200, 'ESP32 watchdog: each drive command runs this long (ms)', (50, 2000)),
+    'send_rate': (10.0, 'Hz the drive command is resent while driving', (1.0, 50.0)),
+    'cmd_timeout': (0.6, 'Pi watchdog: s without cmd_vel before stop', (0.1, 5.0)),
+}
 
 
 def default_port():
@@ -28,20 +44,11 @@ def default_port():
 class Esp32TeleopBridge(Node):
     def __init__(self):
         super().__init__('esp32_teleop_bridge')
-        p = self.declare_parameter
-        p('port', default_port())
-        p('max_speed', 0.5)      # m/s that maps to max_pwm
-        p('turn_gain', 0.5)      # wheel speed (m/s) per rad/s of angular.z
-        p('max_pwm', 75)         # hard cap (team 26 Oct)
-        p('min_pwm', 70)         # stall floor: team calibration 26 Oct (~/hardleel_ws/motor_calib.yaml: 70 both
-                                 # sides). Below it Nav2's 0.27-0.35 m/s (PWM 40-52) did not move the robot.
-        p('zero_speed', 0.02)    # m/s: smaller wheel speeds count as 0 (no 70-PWM jerk at the end of a ramp)
-        p('invert_left', True)   # ESP32 + BTS7960 wiring: left side runs reversed (26 Oct)
-        p('invert_right', False)
-        p('hold_ms', 200)        # each 'm' runs this long on the ESP32 (its only timeout)
-        p('send_rate', 10.0)     # Hz resend while driving
-        p('cmd_timeout', 0.6)    # s without cmd_vel -> 'x'. teleop_twist_keyboard sends one Twist per key
-                                 # event and key repeat starts after ~0.5 s: 0.3 made driving stutter
+        # name: (default, description, (min, max) or None). All but 'port' can be changed live
+        # (tuning GUI / ros2 param set); a node restart returns to these defaults unless saved.
+        for name, (default, desc, rng) in PARAMS.items():
+            d = ParameterDescriptor(description=desc + (f'  [{rng[0]}..{rng[1]}]' if rng else ''))
+            self.declare_parameter(name, default_port() if name == 'port' else default, d)
         g = lambda n: self.get_parameter(n).value
         self.max_speed, self.turn_gain = float(g('max_speed')), float(g('turn_gain'))
         self.max_pwm, self.min_pwm = int(g('max_pwm')), int(g('min_pwm'))
@@ -65,8 +72,50 @@ class Esp32TeleopBridge(Node):
                                f'max_speed {self.max_speed} m/s, hold {self.hold_ms} ms')
 
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd, 10)
-        self.create_timer(1.0 / float(g('send_rate')), self.tick)
+        self.timer = self.create_timer(1.0 / float(g('send_rate')), self.tick)
+        self.add_on_set_parameters_callback(self.on_params)
         threading.Thread(target=self.reader, daemon=True).start()
+
+    def on_params(self, params):
+        """Live tuning: check every value first, then apply all of them (all or nothing)."""
+        new = {p.name: p.value for p in params}
+        for name, value in new.items():
+            if name == 'port':
+                return SetParametersResult(successful=False, reason='port is read at start only: Save, then restart the bridge')
+            if name not in PARAMS:
+                continue
+            rng = PARAMS[name][2]
+            if rng and not rng[0] <= value <= rng[1]:
+                return SetParametersResult(successful=False, reason=f'{name} must be {rng[0]}..{rng[1]}')
+        lo = new.get('min_pwm', self.min_pwm)
+        hi = new.get('max_pwm', self.max_pwm)
+        if lo > hi:
+            return SetParametersResult(successful=False, reason=f'min_pwm ({lo}) must be <= max_pwm ({hi})')
+        for name, value in new.items():
+            if name == 'max_speed':
+                self.max_speed = float(value)
+            elif name == 'turn_gain':
+                self.turn_gain = float(value)
+            elif name == 'max_pwm':
+                self.max_pwm = int(value)
+            elif name == 'min_pwm':
+                self.min_pwm = int(value)
+            elif name == 'zero_speed':
+                self.zero_speed = float(value)
+            elif name == 'invert_left':
+                self.inv_l = bool(value)
+            elif name == 'invert_right':
+                self.inv_r = bool(value)
+            elif name == 'hold_ms':
+                self.hold_ms = int(value)
+            elif name == 'cmd_timeout':
+                self.cmd_timeout = float(value)
+            elif name == 'send_rate':
+                self.timer.cancel()
+                self.destroy_timer(self.timer)
+                self.timer = self.create_timer(1.0 / float(value), self.tick)
+        self.get_logger().info('tuned: ' + ', '.join(f'{k}={v}' for k, v in new.items()))
+        return SetParametersResult(successful=True)
 
     def to_pwm(self, wheel_speed):
         """Wheel speed (m/s) -> signed PWM. Deadband offset like the team's bridge (26 Oct):
