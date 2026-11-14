@@ -3,7 +3,9 @@
 # Needs: WSL networkingMode=mirrored, laptop and Pi on the same Wi-Fi (not the laptop hotspot).
 # usage: hardleel_rviz_d0.sh [pi_ip]          -> open RViz
 #        hardleel_rviz_d0.sh check [pi_ip]    -> list the Pi's topics and rates, no RViz
+#        hardleel_rviz_d0.sh teleop [pi_ip]   -> keyboard teleop (/cmd_vel) in this terminal
 if [ "$1" = check ]; then CHECK=1; shift; fi
+if [ "$1" = teleop ]; then TELEOP=1; shift; fi
 PI=${1:-192.168.137.209}
 DIR=$(cd "$(dirname "$0")" && pwd)
 MYIP=$(ip -4 route get "$PI" 2>/dev/null | grep -oP 'src \K[0-9.]+')
@@ -43,5 +45,9 @@ if [ -n "$CHECK" ]; then
       echo "$t: data OK"; else echo "$t: no data"; fi
   done
   exit 0
+fi
+if [ -n "$TELEOP" ]; then
+  echo "Teleop -> /cmd_vel. Keep THIS window focused. i/,=fwd/back  j/l=turn  k=STOP  q/z=faster/slower"
+  exec ros2 run teleop_twist_keyboard teleop_twist_keyboard
 fi
 exec rviz2 -d "$DIR/hardleel_d0.rviz"
