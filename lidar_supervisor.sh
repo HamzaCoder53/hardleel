@@ -6,8 +6,9 @@
 # a mode the driver reports as unsupported is skipped at once.
 # usage: lidar_supervisor.sh   (started by start_slam.sh; needs ROS sourced)
 LOG=~/hwtest_logs/lidar.log; mkdir -p ~/hwtest_logs
-# by-id path: the FTDI adapter is ttyUSB0 or ttyUSB1 depending on plug order
-PORT=${LIDAR_PORT:-$(ls /dev/serial/by-id/usb-FTDI_* 2>/dev/null | head -1)}; PORT=${PORT:-/dev/ttyUSB0}
+# Lidar = CP2102 on hub port 1.2 (ESP32 motors = CP2102 on port 1.1). Both CP2102s share serial 0001, so
+# by-id cannot tell them apart and ttyUSB0/1 swap with plug order: use the physical by-path port.
+PORT=${LIDAR_PORT:-$(ls /dev/serial/by-path/*usb-0:1.2:1.0-port0 2>/dev/null | head -1)}; PORT=${PORT:-/dev/ttyUSB0}
 MODES=(${LIDAR_MODES:-Standard Express})   # NO Boost (team, 26 Oct: Boost timed out); LIDAR_MODES overrides
 fails=0
 while true; do
