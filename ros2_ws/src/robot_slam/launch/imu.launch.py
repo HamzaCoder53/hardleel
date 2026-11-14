@@ -4,6 +4,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -24,6 +25,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('imu_port', default_value=find_nano()),
+        # false for navigation: laptop_nav.launch.py runs its own EKF (rf2o + IMU) that owns odom->base_link
+        DeclareLaunchArgument('use_ekf', default_value='true'),
 
         # Nano IMU -> /imu/data_raw
         Node(
@@ -55,5 +58,6 @@ def generate_launch_description():
             name='ekf_filter_node',
             output='screen',
             parameters=[os.path.join(pkg, 'config', 'ekf.yaml')],
+            condition=IfCondition(LaunchConfiguration('use_ekf')),
         ),
     ])
