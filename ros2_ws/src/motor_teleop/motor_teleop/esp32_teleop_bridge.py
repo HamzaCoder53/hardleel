@@ -33,7 +33,9 @@ class Esp32TeleopBridge(Node):
         p('max_speed', 0.5)      # m/s that maps to max_pwm
         p('turn_gain', 0.5)      # wheel speed (m/s) per rad/s of angular.z
         p('max_pwm', 75)         # hard cap (team 26 Oct)
-        p('min_pwm', 0)          # stall floor for non-zero commands, 0 = off
+        p('min_pwm', 70)         # stall floor: team calibration 26 Oct (~/hardleel_ws/motor_calib.yaml: 70 both
+                                 # sides). Below it Nav2's 0.27-0.35 m/s (PWM 40-52) did not move the robot.
+        p('zero_speed', 0.02)    # m/s: smaller wheel speeds count as 0 (no 70-PWM jerk at the end of a ramp)
         p('invert_left', True)   # ESP32 + BTS7960 wiring: left side runs reversed (26 Oct)
         p('invert_right', False)
         p('hold_ms', 200)        # each 'm' runs this long on the ESP32 (its only timeout)
@@ -43,6 +45,7 @@ class Esp32TeleopBridge(Node):
         g = lambda n: self.get_parameter(n).value
         self.max_speed, self.turn_gain = float(g('max_speed')), float(g('turn_gain'))
         self.max_pwm, self.min_pwm = int(g('max_pwm')), int(g('min_pwm'))
+        self.zero_speed = float(g('zero_speed'))
         self.inv_l, self.inv_r = bool(g('invert_left')), bool(g('invert_right'))
         self.hold_ms, self.cmd_timeout = int(g('hold_ms')), float(g('cmd_timeout'))
 
@@ -58,17 +61,22 @@ class Esp32TeleopBridge(Node):
         self.last_cmd = 0.0
         self.driving = False
         self.send('x')
-        self.get_logger().info(f'ESP32 on {g("port")}: max_pwm {self.max_pwm}, hold {self.hold_ms} ms')
+        self.get_logger().info(f'ESP32 on {g("port")}: pwm {self.min_pwm}..{self.max_pwm}, '
+                               f'max_speed {self.max_speed} m/s, hold {self.hold_ms} ms')
 
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd, 10)
         self.create_timer(1.0 / float(g('send_rate')), self.tick)
         threading.Thread(target=self.reader, daemon=True).start()
 
     def to_pwm(self, wheel_speed):
-        pwm = int(round(max(-1.0, min(1.0, wheel_speed / self.max_speed)) * self.max_pwm))
-        if pwm != 0 and abs(pwm) < self.min_pwm:
-            pwm = self.min_pwm if pwm > 0 else -self.min_pwm
-        return pwm
+        """Wheel speed (m/s) -> signed PWM. Deadband offset like the team's bridge (26 Oct):
+        0 stays 0, otherwise min_pwm + |p| * (max_pwm - min_pwm) / max_pwm."""
+        if abs(wheel_speed) < self.zero_speed:
+            return 0
+        p = max(-1.0, min(1.0, wheel_speed / self.max_speed)) * self.max_pwm
+        if self.min_pwm > 0:
+            p = (self.min_pwm + abs(p) * (self.max_pwm - self.min_pwm) / self.max_pwm) * (1 if p > 0 else -1)
+        return int(round(p))
 
     def on_cmd(self, msg):
         v, w = msg.linear.x, msg.angular.z
