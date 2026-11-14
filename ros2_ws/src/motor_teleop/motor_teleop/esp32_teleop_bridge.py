@@ -38,7 +38,8 @@ class Esp32TeleopBridge(Node):
         p('invert_right', False)
         p('hold_ms', 200)        # each 'm' runs this long on the ESP32 (its only timeout)
         p('send_rate', 10.0)     # Hz resend while driving
-        p('cmd_timeout', 0.3)    # s without cmd_vel -> 'x'
+        p('cmd_timeout', 0.6)    # s without cmd_vel -> 'x'. teleop_twist_keyboard sends one Twist per key
+                                 # event and key repeat starts after ~0.5 s: 0.3 made driving stutter
         g = lambda n: self.get_parameter(n).value
         self.max_speed, self.turn_gain = float(g('max_speed')), float(g('turn_gain'))
         self.max_pwm, self.min_pwm = int(g('max_pwm')), int(g('min_pwm'))
