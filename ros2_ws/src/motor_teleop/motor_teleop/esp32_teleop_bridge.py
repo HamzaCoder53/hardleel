@@ -33,6 +33,8 @@ PARAMS = {
     'hold_ms': (200, 'ESP32 watchdog: each drive command runs this long (ms)', (50, 2000)),
     'send_rate': (10.0, 'Hz the drive command is resent while driving', (1.0, 50.0)),
     'cmd_timeout': (0.6, 'Pi watchdog: s without cmd_vel before stop', (0.1, 5.0)),
+    'accel': (1.0, 'wheel speed ramp UP, m/s^2 (0 = jump at once)', (0.0, 20.0)),
+    'decel': (2.0, 'wheel speed ramp DOWN, m/s^2 (0 = jump); watchdog stops are always instant', (0.0, 20.0)),
 }
 
 
@@ -64,7 +66,10 @@ class Esp32TeleopBridge(Node):
         time.sleep(1.5)                      # in case opening reset the board
         self.ser.reset_input_buffer()
         self.lock = threading.Lock()
-        self.target = (0, 0)
+        self.accel, self.decel = float(g('accel')), float(g('decel'))
+        self.target = (0.0, 0.0)          # wheel speeds (m/s) asked for by cmd_vel
+        self.cur = [0.0, 0.0]             # wheel speeds after the accel/decel ramp
+        self.last_tick = time.monotonic()
         self.last_cmd = 0.0
         self.driving = False
         self.send('x')
@@ -110,6 +115,10 @@ class Esp32TeleopBridge(Node):
                 self.hold_ms = int(value)
             elif name == 'cmd_timeout':
                 self.cmd_timeout = float(value)
+            elif name == 'accel':
+                self.accel = float(value)
+            elif name == 'decel':
+                self.decel = float(value)
             elif name == 'send_rate':
                 self.timer.cancel()
                 self.destroy_timer(self.timer)
@@ -129,18 +138,30 @@ class Esp32TeleopBridge(Node):
 
     def on_cmd(self, msg):
         v, w = msg.linear.x, msg.angular.z
-        left = self.to_pwm(v - w * self.turn_gain)
-        right = self.to_pwm(v + w * self.turn_gain)
+        self.target = (v - w * self.turn_gain, v + w * self.turn_gain)
+        self.last_cmd = time.monotonic()
+
+    def ramp(self, cur, tgt, dt):
+        """Move one wheel speed toward its target at accel (speeding up) or decel (slowing/reversing)."""
+        speeding_up = abs(tgt) > abs(cur) and (cur == 0.0 or (tgt > 0) == (cur > 0))
+        rate = self.accel if speeding_up else self.decel
+        step = rate * dt
+        if rate <= 0.0 or abs(tgt - cur) <= step:
+            return tgt
+        return cur + (step if tgt > cur else -step)
+
+    def tick(self):
+        now = time.monotonic()
+        dt, self.last_tick = min(now - self.last_tick, 0.5), now
+        if now - self.last_cmd < self.cmd_timeout:
+            self.cur = [self.ramp(c, t, dt) for c, t in zip(self.cur, self.target)]
+        else:
+            self.cur = [0.0, 0.0]         # watchdog: stop at once, no ramp
+        left, right = self.to_pwm(self.cur[0]), self.to_pwm(self.cur[1])
         if self.inv_l:
             left = -left
         if self.inv_r:
             right = -right
-        self.target = (left, right)
-        self.last_cmd = time.monotonic()
-
-    def tick(self):
-        fresh = time.monotonic() - self.last_cmd < self.cmd_timeout
-        left, right = self.target if fresh else (0, 0)
         if left == 0 and right == 0:
             if self.driving:
                 self.send('x')
