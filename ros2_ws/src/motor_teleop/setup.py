@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'motor_bridge = motor_teleop.motor_bridge:main',
+            'esp32_teleop_bridge = motor_teleop.esp32_teleop_bridge:main',
         ],
     },
 )
