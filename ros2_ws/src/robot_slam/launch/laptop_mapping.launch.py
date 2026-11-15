@@ -14,7 +14,7 @@ import shutil
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -37,8 +37,11 @@ def generate_launch_description():
 
         Node(package='rviz2', executable='rviz2', name='rviz2', arguments=['-d', rviz_cfg], output='log',
              condition=IfCondition(LaunchConfiguration('rviz'))),
-        Node(package='robot_slam', executable='tuning_gui', name='hardleel_tuning_gui', output='screen',
-             condition=IfCondition(LaunchConfiguration('tuning'))),
-        ExecuteProcess(cmd=teleop_window(), name='teleop_window', output='log',
-                       condition=IfCondition(LaunchConfiguration('teleop'))),
+        # Staggered: WSLg lost the tuning GUI's window when it started at the same moment as RViz (15 Nov)
+        TimerAction(period=8.0, actions=[
+            Node(package='robot_slam', executable='tuning_gui', name='hardleel_tuning_gui', output='screen',
+                 condition=IfCondition(LaunchConfiguration('tuning')))]),
+        TimerAction(period=12.0, actions=[
+            ExecuteProcess(cmd=teleop_window(), name='teleop_window', output='log',
+                           condition=IfCondition(LaunchConfiguration('teleop')))]),
     ])
