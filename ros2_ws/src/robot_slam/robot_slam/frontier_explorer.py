@@ -46,6 +46,8 @@ PARAMS = {
     'occupied_threshold': (65, 'cells from free_threshold up to this count as UNKNOWN for frontiers: Cartographer '
                                'marks barely-seen space ~40-55, a ring that hid every frontier (15 Nov)', (1, 101)),
     'return_home': (True, 'drive back to the start (map 0,0) when exploration is complete', None),
+    'goal_clearance': (0.35, 'goals keep at least this distance from walls (m); frontiers along walls sent the '
+                             'robot into the wall (15 Nov)', (0.0, 1.5)),
 }
 # Marker for 'goal sent, not accepted yet'. Compare with IS only: == / != on a Nav2 ClientGoalHandle calls
 # its __eq__, which reads other.goal_id and crashed the explorer on a string (15 Nov).
@@ -168,6 +170,19 @@ class FrontierExplorer(Node):
             clusters.append(cells)
         return clusters
 
+    def near_obstacle(self, g, info, clearance):
+        """Cells within `clearance` metres (square neighbourhood) of an occupied cell."""
+        occ = g >= self.p('occupied_threshold')
+        k = int(math.ceil(clearance / info.resolution))
+        out = occ.copy()
+        for dr in range(-k, k + 1):
+            for dc in range(-k, k + 1):
+                if dr == 0 and dc == 0:
+                    continue
+                src = occ[max(0, -dr):occ.shape[0] - max(0, dr), max(0, -dc):occ.shape[1] - max(0, dc)]
+                out[max(0, dr):max(0, dr) + src.shape[0], max(0, dc):max(0, dc) + src.shape[1]] |= src
+        return out
+
     def unknownish(self, g):
         """Unknown (-1) or barely seen (free_threshold <= value < occupied_threshold)."""
         return (g < 0) | ((g >= self.p('free_threshold')) & (g < self.p('occupied_threshold')))
@@ -199,13 +214,18 @@ class FrontierExplorer(Node):
             self.set_state('exploring: waiting for Nav2 (navigate_to_pose)')
             return
         g, info = self.grid()
+        near_wall = self.near_obstacle(g, info, self.p('goal_clearance'))
         best, best_score, shown = None, -math.inf, []
         for cells in self.frontier_clusters(g):
             if len(cells) < self.p('min_frontier_size'):
                 continue
             rows, cols = zip(*cells)
             cr, cc = sum(rows) / len(rows), sum(cols) / len(cols)
-            r, c = min(cells, key=lambda rc: (rc[0] - cr) ** 2 + (rc[1] - cc) ** 2)  # cell nearest the centroid
+            # goal = the cell nearest the centroid that keeps goal_clearance from walls (none -> skip frontier)
+            clear = [rc for rc in cells if not near_wall[rc]]
+            if not clear:
+                continue
+            r, c = min(clear, key=lambda rc: (rc[0] - cr) ** 2 + (rc[1] - cc) ** 2)
             xy = self.cell_to_xy(info, r, c)
             dist = math.hypot(xy[0] - pos[0], xy[1] - pos[1])
             if dist < self.p('min_goal_distance'):
