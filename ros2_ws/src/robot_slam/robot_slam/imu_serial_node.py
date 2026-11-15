@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read the Nano 33 BLE Sense IMU over USB serial and publish ROS 2 messages."""
 import math
+import threading
 import time
 
 import rclpy
@@ -22,9 +23,10 @@ class ImuSerialNode(Node):
         self.declare_parameter('gyro_deadband_dps', 0.3)  # ignore yaw rates smaller than this
 
         self.frame_id = self.get_parameter('frame_id').value
+        # Blocking reads in a thread (sleeps until a line arrives). The old 5 ms polling timer used ~58 % of
+        # a Pi core for a 93 Hz sensor (cpu_profile.py, 15 Nov).
         self.ser = serial.Serial(self.get_parameter('port').value,
-                                 self.get_parameter('baud').value, timeout=0)
-        self.buf = b''
+                                 self.get_parameter('baud').value, timeout=0.2)
 
         self.imu_pub = self.create_publisher(Imu, 'imu/data_raw', 20)
         self.mag_pub = self.create_publisher(MagneticField, 'imu/mag', 10)
@@ -38,7 +40,7 @@ class ImuSerialNode(Node):
         self.get_logger().info(f'Calibrating gyro for {self.calib_s:.0f} s: keep the robot still')
 
         self.add_on_set_parameters_callback(self.on_params)
-        self.create_timer(0.005, self.poll)
+        threading.Thread(target=self.read_loop, daemon=True).start()
 
     def on_params(self, params):
         """Live tuning (tuning GUI): gyro_deadband_dps applies at once; the rest only at the next start."""
@@ -55,15 +57,25 @@ class ImuSerialNode(Node):
                 self.deadband = float(p.value)
         return SetParametersResult(successful=True)
 
-    def poll(self):
-        try:
-            self.buf += self.ser.read(self.ser.in_waiting or 1)
-        except (serial.SerialException, OSError) as e:
-            self.get_logger().error(f'Serial error: {e}', throttle_duration_sec=2.0)
-            return
-        while b'\n' in self.buf:
-            line, self.buf = self.buf.split(b'\n', 1)
-            self.handle_line(line.decode(errors='ignore').strip())
+    def read_loop(self):
+        """Reader thread: wait for data, take everything that is waiting, split into lines, nap 10 ms.
+        (pyserial's readline() reads ONE byte per system call: ~46 % of a core at 94 lines/s, 15 Nov.)"""
+        buf = b''
+        while rclpy.ok():
+            try:
+                chunk = self.ser.read(max(1, self.ser.in_waiting))   # blocks up to 0.2 s for the first byte
+            except (serial.SerialException, OSError) as e:
+                self.get_logger().error(f'Serial error: {e}', throttle_duration_sec=2.0)
+                time.sleep(0.5)
+                continue
+            if chunk:
+                buf += chunk
+                *lines, buf = buf.split(b'\n')
+                for line in lines:
+                    self.handle_line(line.decode(errors='ignore').strip())
+                if len(buf) > 4096:            # no newline for a long time: garbage, start over
+                    buf = b''
+            time.sleep(0.01)                   # let ~1 line collect: ~100 wake-ups/s instead of thousands
 
     def handle_line(self, line):
         parts = line.split(',')

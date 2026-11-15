@@ -19,9 +19,9 @@ options = {
   num_subdivisions_per_laser_scan = 1,
   num_point_clouds = 0,
   lookup_transform_timeout_sec = 0.2,
-  submap_publish_period_sec = 0.3,
-  pose_publish_period_sec = 5e-3,
-  trajectory_publish_period_sec = 30e-3,
+  submap_publish_period_sec = 0.5,     -- was 0.3 (CPU/Wi-Fi, 15 Nov)
+  pose_publish_period_sec = 2e-2,      -- 50 Hz, was 5e-3 = 200 Hz (CPU/TF traffic, 15 Nov)
+  trajectory_publish_period_sec = 100e-3,   -- RViz path only, was 30e-3
   rangefinder_sampling_ratio = 1.,
   odometry_sampling_ratio = 1.,
   fixed_frame_pose_sampling_ratio = 1.,
