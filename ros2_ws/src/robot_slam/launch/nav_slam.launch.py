@@ -9,7 +9,8 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 # Keep these identical to nav.launch.py
-LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0   # yaw 0: lidar faces forward (was pi = reversed, 14 Nov)
+# lidar 10 cm BEHIND the robot centre (user 15 Nov); robot 24 x 30.5 cm, base_link = robot centre
+LASER_X, LASER_Y, LASER_Z, LASER_YAW = -0.10, 0.0, 0.15, 0.0   # yaw 0: lidar faces forward (was pi = reversed, 14 Nov)
 IMU_X, IMU_Y, IMU_Z = 0.0, 0.0, 0.05
 IMU_ROLL, IMU_PITCH, IMU_YAW = 0.0, 0.0, 0.0
 

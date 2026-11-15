@@ -33,9 +33,13 @@ PARAMS = {
     'enabled': (False, 'explore now (Start/STOP in the tuning GUI Auto tab); starts OFF', None),
     'forward_speed': (0.30, 'forward speed m/s sent to the motor bridge (0.3 ~ PWM 73)', (0.05, 1.0)),
     'turn_speed': (1.0, 'turn-on-the-spot speed rad/s', (0.2, 3.0)),
-    'front_stop': (0.30, 'wall this close ahead (m, from the lidar) -> stop and choose a turn', (0.10, 1.0)),
-    'emergency_stop': (0.20, 'anything this close ahead (m, from the lidar) -> stop at once; robot front edge is '
-                             '0.12 m ahead of the lidar (24 x 30.5 cm robot)', (0.05, 0.5)),
+    # ALL distances are from the ROBOT CENTRE (robot 24 x 30.5 cm: front edge 0.12 m, sides 0.1525 m, corners
+    # 0.194 m from the centre); the lidar is 10 cm behind the centre (lidar_x), points are shifted accordingly.
+    'lidar_x': (-0.10, 'lidar position ahead of the robot centre (m); -0.10 = 10 cm behind', (-0.5, 0.5)),
+    'front_stop': (0.25, 'wall this close ahead of the centre (m) -> stop and choose a turn (13 cm from the '
+                         'bumper; leaves room for the 0.194 m turning circle)', (0.10, 1.0)),
+    'emergency_stop': (0.17, 'anything this close ahead of the centre (m) -> stop at once (5 cm from the bumper)',
+                       (0.05, 0.5)),
     'side_open': (0.55, 'side distance (m) above which there is an opening (corridors are 0.55-0.60 m wide)',
                   (0.2, 2.0)),
     'wall_target': (0.27, 'distance to keep from a single wall (m) - half the corridor', (0.1, 0.6)),
@@ -64,25 +68,32 @@ PARAMS = {
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
 
 
-def sector_min(scan, lo_deg, hi_deg):
-    """Closest valid range (m) with the angle in [lo_deg, hi_deg] (lidar frame, 0 = front, +left)."""
-    best = math.inf
+def robot_points(scan, lidar_x=0.0):
+    """Scan points as (angle_deg, distance_m) seen from the ROBOT CENTRE (base_link): the lidar sits
+    lidar_x metres ahead of the centre (negative = behind; -0.10 on this robot, user 15 Nov)."""
+    pts = []
     for i, r in enumerate(scan.ranges):
         if not (math.isfinite(r) and scan.range_min < r < scan.range_max):
             continue
-        a = math.degrees(scan.angle_min + i * scan.angle_increment)
-        a = (a + 180.0) % 360.0 - 180.0
-        if lo_deg <= a <= hi_deg:
-            best = min(best, r)
-    return best
+        a = scan.angle_min + i * scan.angle_increment
+        x, y = r * math.cos(a) + lidar_x, r * math.sin(a)
+        pts.append((math.degrees(math.atan2(y, x)), math.hypot(x, y)))
+    return pts
 
 
-def sectors(scan):
-    return {'front': sector_min(scan, -15, 15), 'front_left': sector_min(scan, 30, 60),
-            'front_right': sector_min(scan, -60, -30), 'left': sector_min(scan, 75, 105),
-            'right': sector_min(scan, -105, -75),
-            'back': min(sector_min(scan, 165, 180), sector_min(scan, -180, -165)),
-            'all': sector_min(scan, -180, 180)}
+def sector_min(pts, lo_deg, hi_deg):
+    """Closest distance (m, from the robot centre) with the angle in [lo_deg, hi_deg] (0 = front, +left)."""
+    return min((d for a, d in pts if lo_deg <= a <= hi_deg), default=math.inf)
+
+
+def sectors(scan, lidar_x=0.0):
+    """Closest distances from the robot centre in the sectors the explorer uses."""
+    pts = robot_points(scan, lidar_x)
+    return {'front': sector_min(pts, -15, 15), 'front_left': sector_min(pts, 30, 60),
+            'front_right': sector_min(pts, -60, -30), 'left': sector_min(pts, 75, 105),
+            'right': sector_min(pts, -105, -75),
+            'back': min(sector_min(pts, 165, 180), sector_min(pts, -180, -165)),
+            'all': sector_min(pts, -180, 180)}
 
 
 def lateral_offset(s, p):
@@ -272,7 +283,7 @@ class MazeExplorer(Node):
             self.set_parameters([Parameter('enabled', value=False)])
             self.say(f'stopped: max_minutes ({p["max_minutes"]:.0f}) reached - save the map')
             return
-        s = sectors(self.scan)
+        s = sectors(self.scan, p['lidar_x'])     # distances from the robot centre
         now = time.monotonic()
 
         if self.state == 'BACKOFF':

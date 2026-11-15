@@ -11,7 +11,8 @@ from launch_ros.actions import Node
 from robot_slam.tuning_store import effective_carto_dir   # lua + tuning GUI overrides (saved / this run)
 
 # Keep identical to slam.launch.py
-LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0   # yaw 0: lidar faces forward (was pi = reversed, 14 Nov)
+# lidar 10 cm BEHIND the robot centre (user 15 Nov); robot 24 x 30.5 cm, base_link = robot centre
+LASER_X, LASER_Y, LASER_Z, LASER_YAW = -0.10, 0.0, 0.15, 0.0   # yaw 0: lidar faces forward (was pi = reversed, 14 Nov)
 
 
 def generate_launch_description():
