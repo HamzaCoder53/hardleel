@@ -46,7 +46,8 @@ PARAMS = {
     'occupied_threshold': (65, 'cells from free_threshold up to this count as UNKNOWN for frontiers: Cartographer '
                                'marks barely-seen space ~40-55, a ring that hid every frontier (15 Nov)', (1, 101)),
     'return_home': (True, 'drive back to the start (map 0,0) when exploration is complete', None),
-    'goal_clearance': (0.35, 'goals keep at least this distance from walls (m); frontiers along walls sent the '
+    'goal_clearance': (0.25, 'goals keep at least this distance from walls (m) - maze: narrow corridors are 0.6 m, '
+                             'so >0.30 skips them; frontiers along walls sent the '
                              'robot into the wall (15 Nov)', (0.0, 1.5)),
 }
 # Marker for 'goal sent, not accepted yet'. Compare with IS only: == / != on a Nav2 ClientGoalHandle calls

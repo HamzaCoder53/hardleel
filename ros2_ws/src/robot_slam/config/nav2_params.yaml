@@ -125,8 +125,8 @@ local_costmap:
       - inflation_layer
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.4
+        cost_scaling_factor: 6.0   # was 3.0: maze corridors 0.6-0.8 m (course map), cost must fall off fast
+        inflation_radius: 0.30     # was 0.4: corridor centre is only 0.30-0.40 m from the walls
       static_layer:
         plugin: nav2_costmap_2d::StaticLayer
         map_subscribe_transient_local: true
@@ -178,8 +178,8 @@ global_costmap:
         map_subscribe_transient_local: true
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.4
+        cost_scaling_factor: 6.0   # was 3.0: maze corridors 0.6-0.8 m (course map), cost must fall off fast
+        inflation_radius: 0.30     # was 0.4: corridor centre is only 0.30-0.40 m from the walls
       always_send_full_costmap: true
 map_saver:
   ros__parameters:
