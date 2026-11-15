@@ -21,7 +21,7 @@ from launch_ros.actions import Node
 from robot_slam.tuning_store import merged_params_file, with_saved   # tuning GUI saved values (~/.hardleel)
 
 # Keep identical to slam.launch.py / carto_mapping.launch.py
-LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 0.0   # yaw 0: lidar faces forward (was pi = reversed, 14 Nov)
+LASER_X, LASER_Y, LASER_Z, LASER_YAW = 0.0, 0.0, 0.15, 3.14159   # pi: lidar 0 deg points to the robot BACK (object test 15 Nov; the 14 Nov change to 0 was wrong)
 
 
 def generate_launch_description():
