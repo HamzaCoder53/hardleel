@@ -321,7 +321,7 @@ collision_monitor:
       simulation_time_step: 0.1
       min_points: 6
       visualize: false
-      enabled: true
+      enabled: false   # OFF: touching a wall it blocked every command, also Nav2's back-up/spin escape (15 Nov). RPP collision detection + costmaps still avoid walls
     observation_sources:
     - scan
     scan:
