@@ -48,6 +48,16 @@ PARAMS = {
     'min_explore_distance': (3.0, 'only finish at the start after driving at least this far (m)', (0.0, 100.0)),
     'home_radius': (0.30, 'back within this distance of the start (odom) -> maze complete', (0.05, 2.0)),
     'max_minutes': (10.0, 'stop after this long no matter what', (0.5, 60.0)),
+    # --- added after the robot turned into a wall and kept pushing for 87 s (15 Nov) ---
+    'turn_clearance': (0.23, 'turn on the spot only when nothing is closer than this all around (m)', (0.0, 0.6)),
+    'max_extra_advance': (0.30, 'at a right opening, drive up to this much further to get turn clearance (m)',
+                          (0.0, 1.0)),
+    'stall_time': (2.0, 'stall check window (s)', (0.5, 10.0)),
+    'stall_turn_deg': (5.0, 'a turn that gains less than this in stall_time is stuck', (0.5, 45.0)),
+    'stall_move': (0.02, 'driving that moves less than this (m) in stall_time is stuck', (0.0, 0.3)),
+    'backoff_distance': (0.08, 'after a stall, back up this far (m) if the space behind is clear', (0.0, 0.5)),
+    'backoff_speed': (0.25, 'reverse speed for backing off (m/s)', (0.05, 1.0)),
+    'max_recoveries': (3, 'stalls in a row before giving up with STUCK', (1, 20)),
 }
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
 
@@ -68,7 +78,9 @@ def sector_min(scan, lo_deg, hi_deg):
 def sectors(scan):
     return {'front': sector_min(scan, -15, 15), 'front_left': sector_min(scan, 30, 60),
             'front_right': sector_min(scan, -60, -30), 'left': sector_min(scan, 75, 105),
-            'right': sector_min(scan, -105, -75)}
+            'right': sector_min(scan, -105, -75),
+            'back': min(sector_min(scan, 165, 180), sector_min(scan, -180, -165)),
+            'all': sector_min(scan, -180, 180)}
 
 
 def lateral_offset(s, p):
@@ -118,6 +130,9 @@ class MazeExplorer(Node):
         self.last_xy = None
         self.acc = 0.0
         self.status_text = ''
+        self.watch_t, self.watch_turned, self.watch_xy = 0.0, 0.0, None   # stall detection window
+        self.recoveries = 0
+        self.backoff_from, self.backoff_t, self.pending_turn = None, 0.0, None
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.status_pub = self.create_publisher(String, '/explore/status', LATCHED)
         self.create_subscription(LaserScan, '/scan', self.on_scan, qos_profile_sensor_data)
@@ -144,7 +159,9 @@ class MazeExplorer(Node):
                     self.state, self.acc = 'FORWARD', 0.0
                     self.travelled, self.dist_since_turn = 0.0, self.p('commit_distance')
                     self.start_xy, self.started = self.xy, time.monotonic()   # xy None -> set on first odom
-                    self.last_say = 0.0
+                    self.last_say, self.recoveries, self.pending_turn = 0.0, 0, None
+                    self.turned = 0.0
+                    self.watch()
                     self.say('exploring: following the right wall')
                 else:
                     self.state = 'IDLE'
@@ -199,9 +216,46 @@ class MazeExplorer(Node):
     def stop(self):
         self.send(0.0, 0.0)
 
+    def watch(self):
+        """(Re)start the stall-detection window."""
+        self.watch_t, self.watch_turned, self.watch_xy = time.monotonic(), self.turned, self.xy
+
     def start_turn(self, deg, why):
         self.state, self.turn_target, self.turned, self.last_yaw = 'TURN', math.radians(deg), 0.0, self.yaw
+        self.watch()
         self.say(f'exploring: {why} -> turning {deg:+.0f} deg')
+
+    def request_turn(self, deg, why, s, p):
+        """Turn now if there is room all around; otherwise back off first (once) when the space behind is clear."""
+        if s['all'] >= p['turn_clearance'] or p['turn_clearance'] <= 0:
+            self.start_turn(deg, why)
+        elif s['back'] > p['backoff_distance'] + 0.15:
+            self.start_backoff((deg, why), f'{why}: only {s["all"]:.2f} m clearance to turn')
+        else:
+            self.start_turn(deg, why + f' (tight: {s["all"]:.2f} m)')    # stall detection protects
+
+    def start_backoff(self, pending, why):
+        self.stop()
+        self.state, self.backoff_from, self.backoff_t, self.pending_turn = 'BACKOFF', self.xy, time.monotonic(), pending
+        self.say(f'exploring: {why} -> backing up')
+
+    def stalled(self, why, s, p):
+        """Robot is not moving although driven: stop, back off (if clear) and decide again; give up after a few."""
+        self.stop()
+        self.recoveries += 1
+        if self.recoveries > p['max_recoveries']:
+            self.set_parameters([Parameter('enabled', value=False)])
+            self.say(f'STUCK - {why}; {self.recoveries - 1} recoveries failed. Move the robot free, then Start again')
+            return
+        pending = None
+        if self.state == 'TURN':
+            left = math.degrees(abs(self.turn_target) - abs(self.turned))
+            pending = (math.copysign(max(left, 0.0), self.turn_target), 'finishing the turn')
+        if s['back'] > p['backoff_distance'] + 0.15:
+            self.start_backoff(pending, f'STALL {self.recoveries}/{p["max_recoveries"]}: {why}')
+        else:
+            self.set_parameters([Parameter('enabled', value=False)])
+            self.say(f'STUCK - {why} and no room behind ({s["back"]:.2f} m). Move the robot free, then Start again')
 
     # ---- control loop ----------------------------------------------------------------------------
     def tick(self):
@@ -217,6 +271,22 @@ class MazeExplorer(Node):
             self.say(f'stopped: max_minutes ({p["max_minutes"]:.0f}) reached - save the map')
             return
         s = sectors(self.scan)
+        now = time.monotonic()
+
+        if self.state == 'BACKOFF':
+            moved = math.hypot(self.xy[0] - self.backoff_from[0], self.xy[1] - self.backoff_from[1]) \
+                if self.xy and self.backoff_from else 0.0
+            if moved >= p['backoff_distance'] or now - self.backoff_t > 3.0 or s['back'] < 0.12:
+                self.stop()
+                pending, self.pending_turn = self.pending_turn, None
+                if pending and abs(pending[0]) > p['turn_overshoot_deg']:
+                    self.start_turn(pending[0], pending[1])        # no clearance check again: no back-off loops
+                else:
+                    self.state, self.acc = 'FORWARD', 0.0
+                    self.watch()
+            else:
+                self.send(-p['backoff_speed'], 0.0)
+            return
 
         if self.state == 'TURN':
             d = math.atan2(math.sin(self.yaw - self.last_yaw), math.cos(self.yaw - self.last_yaw))
@@ -225,27 +295,45 @@ class MazeExplorer(Node):
             remaining = abs(self.turn_target) - abs(self.turned)
             if remaining <= math.radians(p['turn_overshoot_deg']):
                 self.stop()
-                self.state, self.dist_since_turn, self.acc = 'FORWARD', 0.0, 0.0
+                self.state, self.dist_since_turn, self.acc, self.recoveries = 'FORWARD', 0.0, 0.0, 0
+                self.watch()
                 self.say(f'exploring: turned {math.degrees(self.turned):+.0f} deg, following the right wall')
+            elif now - self.watch_t >= p['stall_time']:
+                if abs(self.turned - self.watch_turned) < math.radians(p['stall_turn_deg']):
+                    self.stalled(f'turn blocked (only {math.degrees(abs(self.turned)):.0f} of '
+                                 f'{math.degrees(abs(self.turn_target)):.0f} deg)', s, p)
+                    return
+                self.watch()
+                self.send(0.0, math.copysign(p['turn_speed'], self.turn_target))
             else:
                 self.send(0.0, math.copysign(p['turn_speed'], self.turn_target))
             return
 
-        # FORWARD / ADVANCE
+        # FORWARD / ADVANCE: stall check (driven but not moving)
+        if now - self.watch_t >= p['stall_time']:
+            if self.watch_xy and self.xy and \
+                    math.hypot(self.xy[0] - self.watch_xy[0], self.xy[1] - self.watch_xy[1]) < p['stall_move']:
+                self.stalled('not moving forward', s, p)
+                return
+            if self.watch_xy is not None:
+                self.recoveries = 0                    # moving again
+            self.watch()
         if s['front'] < p['emergency_stop']:
             self.stop()
-            self.start_turn(choose_turn(s, p), f'EMERGENCY: obstacle {s["front"]:.2f} m ahead')
+            self.request_turn(choose_turn(s, p), f'EMERGENCY: obstacle {s["front"]:.2f} m ahead', s, p)
             return
         if s['front'] < p['front_stop']:
             self.stop()
-            self.start_turn(choose_turn(s, p), f'wall ahead ({s["front"]:.2f} m)')
+            self.request_turn(choose_turn(s, p), f'wall ahead ({s["front"]:.2f} m)', s, p)
             return
         if self.state == 'ADVANCE':
-            if self.dist_since_turn - self.advance_from >= p['opening_advance']:
-                self.stop()
-                self.start_turn(-90.0, 'right opening')
-                return
-            self.send(p['forward_speed'], 0.0)
+            advanced = self.dist_since_turn - self.advance_from
+            if advanced >= p['opening_advance']:
+                if s['all'] >= p['turn_clearance'] or advanced >= p['opening_advance'] + p['max_extra_advance']:
+                    self.stop()
+                    self.start_turn(-90.0, f'right opening (clearance {s["all"]:.2f} m)')
+                    return
+            self.send(p['forward_speed'], 0.0)        # keep going until the turn has room
             return
         # FORWARD
         if s['right'] > p['side_open'] and self.dist_since_turn >= p['commit_distance']:
