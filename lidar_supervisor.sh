@@ -12,6 +12,8 @@ PORT=${LIDAR_PORT:-$(ls /dev/serial/by-path/*usb-0:1.2:1.0-port0 2>/dev/null | h
 # values saved in the tuning GUI (sllidar_node section) win over the -p defaults above
 [ -s ~/.hardleel/saved_params.yaml ] && SAVED_PFILE="--params-file $HOME/.hardleel/saved_params.yaml"
 MODES=(${LIDAR_MODES:-Standard Express})   # NO Boost (team, 26 Oct: Boost timed out); LIDAR_MODES overrides
+# stopped by Ctrl+C / the launch file: take the driver down too (it runs in the background)
+trap 'kill -INT $pid 2>/dev/null; sleep 1; pkill -KILL -x sllidar_node 2>/dev/null; exit 0' INT TERM
 fails=0
 while true; do
   mode=${MODES[$(( (fails / 3) % ${#MODES[@]} ))]}

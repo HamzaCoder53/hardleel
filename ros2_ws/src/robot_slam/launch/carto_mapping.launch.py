@@ -45,8 +45,9 @@ def generate_launch_description():
         # start imu.launch.py first.
 
         # Cartographer: SLAM (publishes map -> odom)
+        # respawn: the tuning GUI's "Apply" rewrites the lua and stops Cartographer; it comes back with it
         Node(package='cartographer_ros', executable='cartographer_node',
-             name='cartographer_node', output='screen',
+             name='cartographer_node', output='screen', respawn=True, respawn_delay=2.0,
              parameters=[{'use_sim_time': False}],
              # default lua, or ~/.hardleel/carto/ = default + values saved/applied in the tuning GUI
              arguments=['-configuration_directory', effective_carto_dir(os.path.join(pkg, 'config')),

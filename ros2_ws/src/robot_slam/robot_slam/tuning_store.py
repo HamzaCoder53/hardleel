@@ -184,17 +184,17 @@ def carto_overrides():
 
 
 def effective_carto_dir(default_dir, basename='cartographer_2d.lua'):
-    """Write <basename> = default lua + overrides into CARTO_DIR and return the directory to give
-    Cartographer. Without overrides the default directory is returned unchanged."""
+    """Write <basename> = default lua + overrides into CARTO_DIR (always, also without overrides) and return
+    CARTO_DIR. Always the same path, so a respawned Cartographer (launch respawn) reads a rewritten file:
+    that is how the tuning GUI's "Apply" works when Cartographer runs inside a launch file."""
     over = carto_overrides()
-    if not over:
-        return default_dir
     with open(os.path.join(default_dir, basename)) as f:
         text = f.read()
-    block = '\n-- tuning overrides (~/.hardleel saved_carto.yaml / session_carto.yaml)\n' + \
-        '\n'.join(f'{k} = {v}' for k, v in sorted(over.items())) + '\n'
-    idx = text.rfind('return options')
-    text = text[:idx] + block + '\n' + text[idx:] if idx >= 0 else text + block
+    if over:
+        block = '\n-- tuning overrides (~/.hardleel saved_carto.yaml / session_carto.yaml)\n' + \
+            '\n'.join(f'{k} = {v}' for k, v in sorted(over.items())) + '\n'
+        idx = text.rfind('return options')
+        text = text[:idx] + block + '\n' + text[idx:] if idx >= 0 else text + block
     os.makedirs(CARTO_DIR, exist_ok=True)
     with open(os.path.join(CARTO_DIR, basename), 'w') as f:
         f.write(text)

@@ -40,6 +40,15 @@ Visualization Manager:
       Show Names: true
       Show Axes: true
       Marker Scale: 0.5
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Frontiers (auto mapping)
+      Enabled: true
+      Topic:
+        Value: /explore/frontiers
+        Durability Policy: Volatile
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+        Depth: 1
   Global Options:
     Fixed Frame: map
     Background Color: 48; 48; 48

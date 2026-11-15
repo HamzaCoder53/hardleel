@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml') + glob('config/*.lua')),
+        (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,5 +25,6 @@ setup(
         'imu_serial_node = robot_slam.imu_serial_node:main',
         'tuning_helper = robot_slam.tuning_helper:main',   # Pi side of the tuning GUI
         'tuning_gui = robot_slam.tuning_gui:main',         # laptop: live parameter tuning
+        'frontier_explorer = robot_slam.frontier_explorer:main',   # laptop: auto mapping
     ]},
 )

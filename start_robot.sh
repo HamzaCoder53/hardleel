@@ -8,7 +8,12 @@
 # IMU calibrates.
 # Tuning: every run starts from the code defaults + values SAVED in the tuning GUI (~/.hardleel); live GUI
 # changes and Cartographer "Apply" values from the previous run are dropped here.
+# Modes:  bash ~/start_robot.sh        manual mapping (teleop), IMU EKF gives odom->base_link
+#         bash ~/start_robot.sh auto   auto mapping: IMU without EKF + window "odom" (rf2o + nav EKF on the Pi);
+#                                      then on the laptop: hauto (Nav2 + frontier explorer, Start in htune)
 # Stop:  tmux kill-session -t robot
+MODE=${1:-manual}
+case $MODE in manual) IMU_ARGS= ;; auto) IMU_ARGS="use_ekf:=false" ;; *) echo "usage: start_robot.sh [auto]"; exit 1 ;; esac
 IMU_WAIT_S=${IMU_WAIT_S:-60}
 RUN='bash -ic'
 SAVED=~/.hardleel/saved_params.yaml
@@ -24,7 +29,7 @@ rm -f ~/.hardleel/session_carto.yaml          # last run's unsaved Cartographer 
 PFILE=${SAVED:+--ros-args --params-file $SAVED}
 
 echo "1/3 starting IMU ..."
-tmux new -d -s robot -n imu "$RUN 'ros2 launch robot_slam imu.launch.py ${IMU_PORT:+imu_port:=$IMU_PORT} 2>&1 | tee ~/imu.log'"
+tmux new -d -s robot -n imu "$RUN 'ros2 launch robot_slam imu.launch.py $IMU_ARGS ${IMU_PORT:+imu_port:=$IMU_PORT} 2>&1 | tee ~/imu.log'"
 # imu_serial_node logs "Publishing." after its gyro calibration; then confirm the topic
 # (a ros2 CLI call alone takes >3 s to start on the Pi, so give it 10 s)
 for ((t = 0; t < IMU_WAIT_S; t += 2)); do
@@ -40,7 +45,11 @@ echo "2/3 starting lidar + Cartographer ..."
 tmux new-window -t robot -n lidar "$RUN 'bash ~/lidar_supervisor.sh 2>&1 | tee ~/lidar_supervisor.log'"
 tmux new-window -t robot -n carto "$RUN 'ros2 launch robot_slam carto_mapping.launch.py use_lidar:=false 2>&1 | tee ~/carto.log'"
 
+if [ "$MODE" = auto ]; then
+  echo "    auto mode: rf2o + navigation EKF on the Pi (odom->base_link, /odom)"
+  tmux new-window -t robot -n odom "$RUN 'ros2 launch robot_slam pi_odom.launch.py 2>&1 | tee ~/odom.log'"
+fi
 echo "3/3 starting motor bridge + tuning helper ..."
 tmux new-window -t robot -n motors "$RUN 'ros2 run motor_teleop esp32_teleop_bridge $PFILE 2>&1 | tee ~/motors.log'"
 tmux new-window -t robot -n tuning "$RUN 'ros2 run robot_slam tuning_helper 2>&1 | tee ~/tuning.log'"
-echo "started: tmux attach -t robot   (windows: imu, lidar, carto, motors, tuning)"
+echo "started ($MODE): tmux attach -t robot   (windows: $(tmux list-windows -t robot -F '#W' | paste -sd' '))"

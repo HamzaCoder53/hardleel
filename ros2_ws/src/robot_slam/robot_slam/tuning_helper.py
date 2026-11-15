@@ -11,6 +11,7 @@ Nothing is written unless the GUI sends it; start_robot.sh deletes the session f
 """
 import os
 import subprocess
+import threading
 
 import rclpy
 import yaml
@@ -34,6 +35,7 @@ class TuningHelper(Node):
         self.status_pub = self.create_publisher(String, '/hardleel_tuning/status', 10)
         self.create_subscription(String, '/hardleel_tuning/save', self.on_save, 10)
         self.create_subscription(String, '/hardleel_tuning/carto_apply', self.on_apply, 10)
+        self.create_subscription(String, '/hardleel_tuning/save_map', self.on_save_map, 10)
         self.publish_state()
         self.get_logger().info('tuning helper ready')
 
@@ -74,16 +76,49 @@ class TuningHelper(Node):
                 self.status(f'Pi: not applied, invalid lua values {bad} (use numbers, true/false, math.rad(x))')
                 return
             ts.write(ts.SESSION_CARTO, session)
+            ts.effective_carto_dir(os.path.dirname(self.lua))     # rewrite ~/.hardleel/carto/cartographer_2d.lua
             self.publish_state()
-            if subprocess.run(['tmux', 'has-session', '-t', 'robot'], capture_output=True).returncode != 0:
-                self.status('Pi: values stored for this run, but tmux session "robot" is not running')
+            tmux_carto = subprocess.run(['tmux', 'list-windows', '-t', 'robot', '-F', '#W'], capture_output=True,
+                                        text=True).stdout.split()
+            if 'carto' in tmux_carto:        # started by start_robot.sh: recreate the tmux window
+                subprocess.run(['tmux', 'kill-window', '-t', 'robot:carto'], capture_output=True)
+                subprocess.run(['tmux', 'new-window', '-d', '-t', 'robot', '-n', 'carto', f'bash -ic "{CARTO_CMD}"'],
+                               check=True)
+                how = 'tmux window restarted'
+            elif subprocess.run(['pkill', '-INT', '-x', 'cartographer_no'], capture_output=True).returncode == 0:
+                how = 'stopped, the launch file respawns it in ~2 s'   # pi_mapping.launch.py: respawn=True
+            else:
+                self.status('Pi: values stored for this run, but Cartographer is not running')
                 return
-            subprocess.run(['tmux', 'kill-window', '-t', 'robot:carto'], capture_output=True)
-            subprocess.run(['tmux', 'new-window', '-d', '-t', 'robot', '-n', 'carto', f'bash -ic "{CARTO_CMD}"'],
-                           check=True)
-            self.status(f'Pi: Cartographer restarted with {len(session)} session value(s) - new map started')
+            self.status(f'Pi: Cartographer restarting with {len(session)} session value(s) ({how}) - new map')
         except Exception as e:  # noqa: BLE001
             self.status(f'Pi: apply failed: {e}')
+
+
+    def on_save_map(self, msg):
+        """Save the live Cartographer map as ~/maps/<name>.{pbstream,pgm,yaml} without stopping mapping."""
+        name = ''.join(ch for ch in msg.data.strip() if ch.isalnum() or ch in '_-')
+        if not name:
+            self.status('Pi: map not saved - empty name')
+            return
+        threading.Thread(target=self.save_map, args=(name,), daemon=True).start()
+
+    def save_map(self, name):
+        base = os.path.expanduser(f'~/maps/{name}')
+        os.makedirs(os.path.dirname(base), exist_ok=True)
+        self.status(f'Pi: saving map {name} ...')
+        req = f'{{filename: {base}.pbstream, include_unfinished_submaps: true}}'
+        ws = subprocess.run(['ros2', 'service', 'call', '/write_state', 'cartographer_ros_msgs/srv/WriteState', req],
+                            capture_output=True, text=True, timeout=120)
+        ms = subprocess.run(['ros2', 'run', 'nav2_map_server', 'map_saver_cli', '-f', base,
+                             '--ros-args', '-p', 'map_subscribe_transient_local:=true'],
+                            capture_output=True, text=True, timeout=90)
+        got = [ext for ext in ('pbstream', 'pgm', 'yaml') if os.path.exists(f'{base}.{ext}')]
+        if len(got) == 3:
+            self.status(f'Pi: map saved: ~/maps/{name}.pbstream/.pgm/.yaml')
+        else:
+            err = (ws.stdout + ws.stderr + ms.stderr)[-200:].replace('\n', ' ')
+            self.status(f'Pi: map save incomplete (have {got}): {err}')
 
 
 def main():

@@ -29,6 +29,7 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
 
 from robot_slam import tuning_store as ts
+from robot_slam.carto_help import CARTO_HELP
 
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
 HIDE_PARAMS = ('use_sim_time', 'qos_overrides.', 'start_type_description_service', 'tf_buffer')
@@ -37,7 +38,9 @@ HIDE_NODES = ('_ros2cli', 'transform_listener_impl', 'launch_ros', 'hardleel_tun
 # Nodes known to apply parameter changes while running; others usually need a restart (Save first).
 LIVE_NODES = ('esp32_teleop_bridge', 'controller_server', 'planner_server', 'local_costmap', 'global_costmap',
               'velocity_smoother', 'amcl', 'behavior_server', 'collision_monitor', 'smoother_server',
-              'bt_navigator', 'waypoint_follower', 'imu_serial_node')
+              'bt_navigator', 'waypoint_follower', 'imu_serial_node', 'frontier_explorer')
+# Never written by Save: the explorer must not start driving by itself on the next launch.
+NEVER_SAVE = {('/frontier_explorer', 'enabled')}
 GREEN, YELLOW, RED, GREY = QColor(200, 240, 200), QColor(255, 240, 180), QColor(255, 205, 205), QColor(225, 225, 225)
 
 
@@ -104,6 +107,14 @@ class RosSide(Node):
         self.create_subscription(String, '/hardleel_tuning/carto_info', self.on_info, LATCHED)
         self.create_subscription(String, '/hardleel_tuning/saved_params', self.on_saved, LATCHED)
         self.create_subscription(String, '/hardleel_tuning/status', lambda m: self.statuses.append(m.data), 10)
+        # auto mapping (frontier_explorer on the laptop, map saving via tuning_helper on the Pi)
+        self.explore_status = None
+        self.explore_pub = self.create_publisher(String, '/explore/command', 10)
+        self.save_map_pub = self.create_publisher(String, '/hardleel_tuning/save_map', 10)
+        self.create_subscription(String, '/explore/status', self.on_explore_status, LATCHED)
+
+    def on_explore_status(self, msg):
+        self.explore_status = msg.data
 
     def on_info(self, msg):
         self.carto_info = yaml.safe_load(msg.data) or {}
@@ -165,6 +176,7 @@ class TuningWindow(QMainWindow):
         tabs = QTabWidget()
         tabs.addTab(self.build_params_tab(), 'Node parameters (live)')
         tabs.addTab(self.build_carto_tab(), 'Cartographer (lua, restart)')
+        tabs.addTab(self.build_auto_tab(), 'Auto mapping')
         central = QWidget()
         lay = QVBoxLayout(central)
         lay.addWidget(tabs)
@@ -354,10 +366,12 @@ class TuningWindow(QMainWindow):
         lay.addWidget(QLabel('Cartographer reads these only at start. "Apply" restarts Cartographer on the Pi with '
                              'them for THIS RUN (the current map is lost - save it first). Values: numbers, '
                              'true/false or math.rad(x).'))
-        self.carto = QTableWidget(0, 4)
-        self.carto.setHorizontalHeaderLabels(['Lua key', 'Value (edit)', 'Default', 'Status'])
+        self.carto = QTableWidget(0, 5)
+        self.carto.setHorizontalHeaderLabels(['Lua key', 'Value (edit)', 'Default', 'Meaning (hover for all)',
+                                              'Status'])
         self.carto.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.carto.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        self.carto.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.carto.itemChanged.connect(self.carto_edited)
         lay.addWidget(self.carto)
         bar = QHBoxLayout()
@@ -375,14 +389,18 @@ class TuningWindow(QMainWindow):
         d, saved, session = info.get('defaults', {}), info.get('saved', {}), info.get('session', {})
         self.loading = True
         self.carto.setRowCount(0)
-        for key in sorted(d):
+        order = [k for k in CARTO_HELP if k in d] + sorted(k for k in d if k not in CARTO_HELP)
+        for key in order:
             val = str(session.get(key, saved.get(key, d[key])))
             r = self.carto.rowCount()
             self.carto.insertRow(r)
-            for c, text in enumerate([key, val, d[key], '']):
+            help_text = CARTO_HELP.get(key, '')
+            for c, text in enumerate([key, val, d[key], help_text, '']):
                 it = QTableWidgetItem(text)
                 if c != 1:
                     it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+                if help_text:
+                    it.setToolTip(help_text)
                 self.carto.setItem(r, c, it)
             self.carto_paint(r, key in session, key in saved)
         self.loading = False
@@ -392,9 +410,9 @@ class TuningWindow(QMainWindow):
         changed = self.carto.item(r, 1).text().strip() != self.carto.item(r, 2).text().strip()
         text = 'this run (applied)' if in_session else 'saved' if in_saved else 'edited, not applied' \
             if changed else ''
-        self.carto.item(r, 3).setText(text)
+        self.carto.item(r, 4).setText(text)
         color = GREEN if in_session else YELLOW if (changed or in_saved) else None
-        for c in range(4):
+        for c in range(5):
             self.carto.item(r, c).setBackground(QBrush(color) if color else QBrush())
 
     def carto_edited(self, item):
@@ -445,6 +463,55 @@ class TuningWindow(QMainWindow):
         self.loading = False
         self.say('Cartographer table reset to defaults (press Apply to use them now, Save to keep)')
 
+    # ---- auto mapping tab ----------------------------------------------------------------------
+    def build_auto_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.addWidget(QLabel(
+            'Auto mapping: Pi "bash ~/start_robot.sh auto", laptop "hauto". The robot explores until no unknown '
+            'edges (frontiers) are left.\nStay with the robot - Stop (or teleop k / Ctrl+C in the hauto window) '
+            'ends it. Explorer and Nav2 settings: Node parameters tab -> /frontier_explorer, /controller_server, '
+            '/local_costmap/local_costmap, /velocity_smoother ...'))
+        self.auto_status = QLabel('explorer: not running (start hauto on the laptop)')
+        self.auto_status.setStyleSheet('font-size: 15px; font-weight: bold; padding: 8px;')
+        self.auto_status.setWordWrap(True)
+        lay.addWidget(self.auto_status)
+        row = QHBoxLayout()
+        for text, cmd in (('Start exploring', 'start'), ('STOP', 'stop'), ('Return to start', 'home')):
+            b = QPushButton(text)
+            b.setMinimumHeight(48)
+            if cmd == 'stop':
+                b.setStyleSheet('background: #d33; color: white; font-weight: bold;')
+            b.clicked.connect(lambda _=False, c=cmd: self.explore_cmd(c))
+            row.addWidget(b)
+        lay.addLayout(row)
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel('Map name:'))
+        self.map_name = QLineEdit(time.strftime('auto_%Y%m%d_%H%M'))
+        row2.addWidget(self.map_name)
+        b = QPushButton('Save map on the Pi (~/maps, mapping keeps running)')
+        b.clicked.connect(self.save_map)
+        row2.addWidget(b)
+        lay.addLayout(row2)
+        lay.addStretch(1)
+        return w
+
+    def explore_cmd(self, cmd):
+        if cmd == 'start' and QMessageBox.question(
+                self, 'Start auto mapping?', 'The robot will drive by itself.\nAre you with the robot and is '
+                'the area clear?') != QMessageBox.Yes:
+            return
+        self.ros.explore_pub.publish(String(data=cmd))
+        self.say(f'explorer: {cmd} sent')
+
+    def save_map(self):
+        name = ''.join(ch for ch in self.map_name.text().strip() if ch.isalnum() or ch in '_-')
+        if not name:
+            self.say('give the map a name (letters, digits, _ or -)')
+            return
+        self.ros.save_map_pub.publish(String(data=name))
+        self.say(f'saving map "{name}" on the Pi ...')
+
     # ---- save / clear ---------------------------------------------------------------------------
     def wanted_overrides(self):
         """Everything that differs from this run's start (live changes + pending), merged over what is saved."""
@@ -455,6 +522,8 @@ class TuningWindow(QMainWindow):
                 flat.setdefault(key[0], {})[key[1]] = val
         for key, val in self.pending.items():
             flat.setdefault(key[0], {})[key[1]] = val
+        for node, name in NEVER_SAVE:
+            flat.get(node, {}).pop(name, None)
         return {n: p for n, p in flat.items() if p}
 
     def save(self):
@@ -478,6 +547,8 @@ class TuningWindow(QMainWindow):
 
     # ---- misc ----------------------------------------------------------------------------------
     def poll(self):
+        if self.ros.explore_status is not None:
+            self.auto_status.setText('explorer: ' + self.ros.explore_status)
         if self.ros.carto_info is not None and not self.carto_loaded:
             self.fill_carto(self.ros.carto_info)
         while self.ros.statuses:
