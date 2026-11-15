@@ -43,8 +43,13 @@ PARAMS = {
     'blacklist_radius': (0.4, 'frontiers this close to a failed goal are skipped (m)', (0.05, 3.0)),
     'explored_radius': (0.25, 'cancel the goal early when no unknown cells are left this close to it (m)', (0.0, 2.0)),
     'free_threshold': (25, 'map cells below this occupancy (0-100) count as free', (0, 100)),
+    'occupied_threshold': (65, 'cells from free_threshold up to this count as UNKNOWN for frontiers: Cartographer '
+                               'marks barely-seen space ~40-55, a ring that hid every frontier (15 Nov)', (1, 101)),
     'return_home': (True, 'drive back to the start (map 0,0) when exploration is complete', None),
 }
+# Marker for 'goal sent, not accepted yet'. Compare with IS only: == / != on a Nav2 ClientGoalHandle calls
+# its __eq__, which reads other.goal_id and crashed the explorer on a string (15 Nov).
+PENDING = object()
 LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
 
 
@@ -59,7 +64,7 @@ class FrontierExplorer(Node):
             self.get_logger().warn('enabled was true at start - forced OFF; press Start to explore')
         self.add_on_set_parameters_callback(self.on_params)
         self.map = None
-        self.goal_handle = None     # None, 'pending' (sent, not accepted yet) or the Nav2 goal handle
+        self.goal_handle = None     # None, PENDING (sent, not accepted yet) or the Nav2 goal handle
         self.token = None           # identifies the current goal; callbacks of older goals are ignored
         self.goal_xy = None
         self.goal_sent = 0.0
@@ -136,7 +141,7 @@ class FrontierExplorer(Node):
 
     def frontier_clusters(self, g):
         free = (g >= 0) & (g < self.p('free_threshold'))
-        unknown = g < 0
+        unknown = self.unknownish(g)
         near_unknown = np.zeros_like(unknown)
         near_unknown[1:, :] |= unknown[:-1, :]
         near_unknown[:-1, :] |= unknown[1:, :]
@@ -163,6 +168,10 @@ class FrontierExplorer(Node):
             clusters.append(cells)
         return clusters
 
+    def unknownish(self, g):
+        """Unknown (-1) or barely seen (free_threshold <= value < occupied_threshold)."""
+        return (g < 0) | ((g >= self.p('free_threshold')) & (g < self.p('occupied_threshold')))
+
     def unknown_near(self, g, info, xy, radius):
         if radius <= 0:
             return True
@@ -170,7 +179,7 @@ class FrontierExplorer(Node):
         r = int((xy[1] - info.origin.position.y) / info.resolution)
         k = max(1, int(radius / info.resolution))
         win = g[max(0, r - k):r + k + 1, max(0, c - k):c + k + 1]
-        return bool((win < 0).any())
+        return bool(self.unknownish(win).any())
 
     # ---- main loop -----------------------------------------------------------------------------
     def loop(self):
@@ -230,7 +239,7 @@ class FrontierExplorer(Node):
         goal.pose.pose.orientation.z, goal.pose.pose.orientation.w = math.sin(yaw / 2), math.cos(yaw / 2)
         self.goal_xy, self.goal_sent = xy, time.monotonic()
         token = object()
-        self.token, self.goal_handle = token, 'pending'
+        self.token, self.goal_handle = token, PENDING
         self.nav.send_goal_async(goal).add_done_callback(lambda f: self.on_goal_accepted(f, token))
         self.set_state(state)
 
@@ -271,7 +280,7 @@ class FrontierExplorer(Node):
         self.set_state(f'exploring: {why} - blacklisted, picking another frontier')
 
     def check_goal(self):
-        if self.goal_handle == 'pending':
+        if self.goal_handle is PENDING:
             if time.monotonic() - self.goal_sent > 10.0:
                 self.goal_failed('Nav2 did not accept the goal within 10 s')
             return
@@ -294,7 +303,7 @@ class FrontierExplorer(Node):
     def cancel_goal(self):
         h = self.goal_handle
         self.token, self.goal_handle = None, None   # a still-pending goal is cancelled once accepted
-        if h is not None and h != 'pending':
+        if h is not None and h is not PENDING:
             h.cancel_goal_async()
 
     def go_home(self):
