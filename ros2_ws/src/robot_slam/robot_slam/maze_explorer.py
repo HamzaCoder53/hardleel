@@ -170,7 +170,9 @@ class MazeExplorer(Node):
             if prm.name == 'enabled':
                 if prm.value:
                     self.state, self.acc = 'FORWARD', 0.0
-                    self.travelled, self.dist_since_turn = 0.0, self.p('commit_distance')
+                    # dist_since_turn 0: drive commit_distance along the corridor before taking any right opening
+                    # (15 Nov: an instant right turn at Start, into an open area, left it boxed in against walls)
+                    self.travelled, self.dist_since_turn = 0.0, 0.0
                     self.start_xy, self.started = self.xy, time.monotonic()   # xy None -> set on first odom
                     self.last_say, self.recoveries, self.pending_turn = 0.0, 0, None
                     self.turned = 0.0
