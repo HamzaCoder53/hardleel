@@ -35,7 +35,7 @@ PARAMS = {
     'turn_speed': (1.0, 'turn-on-the-spot speed rad/s', (0.2, 3.0)),
     'front_stop': (0.30, 'wall this close ahead (m, from the lidar) -> stop and choose a turn', (0.10, 1.0)),
     'emergency_stop': (0.20, 'anything this close ahead (m, from the lidar) -> stop at once; robot front edge is '
-                             '0.14 m ahead of the lidar (28 x 30.5 cm robot)', (0.05, 0.5)),
+                             '0.12 m ahead of the lidar (24 x 30.5 cm robot)', (0.05, 0.5)),
     'side_open': (0.55, 'side distance (m) above which there is an opening (corridors are 0.55-0.60 m wide)',
                   (0.2, 2.0)),
     'wall_target': (0.27, 'distance to keep from a single wall (m) - half the corridor', (0.1, 0.6)),
@@ -51,7 +51,7 @@ PARAMS = {
     'max_minutes': (10.0, 'stop after this long no matter what', (0.5, 60.0)),
     # --- added after the robot turned into a wall and kept pushing for 87 s (15 Nov) ---
     'turn_clearance': (0.23, 'turn on the spot only when nothing is closer than this all around (m); robot corners '
-                             'sweep 0.207 m (28 x 30.5 cm)', (0.0, 0.6)),
+                             'sweep 0.194 m (24 x 30.5 cm)', (0.0, 0.6)),
     'max_extra_advance': (0.30, 'at a right opening, drive up to this much further to get turn clearance (m)',
                           (0.0, 1.0)),
     'stall_time': (2.0, 'stall check window (s)', (0.5, 10.0)),

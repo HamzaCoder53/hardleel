@@ -119,8 +119,8 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      # real robot 28 cm long x 30.5 cm wide (user 15 Nov), lidar assumed at the centre
-      footprint: "[[0.14, 0.1525], [0.14, -0.1525], [-0.14, -0.1525], [-0.14, 0.1525]]"
+      # real robot 24 cm long x 30.5 cm wide (user 15 Nov), lidar assumed at the centre
+      footprint: "[[0.12, 0.1525], [0.12, -0.1525], [-0.12, -0.1525], [-0.12, 0.1525]]"
       plugins:
       - obstacle_layer
       - inflation_layer
@@ -153,8 +153,8 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      # real robot 28 cm long x 30.5 cm wide (user 15 Nov), lidar assumed at the centre
-      footprint: "[[0.14, 0.1525], [0.14, -0.1525], [-0.14, -0.1525], [-0.14, 0.1525]]"
+      # real robot 24 cm long x 30.5 cm wide (user 15 Nov), lidar assumed at the centre
+      footprint: "[[0.12, 0.1525], [0.12, -0.1525], [-0.12, -0.1525], [-0.12, 0.1525]]"
       resolution: 0.05
       track_unknown_space: true
       plugins:
