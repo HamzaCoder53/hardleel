@@ -25,6 +25,7 @@ setup(
         'imu_serial_node = robot_slam.imu_serial_node:main',
         'tuning_helper = robot_slam.tuning_helper:main',   # Pi side of the tuning GUI
         'tuning_gui = robot_slam.tuning_gui:main',         # laptop: live parameter tuning
-        'frontier_explorer = robot_slam.frontier_explorer:main',   # laptop: auto mapping
+        'frontier_explorer = robot_slam.frontier_explorer:main',   # laptop: auto mapping in open space (Nav2)
+        'maze_explorer = robot_slam.maze_explorer:main',           # Pi: auto mapping in the maze (wall follower)
     ]},
 )

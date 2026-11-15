@@ -3,8 +3,9 @@ plus the ESP32 motor bridge and the tuning helper. Laptop side: laptop_mapping.l
 
 usage (on the Pi, ROS settings from ~/.bashrc):
   ros2 launch robot_slam pi_mapping.launch.py              manual mapping (teleop)
-  ros2 launch robot_slam pi_mapping.launch.py auto:=true   auto mapping: IMU without EKF + rf2o/EKF on the Pi
-                                                           (laptop: laptop_auto.launch.py / hauto)
+  ros2 launch robot_slam pi_mapping.launch.py auto:=true   auto mapping in the maze: IMU without EKF, rf2o/EKF
+                                                           and the maze explorer on the Pi (laptop: hmap only;
+                                                           Start in the tuning GUI Auto tab - NOT hauto/Nav2)
 Keep the robot still until the IMU logs "Publishing." (gyro calibration). Ctrl+C stops everything.
 Same nodes as start_robot.sh (which runs them in tmux windows instead). Values saved in the tuning GUI
 are loaded; last run's unsaved Cartographer "Apply" values are dropped.
@@ -45,6 +46,9 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'pi_odom.launch.py')),
             condition=IfCondition(auto)),
+        # auto mode: maze explorer (right-hand wall follower) on the Pi, starts DISABLED (Start in the GUI)
+        Node(package='robot_slam', executable='maze_explorer', name='maze_explorer', output='screen',
+             parameters=ts.with_saved(), condition=IfCondition(auto)),
     ]
     started = {'done': False}
 

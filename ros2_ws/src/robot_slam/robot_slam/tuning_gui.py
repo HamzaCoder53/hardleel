@@ -38,9 +38,9 @@ HIDE_NODES = ('_ros2cli', 'transform_listener_impl', 'launch_ros', 'hardleel_tun
 # Nodes known to apply parameter changes while running; others usually need a restart (Save first).
 LIVE_NODES = ('esp32_teleop_bridge', 'controller_server', 'planner_server', 'local_costmap', 'global_costmap',
               'velocity_smoother', 'amcl', 'behavior_server', 'collision_monitor', 'smoother_server',
-              'bt_navigator', 'waypoint_follower', 'imu_serial_node', 'frontier_explorer')
+              'bt_navigator', 'waypoint_follower', 'imu_serial_node', 'frontier_explorer', 'maze_explorer')
 # Never written by Save: the explorer must not start driving by itself on the next launch.
-NEVER_SAVE = {('/frontier_explorer', 'enabled')}
+NEVER_SAVE = {('/frontier_explorer', 'enabled'), ('/maze_explorer', 'enabled')}
 GREEN, YELLOW, RED, GREY = QColor(200, 240, 200), QColor(255, 240, 180), QColor(255, 205, 205), QColor(225, 225, 225)
 
 
@@ -468,10 +468,12 @@ class TuningWindow(QMainWindow):
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.addWidget(QLabel(
-            'Auto mapping: Pi "bash ~/start_robot.sh auto", laptop "hauto". The robot explores until no unknown '
-            'edges (frontiers) are left.\nStay with the robot - Stop (or teleop k / Ctrl+C in the hauto window) '
-            'ends it. Explorer and Nav2 settings: Node parameters tab -> /frontier_explorer, /controller_server, '
-            '/local_costmap/local_costmap, /velocity_smoother ...'))
+            'Auto mapping in the MAZE: Pi "ros2 launch robot_slam pi_mapping.launch.py auto:=true" (starts the maze '
+            'explorer on the Pi), laptop "hmap" only - do NOT run hauto (Nav2) with it. Right-hand wall following '
+            'until it is back at the start.\nStay with the robot - STOP (red) ends it at once; Ctrl+C of the Pi launch '
+            'also stops everything. '
+            'ends it. Settings: Node parameters tab -> /maze_explorer (speeds, wall distances, turns); '
+            'open-space mode (hauto): /frontier_explorer + Nav2.'))
         self.auto_status = QLabel('explorer: not running (start hauto on the laptop)')
         self.auto_status.setStyleSheet('font-size: 15px; font-weight: bold; padding: 8px;')
         self.auto_status.setWordWrap(True)
