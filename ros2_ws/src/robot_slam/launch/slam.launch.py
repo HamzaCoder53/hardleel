@@ -40,7 +40,7 @@ def generate_launch_description():
 
         # base_link -> laser. EDIT x, y, z (metres, from robot centre; x forward,
         # y left, z up) and yaw (radians) to match where the LiDAR is mounted.
-        static_tf(0.0, 0.0, 0.15, 3.14159, 'base_link', 'laser', 'base_to_laser'),   # pi: lidar mounted reversed (test 15 Nov)
+        static_tf(0.0, 0.0, 0.15, 0.0, 'base_link', 'laser', 'base_to_laser'),   # yaw 0 (was pi = reversed)
 
         # odom -> base_link: fixed at zero because there are no encoders
         # (SLAM Toolbox drops every scan without this transform)
