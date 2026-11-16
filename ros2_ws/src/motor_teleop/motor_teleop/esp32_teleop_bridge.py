@@ -9,16 +9,25 @@ cmd_timeout it sends 'x', and if this node or the link dies the ESP32 stops by i
 Values from the team's 26 Oct tuning (feat/esp32-motors): max_pwm 75, hold 200 ms (400 overshot
 turns), LEFT side reversed. max_speed 0.5 so teleop_twist_keyboard's default 0.5 m/s = max_pwm.
 The port is opened with DTR/RTS released: asserted, they hold the ESP32 in reset (13-14 Nov).
+
+DIY wheel encoders (16 Nov, docs/WHEEL_ENCODERS.md): the sketch streams 'E <ms> <lf> <lr> <rf> <rr>'.
+With encoders:=true this node publishes /wheel/odom (nav_msgs/Odometry, frame odom -> base_link,
+NO TF) and /wheel/speeds (Float32MultiArray [lf, lr, rf, rr] m/s). Off by default.
 """
 import glob
+import math
 import threading
 import time
 
 import rclpy
 import serial
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float32MultiArray
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.node import Node
+
+from motor_teleop.wheel_odom import WheelOdom, parse_line
 
 # name: (default, description, (min, max) or None)
 PARAMS = {
@@ -35,7 +44,14 @@ PARAMS = {
     'cmd_timeout': (0.6, 'Pi watchdog: s without cmd_vel before stop', (0.1, 5.0)),
     'accel': (1.0, 'wheel speed ramp UP, m/s^2 (0 = jump at once)', (0.0, 20.0)),
     'decel': (2.0, 'wheel speed ramp DOWN, m/s^2 (0 = jump); watchdog stops are always instant', (0.0, 20.0)),
+    'encoders': (False, 'publish /wheel/odom + /wheel/speeds from the ESP32 E lines', None),
+    'ticks_per_rev': (40.0, 'encoder counts per WHEEL turn (20-slot disc, both edges = 40)', (1.0, 100000.0)),
+    'wheel_diameter': (0.065, 'wheel diameter m (measure! calibrate with a 2 m straight run)', (0.01, 0.5)),
+    'track_width': (0.30, 'EFFECTIVE track m for encoder yaw (skid steer: calibrate by spinning)', (0.05, 2.0)),
+    'enc_window': (0.2, 'speed averaging window s', (0.05, 2.0)),
 }
+ENC_PARAMS = ('ticks_per_rev', 'wheel_diameter', 'track_width', 'enc_window')
+
 
 
 def default_port():
@@ -78,6 +94,11 @@ class Esp32TeleopBridge(Node):
 
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd, 10)
         self.timer = self.create_timer(1.0 / float(g('send_rate')), self.tick)
+        self.encoders = bool(g('encoders'))
+        self.odom = WheelOdom()
+        self.apply_enc_params({n: g(n) for n in ENC_PARAMS})
+        self.odom_pub = self.create_publisher(Odometry, 'wheel/odom', 10)
+        self.speed_pub = self.create_publisher(Float32MultiArray, 'wheel/speeds', 10)
         self.add_on_set_parameters_callback(self.on_params)
         threading.Thread(target=self.reader, daemon=True).start()
 
@@ -109,8 +130,10 @@ class Esp32TeleopBridge(Node):
                 self.zero_speed = float(value)
             elif name == 'invert_left':
                 self.inv_l = bool(value)
+                self.apply_enc_params({})
             elif name == 'invert_right':
                 self.inv_r = bool(value)
+                self.apply_enc_params({})
             elif name == 'hold_ms':
                 self.hold_ms = int(value)
             elif name == 'cmd_timeout':
@@ -119,12 +142,52 @@ class Esp32TeleopBridge(Node):
                 self.accel = float(value)
             elif name == 'decel':
                 self.decel = float(value)
+            elif name == 'encoders':
+                self.encoders = bool(value)
+            elif name in ENC_PARAMS:
+                self.apply_enc_params({name: value})
             elif name == 'send_rate':
                 self.timer.cancel()
                 self.destroy_timer(self.timer)
                 self.timer = self.create_timer(1.0 / float(value), self.tick)
         self.get_logger().info('tuned: ' + ', '.join(f'{k}={v}' for k, v in new.items()))
         return SetParametersResult(successful=True)
+
+    def apply_enc_params(self, p):
+        o = self.odom
+        o.ticks_per_rev = float(p.get('ticks_per_rev', o.ticks_per_rev))
+        o.wheel_diameter = float(p.get('wheel_diameter', o.wheel_diameter))
+        o.track_width = float(p.get('track_width', o.track_width))
+        o.window = float(p.get('enc_window', o.window))
+        # counts carry the sketch's sign; flip them the same way the PWM is flipped
+        o.sign_left, o.sign_right = (-1 if self.inv_l else 1), (-1 if self.inv_r else 1)
+
+    def on_encoders(self, millis, counts):
+        r = self.odom.update(millis, counts)
+        if r is None or not self.encoders:
+            return
+        if r['faults']:
+            self.get_logger().warn(f'encoder looks dead: {", ".join(r["faults"])} '
+                                   '(using the other wheel of that side)', throttle_duration_sec=5.0)
+        msg = Odometry()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id, msg.child_frame_id = 'odom', 'base_link'
+        msg.pose.pose.position.x, msg.pose.pose.position.y = r['x'], r['y']
+        msg.pose.pose.orientation.z = math.sin(r['yaw'] / 2.0)
+        msg.pose.pose.orientation.w = math.cos(r['yaw'] / 2.0)
+        pc = [0.0] * 36
+        for i in (0, 7, 14, 21, 28, 35):
+            pc[i] = 1e3               # pose is dead reckoning only: fuse the twist, not this
+        msg.pose.covariance = pc
+        msg.twist.twist.linear.x, msg.twist.twist.angular.z = r['vx'], r['wz']
+        tc = [0.0] * 36
+        tc[0] = 0.02 ** 2             # vx: good while the wheels grip
+        tc[7] = 1e-4                  # vy = 0 (non-holonomic), fairly sure
+        tc[14] = tc[21] = tc[28] = 1e3
+        tc[35] = 0.5                  # wz: skid-steer slip, let the IMU own yaw
+        msg.twist.covariance = tc
+        self.odom_pub.publish(msg)
+        self.speed_pub.publish(Float32MultiArray(data=[float(v) for v in r['wheel']]))
 
     def to_pwm(self, wheel_speed):
         """Wheel speed (m/s) -> signed PWM. Deadband offset like the team's bridge (26 Oct):
@@ -183,7 +246,12 @@ class Esp32TeleopBridge(Node):
                 text = self.ser.readline().decode(errors='replace').strip()
             except (serial.SerialException, OSError):
                 return
-            if text and not text.startswith(('Run', 'Left', 'Right', 'm ', 'Motors')):
+            if text.startswith('E '):
+                parsed = parse_line(text)
+                if parsed:
+                    self.on_encoders(*parsed)
+                continue
+            if text and not text.startswith(('Run', 'Left', 'Right', 'm ', 'Motors', 'Encoder')):
                 self.get_logger().info(f'ESP32: {text}', throttle_duration_sec=2.0)
 
     def stop(self):
