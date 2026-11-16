@@ -13,6 +13,12 @@ The port is opened with DTR/RTS released: asserted, they hold the ESP32 in reset
 DIY wheel encoders (16 Nov, docs/WHEEL_ENCODERS.md): the sketch streams 'E <ms> <lf> <lr> <rf> <rr>'.
 With encoders:=true this node publishes /wheel/odom (nav_msgs/Odometry, frame odom -> base_link,
 NO TF) and /wheel/speeds (Float32MultiArray [lf, lr, rf, rr] m/s). Off by default.
+
+PWM odometry (16 Nov, stop-gap until the encoders work): with pwm_odom:=true this node publishes
+/pwm/odom = the speed the SENT PWM should give (two-point calibration pwm_cal_*/pwm_v_*, from
+'ros2 run motor_teleop pwm_calibrate'), lagged by pwm_tau, 0 below pwm_stall. It cannot see a
+stall or a wall push, so its covariance is large: rf2o + IMU must win. Its best part is the
+exact zero while stopped. Off by default; no TF.
 """
 import glob
 import math
@@ -27,7 +33,7 @@ from std_msgs.msg import Float32MultiArray
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.node import Node
 
-from motor_teleop.wheel_odom import WheelOdom, parse_line
+from motor_teleop.wheel_odom import PwmOdom, WheelOdom, parse_line
 
 # name: (default, description, (min, max) or None)
 PARAMS = {
@@ -49,8 +55,17 @@ PARAMS = {
     'wheel_diameter': (0.065, 'wheel diameter m (measure! calibrate with a 2 m straight run)', (0.01, 0.5)),
     'track_width': (0.30, 'EFFECTIVE track m for encoder yaw (skid steer: calibrate by spinning)', (0.05, 2.0)),
     'enc_window': (0.2, 'speed averaging window s', (0.05, 2.0)),
+    'pwm_odom': (False, 'publish /pwm/odom: speed estimated from the sent PWM (no encoders)', None),
+    'pwm_stall': (70, 'PWM below which the wheels are assumed NOT to turn', (0, 255)),
+    'pwm_cal_lo': (70, 'calibration point 1: PWM', (0, 255)),
+    'pwm_v_lo': (0.10, 'calibration point 1: measured m/s at pwm_cal_lo (PLACEHOLDER - run pwm_calibrate)', (0.0, 3.0)),
+    'pwm_cal_hi': (75, 'calibration point 2: PWM', (0, 255)),
+    'pwm_v_hi': (0.15, 'calibration point 2: measured m/s at pwm_cal_hi (PLACEHOLDER - run pwm_calibrate)', (0.0, 3.0)),
+    'pwm_tau': (0.15, 'motor lag s (first order) between PWM and speed', (0.0, 2.0)),
+    'pwm_vx_std': (0.08, 'm/s 1-sigma for /pwm/odom vx (large: it is a guess)', (0.001, 5.0)),
 }
 ENC_PARAMS = ('ticks_per_rev', 'wheel_diameter', 'track_width', 'enc_window')
+PWM_PARAMS = ('pwm_stall', 'pwm_cal_lo', 'pwm_v_lo', 'pwm_cal_hi', 'pwm_v_hi', 'pwm_tau', 'pwm_vx_std', 'track_width')
 
 
 
@@ -99,6 +114,12 @@ class Esp32TeleopBridge(Node):
         self.apply_enc_params({n: g(n) for n in ENC_PARAMS})
         self.odom_pub = self.create_publisher(Odometry, 'wheel/odom', 10)
         self.speed_pub = self.create_publisher(Float32MultiArray, 'wheel/speeds', 10)
+        self.pwm_odom_on = bool(g('pwm_odom'))
+        self.pwm_odom = PwmOdom()
+        self.pwm_vx_std = 0.08
+        self.apply_pwm_params({n: g(n) for n in PWM_PARAMS})
+        self.pwm_pub = self.create_publisher(Odometry, 'pwm/odom', 10)
+        self.last_pwm_t = time.monotonic()
         self.add_on_set_parameters_callback(self.on_params)
         threading.Thread(target=self.reader, daemon=True).start()
 
@@ -118,6 +139,10 @@ class Esp32TeleopBridge(Node):
         if lo > hi:
             return SetParametersResult(successful=False, reason=f'min_pwm ({lo}) must be <= max_pwm ({hi})')
         for name, value in new.items():
+            if name == 'pwm_odom':
+                self.pwm_odom_on = bool(value)
+            if name in PWM_PARAMS:
+                self.apply_pwm_params({name: value})
             if name == 'max_speed':
                 self.max_speed = float(value)
             elif name == 'turn_gain':
@@ -161,6 +186,44 @@ class Esp32TeleopBridge(Node):
         o.window = float(p.get('enc_window', o.window))
         # counts carry the sketch's sign; flip them the same way the PWM is flipped
         o.sign_left, o.sign_right = (-1 if self.inv_l else 1), (-1 if self.inv_r else 1)
+
+    def apply_pwm_params(self, p):
+        o = self.pwm_odom
+        o.stall_pwm = int(p.get('pwm_stall', o.stall_pwm))
+        o.pwm_lo = int(p.get('pwm_cal_lo', o.pwm_lo))
+        o.v_lo = float(p.get('pwm_v_lo', o.v_lo))
+        o.pwm_hi = int(p.get('pwm_cal_hi', o.pwm_hi))
+        o.v_hi = float(p.get('pwm_v_hi', o.v_hi))
+        o.tau = float(p.get('pwm_tau', o.tau))
+        o.track_width = float(p.get('track_width', o.track_width))
+        self.pwm_vx_std = float(p.get('pwm_vx_std', self.pwm_vx_std))
+
+    def publish_pwm_odom(self, pwm_left, pwm_right):
+        """pwm_*: forward-positive PWM just sent (0 when stopped)."""
+        now = time.monotonic()
+        dt, self.last_pwm_t = now - self.last_pwm_t, now
+        r = self.pwm_odom.update(dt, pwm_left, pwm_right)
+        if not self.pwm_odom_on:
+            return
+        msg = Odometry()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id, msg.child_frame_id = 'odom', 'base_link'
+        msg.pose.pose.position.x, msg.pose.pose.position.y = r['x'], r['y']
+        msg.pose.pose.orientation.z = math.sin(r['yaw'] / 2.0)
+        msg.pose.pose.orientation.w = math.cos(r['yaw'] / 2.0)
+        pc = [0.0] * 36
+        for i in (0, 7, 14, 21, 28, 35):
+            pc[i] = 1e3               # dead reckoning from commands: never fuse the pose
+        msg.pose.covariance = pc
+        msg.twist.twist.linear.x, msg.twist.twist.angular.z = r['vx'], r['wz']
+        tc = [0.0] * 36
+        # stopped -> confidently 0; driving -> a loose guess (stall / wall / battery / floor)
+        tc[0] = 0.01 ** 2 if r['vx'] == 0.0 and pwm_left == 0 and pwm_right == 0 else self.pwm_vx_std ** 2
+        tc[7] = 1e-4                  # vy = 0 (non-holonomic)
+        tc[14] = tc[21] = tc[28] = 1e3
+        tc[35] = 1.0                  # wz from PWM: skid-steer slip, the IMU owns yaw
+        msg.twist.covariance = tc
+        self.pwm_pub.publish(msg)
 
     def on_encoders(self, millis, counts):
         r = self.odom.update(millis, counts)
@@ -221,6 +284,7 @@ class Esp32TeleopBridge(Node):
         else:
             self.cur = [0.0, 0.0]         # watchdog: stop at once, no ramp
         left, right = self.to_pwm(self.cur[0]), self.to_pwm(self.cur[1])
+        self.publish_pwm_odom(left, right)   # forward-positive, before the wiring inversion
         if self.inv_l:
             left = -left
         if self.inv_r:

@@ -98,3 +98,19 @@ Uses vx and vy (= 0, non-holonomic). Don't fuse wz from the wheels - skid steer 
 - Stall detection in `maze_explorer`: a commanded speed with `/wheel/speeds` ~0 for 0.5 s = stuck (better than the
   current 2 s pose check).
 - Closed-loop speed (PI on `/wheel/speeds`) to get rid of the fixed PWM 70 floor and drive slower in the maze.
+
+## 9. Stop-gap until the encoders work: PWM odometry (`/pwm/odom`)
+
+The bridge can publish the speed the **sent PWM should** give. It's a guess, not a measurement: it can't
+see a stall, a wall push, a weak battery or slip. So it goes out with a large vx covariance
+(`pwm_vx_std` 0.08 m/s), a huge wz covariance (the IMU owns yaw), and a confident **0 when stopped**
+(the most useful part: it stops the EKF drifting while parked).
+
+1. **Calibrate** (you with the robot, competition floor, flat wall 0.8-2 m straight ahead, bridge stopped, lidar running):
+   `ros2 run motor_teleop pwm_calibrate --ros-args -p pwms:=[70,72,75]`
+   It drives forward then back 1.5 s per PWM (timed ESP32 commands, stops itself, aborts < 0.30 m) and
+   prints `pwm_cal_lo/pwm_v_lo/pwm_cal_hi/pwm_v_hi/pwm_stall`. Re-run when the battery is low.
+2. **Run**: `esp32_teleop_bridge --ros-args -p pwm_odom:=true -p pwm_v_lo:=... -p pwm_v_hi:=...` (or set + Save in
+   the tuning GUI). Check `ros2 topic echo /pwm/odom --field twist.twist.linear.x` while driving.
+3. **Fuse** (only after step 1) into `ekf_nav.yaml`. Same block as section 7 but `odom2: /pwm/odom`, vx + vy only.
+   When the encoders work, use `/wheel/odom` instead. Don't fuse both.

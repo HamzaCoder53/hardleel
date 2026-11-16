@@ -71,3 +71,35 @@ def test_esp32_reboot_keeps_pose():
     assert o.update(10, [0, 0, 0, 0]) is None or abs(o.x - x) < 1e-9
     r = feed(o, 20, 20, 1.0)
     assert abs(r['x'] - (x + 0.2)) < 0.03
+
+
+# ---- PWM odometry ----
+from motor_teleop.wheel_odom import PwmOdom, pwm_to_speed  # noqa: E402
+
+
+def test_pwm_to_speed():
+    cal = dict(stall_pwm=70, pwm_lo=70, v_lo=0.10, pwm_hi=75, v_hi=0.15)
+    assert pwm_to_speed(0, **cal) == 0.0
+    assert pwm_to_speed(65, **cal) == 0.0          # below stall
+    assert abs(pwm_to_speed(70, **cal) - 0.10) < 1e-9
+    assert abs(pwm_to_speed(-75, **cal) + 0.15) < 1e-9
+    assert abs(pwm_to_speed(80, **cal) - 0.20) < 1e-9  # extrapolated
+
+
+def test_pwm_odom_straight_lag_and_stop():
+    o = PwmOdom(tau=0.15)
+    r = o.update(0.1, 75, 75)
+    assert 0.0 < r['vx'] < 0.15                    # still ramping up
+    for _ in range(20):
+        r = o.update(0.1, 75, 75)
+    assert abs(r['vx'] - 0.15) < 1e-3 and abs(r['wz']) < 1e-9
+    for _ in range(20):
+        r = o.update(0.1, 0, 0)
+    assert r['vx'] == 0.0                          # exact zero when stopped
+    assert 0.3 < r['x'] < 0.4 and abs(r['y']) < 1e-9
+
+
+def test_pwm_odom_spin():
+    o = PwmOdom(tau=0.0, track_width=0.30)
+    r = o.update(0.1, -75, 75)
+    assert abs(r['vx']) < 1e-9 and abs(r['wz'] - 1.0) < 1e-9

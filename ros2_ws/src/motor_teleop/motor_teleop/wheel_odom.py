@@ -92,3 +92,48 @@ class WheelOdom:
             self.faults.add('right_' + fr)
         return {'vx': (vl + vr) / 2.0, 'wz': (vr - vl) / self.track_width, 'wheel': w,
                 'x': self.x, 'y': self.y, 'yaw': self.yaw, 'faults': sorted(self.faults)}
+
+
+# ---------------------------------------------------------------------------------------------
+# PWM "odometry" (16 Nov): the speed the PWM SHOULD give, until real encoders are fitted.
+# It is a guess, not a measurement: it keeps "moving" when the robot stalls or pushes a wall,
+# and it changes with battery and floor. Publish it with a large covariance so rf2o + IMU win.
+# ---------------------------------------------------------------------------------------------
+
+def pwm_to_speed(pwm, stall_pwm, pwm_lo, v_lo, pwm_hi, v_hi):
+    """Signed PWM -> signed wheel speed (m/s). Below stall_pwm = 0; linear through the two
+    calibration points (pwm_lo, v_lo) and (pwm_hi, v_hi), extrapolated, never negative."""
+    a = abs(pwm)
+    if a == 0 or a < stall_pwm:
+        return 0.0
+    if pwm_hi == pwm_lo:
+        v = v_hi
+    else:
+        v = v_lo + (a - pwm_lo) * (v_hi - v_lo) / (pwm_hi - pwm_lo)
+    return max(0.0, v) * (1.0 if pwm > 0 else -1.0)
+
+
+class PwmOdom:
+    def __init__(self, stall_pwm=70, pwm_lo=70, v_lo=0.10, pwm_hi=75, v_hi=0.15, tau=0.15,
+                 track_width=0.30):
+        self.stall_pwm, self.pwm_lo, self.v_lo = stall_pwm, pwm_lo, v_lo
+        self.pwm_hi, self.v_hi, self.tau, self.track_width = pwm_hi, v_hi, tau, track_width
+        self.v = [0.0, 0.0]           # modelled left/right wheel speed (lags the command)
+        self.x = self.y = self.yaw = 0.0
+
+    def update(self, dt, pwm_left, pwm_right):
+        """pwm_*: forward-positive PWM actually sent (before the wiring inversion)."""
+        dt = max(0.0, min(dt, 0.5))
+        k = 1.0 if self.tau <= 0 else min(1.0, dt / self.tau)
+        for i, p in enumerate((pwm_left, pwm_right)):
+            tgt = pwm_to_speed(p, self.stall_pwm, self.pwm_lo, self.v_lo, self.pwm_hi, self.v_hi)
+            self.v[i] += (tgt - self.v[i]) * k
+            if tgt == 0.0 and abs(self.v[i]) < 1e-3:
+                self.v[i] = 0.0
+        vl, vr = self.v
+        vx, wz = (vl + vr) / 2.0, (vr - vl) / self.track_width
+        mid = self.yaw + wz * dt / 2.0
+        self.x += vx * dt * math.cos(mid)
+        self.y += vx * dt * math.sin(mid)
+        self.yaw = math.atan2(math.sin(self.yaw + wz * dt), math.cos(self.yaw + wz * dt))
+        return {'vx': vx, 'wz': wz, 'x': self.x, 'y': self.y, 'yaw': self.yaw}
