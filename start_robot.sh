@@ -26,7 +26,10 @@ ls /dev/serial/by-id/usb-Arduino* >/dev/null 2>&1 || ls /dev/ttyACM* >/dev/null 
 
 rm -f ~/.hardleel/session_carto.yaml          # last run's unsaved Cartographer values
 [ -s "$SAVED" ] && echo "using saved tuning values: $SAVED" || SAVED=
-PFILE=${SAVED:+--ros-args --params-file $SAVED}
+# which ttyUSB is the lidar / the ESP32 (identical CP2102 adapters; plugs can be swapped): ask them once
+eval "$($RUN 'python3 -m robot_slam.serial_ports --shell' 2>/dev/null | grep "^LIDAR_PORT=")"
+echo "serial ports: lidar ${LIDAR_PORT:-?}, ESP32 ${ESP32_PORT:-?}"
+PFILE="--ros-args ${ESP32_PORT:+-p port:=$ESP32_PORT} ${SAVED:+--params-file $SAVED}"
 
 echo "1/3 starting IMU ..."
 tmux new -d -s robot -n imu "$RUN 'ros2 launch robot_slam imu.launch.py $IMU_ARGS ${IMU_PORT:+imu_port:=$IMU_PORT} 2>&1 | tee ~/imu.log'"
@@ -42,7 +45,7 @@ fi
 echo "    /imu/data_raw is publishing"
 
 echo "2/3 starting lidar + Cartographer ..."
-tmux new-window -t robot -n lidar "$RUN 'bash ~/lidar_supervisor.sh 2>&1 | tee ~/lidar_supervisor.log'"
+tmux new-window -t robot -n lidar "$RUN 'LIDAR_PORT=$LIDAR_PORT bash ~/lidar_supervisor.sh 2>&1 | tee ~/lidar_supervisor.log'"
 tmux new-window -t robot -n carto "$RUN 'ros2 launch robot_slam carto_mapping.launch.py use_lidar:=false 2>&1 | tee ~/carto.log'"
 
 if [ "$MODE" = auto ]; then

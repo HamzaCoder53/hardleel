@@ -23,6 +23,7 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 from robot_slam import tuning_store as ts
+from robot_slam.serial_ports import ports_or_fallback
 
 
 def generate_launch_description():
@@ -30,6 +31,11 @@ def generate_launch_description():
     auto = LaunchConfiguration('auto')
     if os.path.exists(ts.SESSION_CARTO):          # a new run starts without last run's unsaved values
         os.remove(ts.SESSION_CARTO)
+    # Which /dev/ttyUSB* is the lidar and which the ESP32: asked ONCE here, before any node opens a port
+    # (identical CP2102 adapters; plugs got swapped 19 Nov). Falls back to the fixed hub ports.
+    ports = ports_or_fallback()
+    port_info = f"serial ports: lidar {ports['lidar']} ({ports['how'].get('lidar')}), " \
+                f"ESP32 {ports['esp32']} ({ports['how'].get('esp32')})"
 
     imu = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(launch_dir, 'imu.launch.py')),
@@ -39,7 +45,7 @@ def generate_launch_description():
     after_imu = [
         LogInfo(msg='IMU publishing - starting lidar + Cartographer'),
         ExecuteProcess(cmd=['bash', os.path.expanduser('~/lidar_supervisor.sh')], name='lidar_supervisor',
-                       output='screen'),
+                       output='screen', additional_env={'LIDAR_PORT': ports['lidar']}),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'carto_mapping.launch.py')),
             launch_arguments={'use_lidar': 'false'}.items()),
@@ -61,11 +67,12 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('auto', default_value='false',
                               description='true = auto mapping (rf2o + EKF on the Pi, IMU without EKF)'),
+        LogInfo(msg=port_info),
         imu,
         # ROS logs go to stderr; check both streams of every process for the IMU's "Publishing."
         RegisterEventHandler(OnProcessIO(on_stdout=on_imu_output, on_stderr=on_imu_output)),
 
         Node(package='motor_teleop', executable='esp32_teleop_bridge', name='esp32_teleop_bridge',
-             output='screen', parameters=ts.with_saved()),
+             output='screen', parameters=ts.with_saved({'port': ports['esp32']})),
         Node(package='robot_slam', executable='tuning_helper', name='tuning_helper', output='screen'),
     ])
