@@ -25,7 +25,7 @@ options = {
   rangefinder_sampling_ratio = 1.,
   odometry_sampling_ratio = 1.,
   fixed_frame_pose_sampling_ratio = 1.,
-  imu_sampling_ratio = 1.,
+  imu_sampling_ratio = 0.25,   -- 19 Nov: at 92 Hz Cartographer (ROS 2 node) reordered IMU msgs under load -> "Non-sorted data added to queue (0, imu)" crash loops (14 in 60 s); 0.25 (~23 Hz): 0 in 90 s
   landmarks_sampling_ratio = 1.,
 }
 
