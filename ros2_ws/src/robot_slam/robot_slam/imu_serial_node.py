@@ -75,7 +75,9 @@ class ImuSerialNode(Node):
                     self.handle_line(line.decode(errors='ignore').strip())
                 if len(buf) > 4096:            # no newline for a long time: garbage, start over
                     buf = b''
-            time.sleep(0.01)                   # let ~1 line collect: ~100 wake-ups/s instead of thousands
+            # (no nap: the Nano sends each sample as its own USB packet, so read() wakes once per sample and
+            # the stamp is within ~1 ms of the measurement; the old 10 ms nap made stamps jitter 0.8-21.6 ms and
+            # crashed Cartographer, imu_tracker.cc:40 "time_ <= time", 19 Nov)
 
     def handle_line(self, line):
         parts = line.split(',')
