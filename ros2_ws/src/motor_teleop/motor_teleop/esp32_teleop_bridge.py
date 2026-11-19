@@ -47,6 +47,8 @@ PARAMS = {
     # or one side is stopped (pivot); straight driving keeps min_pwm..max_pwm.
     'spin_min_pwm': (85, 'PWM floor when turning on the spot / pivoting', (0, 255)),
     'spin_max_pwm': (100, 'PWM cap when turning on the spot / pivoting (watch the motor drivers)', (0, 255)),
+    'spin_timeout': (0.25, 'watchdog for TURN commands (s): one teleop key press turned too far with the 0.6 s '
+                           'cmd_timeout at spin PWM (user 19 Nov)', (0.05, 5.0)),
     'zero_speed': (0.02, 'wheel speeds below this m/s count as 0', (0.0, 0.5)),
     'invert_left': (True, 'left side runs reversed (ESP32 + BTS7960 wiring)', None),
     'invert_right': (False, 'right side runs reversed', None),
@@ -91,6 +93,7 @@ class Esp32TeleopBridge(Node):
         self.max_speed, self.turn_gain = float(g('max_speed')), float(g('turn_gain'))
         self.max_pwm, self.min_pwm = int(g('max_pwm')), int(g('min_pwm'))
         self.spin_min_pwm, self.spin_max_pwm = int(g('spin_min_pwm')), int(g('spin_max_pwm'))
+        self.spin_timeout = float(g('spin_timeout'))
         self.zero_speed = float(g('zero_speed'))
         self.inv_l, self.inv_r = bool(g('invert_left')), bool(g('invert_right'))
         self.hold_ms, self.cmd_timeout = int(g('hold_ms')), float(g('cmd_timeout'))
@@ -165,6 +168,8 @@ class Esp32TeleopBridge(Node):
                 self.spin_min_pwm = int(value)
             elif name == 'spin_max_pwm':
                 self.spin_max_pwm = int(value)
+            elif name == 'spin_timeout':
+                self.spin_timeout = float(value)
             elif name == 'zero_speed':
                 self.zero_speed = float(value)
             elif name == 'invert_left':
@@ -299,7 +304,8 @@ class Esp32TeleopBridge(Node):
     def tick(self):
         now = time.monotonic()
         dt, self.last_tick = min(now - self.last_tick, 0.5), now
-        if now - self.last_cmd < self.cmd_timeout:
+        timeout = self.spin_timeout if self.is_turning(*self.target) else self.cmd_timeout
+        if now - self.last_cmd < timeout:
             self.cur = [self.ramp(c, t, dt) for c, t in zip(self.cur, self.target)]
         else:
             self.cur = [0.0, 0.0]         # watchdog: stop at once, no ramp
