@@ -10,7 +10,7 @@ options = {
   odom_frame = "odom",
   provide_odom_frame = false,
   publish_frame_projected_to_2d = true,
-  use_pose_extrapolator = true,
+  use_pose_extrapolator = false,   -- 19 Nov: true crashed Cartographer (imu_tracker.cc:40 "time_ <= time": IMU messages fed unordered)
   use_odometry = false,            -- no wheel odometry
   use_nav_sat = false,
   use_landmarks = false,
@@ -34,7 +34,7 @@ MAP_BUILDER.use_trajectory_builder_2d = true
 TRAJECTORY_BUILDER_2D.min_range = 0.15
 TRAJECTORY_BUILDER_2D.max_range = 8.0
 TRAJECTORY_BUILDER_2D.missing_data_ray_length = 3.
-TRAJECTORY_BUILDER_2D.use_imu_data = true
+TRAJECTORY_BUILDER_2D.use_imu_data = false   -- 19 Nov: IMU timing crashed Cartographer 22x in 75 s (imu_tracker.cc:40); 0 with false. Lidar-only matching until the IMU timing is fixed
 TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true   -- helps with no odometry
 TRAJECTORY_BUILDER_2D.num_accumulated_range_data = 1                -- the A1 gives one full scan per message
 TRAJECTORY_BUILDER_2D.motion_filter.max_time_seconds = 5.           -- was 0.2: don't add nodes every 0.2 s while parked (drift fix, 15 Nov)
