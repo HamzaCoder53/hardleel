@@ -42,6 +42,11 @@ PARAMS = {
     'turn_gain': (0.5, 'wheel speed m/s per rad/s of angular.z', (0.05, 3.0)),
     'max_pwm': (75, 'PWM cap (team 26 Oct: 75)', (0, 255)),
     'min_pwm': (70, 'stall floor for non-zero commands (team calibration 26 Oct: 70)', (0, 255)),
+    # Turning: skid-steer wheels scrub sideways and need far more torque than driving straight; at 70-75 the
+    # wheels did not get enough power to turn (user, 19 Nov). Used when the sides turn opposite ways (spin)
+    # or one side is stopped (pivot); straight driving keeps min_pwm..max_pwm.
+    'spin_min_pwm': (85, 'PWM floor when turning on the spot / pivoting', (0, 255)),
+    'spin_max_pwm': (100, 'PWM cap when turning on the spot / pivoting (watch the motor drivers)', (0, 255)),
     'zero_speed': (0.02, 'wheel speeds below this m/s count as 0', (0.0, 0.5)),
     'invert_left': (True, 'left side runs reversed (ESP32 + BTS7960 wiring)', None),
     'invert_right': (False, 'right side runs reversed', None),
@@ -85,6 +90,7 @@ class Esp32TeleopBridge(Node):
         g = lambda n: self.get_parameter(n).value
         self.max_speed, self.turn_gain = float(g('max_speed')), float(g('turn_gain'))
         self.max_pwm, self.min_pwm = int(g('max_pwm')), int(g('min_pwm'))
+        self.spin_min_pwm, self.spin_max_pwm = int(g('spin_min_pwm')), int(g('spin_max_pwm'))
         self.zero_speed = float(g('zero_speed'))
         self.inv_l, self.inv_r = bool(g('invert_left')), bool(g('invert_right'))
         self.hold_ms, self.cmd_timeout = int(g('hold_ms')), float(g('cmd_timeout'))
@@ -138,6 +144,10 @@ class Esp32TeleopBridge(Node):
         hi = new.get('max_pwm', self.max_pwm)
         if lo > hi:
             return SetParametersResult(successful=False, reason=f'min_pwm ({lo}) must be <= max_pwm ({hi})')
+        slo = new.get('spin_min_pwm', self.spin_min_pwm)
+        shi = new.get('spin_max_pwm', self.spin_max_pwm)
+        if slo > shi:
+            return SetParametersResult(successful=False, reason=f'spin_min_pwm ({slo}) must be <= spin_max_pwm ({shi})')
         for name, value in new.items():
             if name == 'pwm_odom':
                 self.pwm_odom_on = bool(value)
@@ -151,6 +161,10 @@ class Esp32TeleopBridge(Node):
                 self.max_pwm = int(value)
             elif name == 'min_pwm':
                 self.min_pwm = int(value)
+            elif name == 'spin_min_pwm':
+                self.spin_min_pwm = int(value)
+            elif name == 'spin_max_pwm':
+                self.spin_max_pwm = int(value)
             elif name == 'zero_speed':
                 self.zero_speed = float(value)
             elif name == 'invert_left':
@@ -252,15 +266,21 @@ class Esp32TeleopBridge(Node):
         self.odom_pub.publish(msg)
         self.speed_pub.publish(Float32MultiArray(data=[float(v) for v in r['wheel']]))
 
-    def to_pwm(self, wheel_speed):
+    def to_pwm(self, wheel_speed, lo=None, hi=None):
         """Wheel speed (m/s) -> signed PWM. Deadband offset like the team's bridge (26 Oct):
-        0 stays 0, otherwise min_pwm + |p| * (max_pwm - min_pwm) / max_pwm."""
+        0 stays 0, otherwise lo + |speed/max_speed| * (hi - lo). lo/hi default to min_pwm/max_pwm."""
+        lo = self.min_pwm if lo is None else lo
+        hi = self.max_pwm if hi is None else hi
         if abs(wheel_speed) < self.zero_speed:
             return 0
-        p = max(-1.0, min(1.0, wheel_speed / self.max_speed)) * self.max_pwm
-        if self.min_pwm > 0:
-            p = (self.min_pwm + abs(p) * (self.max_pwm - self.min_pwm) / self.max_pwm) * (1 if p > 0 else -1)
-        return int(round(p))
+        f = max(-1.0, min(1.0, wheel_speed / self.max_speed))
+        p = (lo + abs(f) * (hi - lo)) if lo > 0 else abs(f) * hi
+        return int(round(p)) * (1 if f > 0 else -1)
+
+    def is_turning(self, left, right):
+        """Spin (sides opposite) or pivot (one side stopped, the other moving)."""
+        zl, zr = abs(left) < self.zero_speed, abs(right) < self.zero_speed
+        return (not zl and not zr and (left > 0) != (right > 0)) or (zl != zr)
 
     def on_cmd(self, msg):
         v, w = msg.linear.x, msg.angular.z
@@ -283,7 +303,11 @@ class Esp32TeleopBridge(Node):
             self.cur = [self.ramp(c, t, dt) for c, t in zip(self.cur, self.target)]
         else:
             self.cur = [0.0, 0.0]         # watchdog: stop at once, no ramp
-        left, right = self.to_pwm(self.cur[0]), self.to_pwm(self.cur[1])
+        if self.is_turning(*self.cur):       # turning needs more torque than driving straight
+            left = self.to_pwm(self.cur[0], self.spin_min_pwm, self.spin_max_pwm)
+            right = self.to_pwm(self.cur[1], self.spin_min_pwm, self.spin_max_pwm)
+        else:
+            left, right = self.to_pwm(self.cur[0]), self.to_pwm(self.cur[1])
         self.publish_pwm_odom(left, right)   # forward-positive, before the wiring inversion
         if self.inv_l:
             left = -left
