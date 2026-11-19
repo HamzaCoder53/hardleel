@@ -47,7 +47,7 @@ TRAJECTORY_BUILDER_2D.submaps.num_range_data = 45
 -- skipped nearly every loop closure, so drift was never corrected (drift fix, 15 Nov).
 POSE_GRAPH.optimize_every_n_nodes = 30                             -- was 40: optimize ~once per finished submap
 POSE_GRAPH.constraint_builder.sampling_ratio = 0.3                 -- was 0.2: 0.2 skips 80% of loop candidates
-POSE_GRAPH.constraint_builder.min_score = 0.55                     -- was 0.65: 0.65 rejects almost every match; raise to 0.6 only if you see false closures (map snaps/warps)
+POSE_GRAPH.constraint_builder.min_score = 0.65                     -- 19 Nov: 0.55 accepted ~750 weak (<0.655) matches between look-alike maze corridors -> ghost walls at angles, warped map; back to 0.65
 POSE_GRAPH.constraint_builder.global_localization_min_score = 0.6  -- only used in pure-localization mode, not mapping
 POSE_GRAPH.constraint_builder.max_constraint_distance = 15.        -- raise if your loops are longer than 15 m
 POSE_GRAPH.constraint_builder.log_matches = true                   -- watch the log: revisit old areas, expect "Found connection" lines with score >= 0.55
