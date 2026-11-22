@@ -36,6 +36,7 @@ PARAMS = {
     'max_rpm': (210.0, 'wheel RPM at command 255 (6 V, no load) - feedforward scale', (10.0, 2000.0)),
     'max_speed': (0.45, 'wheel speed limit m/s', (0.02, 3.0)),
     'max_accel': (0.0, 'wheel speed ramp when speeding up m/s^2 (0 = off: only the firmware ramp, user 22 Nov)', (0.0, 20.0)),
+    'swap_motor_sides': (True, 'send the left command to the firmware RIGHT output and vice versa (22 Nov: motor outputs wired to the opposite sides of the encoders; turns went the wrong way)', None),
     'max_decel': (0.0, 'wheel speed ramp when slowing down / stopping m/s^2 (0 = off: only the firmware ramp)', (0.0, 20.0)),
     'kp': (150.0, 'PI: command per m/s of speed error', (0.0, 5000.0)),
     'ki': (400.0, 'PI: command per (m/s * s) of accumulated error', (0.0, 20000.0)),
@@ -293,6 +294,8 @@ class EncoderBridge(Node):
                 self.sent_stop = True
             return
         self.sent_stop = False
+        if self.p['swap_motor_sides']:
+            cmds = cmds[::-1]
         self.send(f'M,{cmds[0]},{cmds[1]}')
 
     def stop(self):
