@@ -67,21 +67,31 @@ def side_targets(v, w, track):
     return v - w * track / 2.0, v + w * track / 2.0
 
 
+def side_value(a, b):
+    """One side's two encoders (front, rear) -> one value. Both wheels of a side get the same command, so a
+    reading near 0 while the other one clearly moves is a dead/loose encoder (22 Nov: FL, later RR read 0):
+    use the moving one. Otherwise the mean."""
+    if abs(a) < 0.25 * abs(b):
+        return b
+    if abs(b) < 0.25 * abs(a):
+        return a
+    return (a + b) / 2.0
+
+
 class OdomIntegrator:
-    """Encoder counts -> 2D pose (left = mean of FL/RL, right = mean of FR/RR)."""
+    """Encoder counts -> 2D pose (per side: mean of front/rear, or the one still working - side_value)."""
     def __init__(self):
         self.x = self.y = self.th = 0.0
         self.last = None
 
     def update(self, counts, m_per_count, track):
-        left = (counts[0] + counts[1]) / 2.0
-        right = (counts[2] + counts[3]) / 2.0
         if self.last is None:
-            self.last = (left, right)
+            self.last = list(counts)
             return 0.0, 0.0
-        dl = (left - self.last[0]) * m_per_count
-        dr = (right - self.last[1]) * m_per_count
-        self.last = (left, right)
+        d = [c - p for c, p in zip(counts, self.last)]
+        self.last = list(counts)
+        dl = side_value(d[0], d[1]) * m_per_count
+        dr = side_value(d[2], d[3]) * m_per_count
         ds, dth = (dl + dr) / 2.0, (dr - dl) / track
         self.x += ds * math.cos(self.th + dth / 2.0)
         self.y += ds * math.sin(self.th + dth / 2.0)
@@ -187,7 +197,7 @@ class EncoderBridge(Node):
         now = time.monotonic()
         k = math.pi * self.p['wheel_diameter'] / 60.0
         with self.lock:
-            self.meas = [k * (t['rpm'][0] + t['rpm'][1]) / 2.0, k * (t['rpm'][2] + t['rpm'][3]) / 2.0]
+            self.meas = [k * side_value(t['rpm'][0], t['rpm'][1]), k * side_value(t['rpm'][2], t['rpm'][3])]
             self.last_tele = now
             if t['flags'] & 1 and not self.flags & 1:
                 self.get_logger().error(f'ESP32 LOW BATTERY ({t["batt"]:.2f} V): motors disabled')
