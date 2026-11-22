@@ -18,8 +18,9 @@ import time
 
 import rclpy
 import serial
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TransformStamped, Twist
 from nav_msgs.msg import Odometry
+from tf2_ros import TransformBroadcaster
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 from rclpy.node import Node
 from std_msgs.msg import Float32, Float32MultiArray
@@ -41,6 +42,9 @@ PARAMS = {
     'min_cmd': (0.0, 'smallest non-zero command (static friction kick); 0 = off', (0.0, 255.0)),
     'cmd_timeout': (0.5, 's without cmd_vel before the target goes to 0', (0.05, 5.0)),
     'send_rate': (20.0, 'Hz control loop / M commands (firmware stops after 500 ms of silence)', (5.0, 50.0)),
+    # encoder-only stack (pi_encoder_mapping.launch.py, no IMU/EKF): publish odom->base_link + /odom for Nav2
+    'publish_tf': (False, 'broadcast odom->base_link from the encoders (start only; only without an EKF)', None),
+    'odom_topic': ('/wheel/odom', 'odometry topic (start only; /odom when this bridge is the only odometry)', None),
     'stall_cmd': (180.0, 'stall warning: |command| above this ...', (0.0, 255.0)),
     'stall_time': (1.0, '... for this long (s) with the side not turning', (0.2, 10.0)),
 }
@@ -116,7 +120,8 @@ class EncoderBridge(Node):
         self.send('I')
         self.get_logger().info(f'ESP32 encoder controller on {port}')
 
-        self.odom_pub = self.create_publisher(Odometry, '/wheel/odom', 10)
+        self.odom_pub = self.create_publisher(Odometry, self.p['odom_topic'], 10)
+        self.tf_pub = TransformBroadcaster(self) if self.p['publish_tf'] else None
         self.speed_pub = self.create_publisher(Float32MultiArray, '/wheel/speeds', 10)
         self.batt_pub = self.create_publisher(Float32, '/wheel/battery', 10)
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd, 10)
@@ -128,8 +133,8 @@ class EncoderBridge(Node):
     def on_params(self, params):
         new = {x.name: x.value for x in params}
         for name, value in new.items():
-            if name == 'port':
-                return SetParametersResult(successful=False, reason='port is read at start only')
+            if name in ('port', 'publish_tf', 'odom_topic'):
+                return SetParametersResult(successful=False, reason=f'{name} is read at start only')
             rng = PARAMS.get(name, (None, None, None))[2]
             if rng and not rng[0] <= value <= rng[1]:
                 return SetParametersResult(successful=False, reason=f'{name} must be {rng[0]}..{rng[1]}')
@@ -214,6 +219,13 @@ class EncoderBridge(Node):
         tc[14] = tc[21] = tc[28] = 1e6
         m.twist.covariance = tc
         self.odom_pub.publish(m)
+        if self.tf_pub is not None:                  # encoder-only stack: odom->base_link
+            tf = TransformStamped()
+            tf.header = m.header
+            tf.child_frame_id = 'base_link'
+            tf.transform.translation.x, tf.transform.translation.y = self.odom.x, self.odom.y
+            tf.transform.rotation = m.pose.pose.orientation
+            self.tf_pub.sendTransform(tf)
 
     # ---- control ---------------------------------------------------------------------------------
     def on_cmd(self, msg):
