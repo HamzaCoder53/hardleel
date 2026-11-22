@@ -46,7 +46,8 @@ def generate_launch_description():
 
         Node(package='motor_teleop', executable='esp32_encoder_bridge', name='esp32_encoder_bridge',
              output='screen',
-             parameters=ts.with_saved({'port': ports['esp32'], 'publish_tf': True, 'odom_topic': '/odom'})),
+             parameters=ts.with_saved({'port': ports['esp32'], 'publish_tf': True, 'odom_topic': '/odom',
+                                       'max_speed': 3.0})),   # user 22 Nov: no speed cap (motors top out ~0.88 m/s)
 
         # respawn: the tuning GUI's Cartographer "Apply" restarts it with rewritten values
         Node(package='cartographer_ros', executable='cartographer_node', name='cartographer_node',
