@@ -1,0 +1,39 @@
+ekf_encoder_node:   # encoder + IMU odometry (pi_encoder_mapping.launch.py imu:=true, 22 Nov)
+  ros__parameters:
+    # Skid steer: the wheel encoders measure DISTANCE well but slip sideways in turns, so their heading drifts.
+    # The gyro measures rotation directly. Fused: forward speed from the encoders, yaw rate from the gyro.
+    # Output: odom -> base_link TF + odometry/filtered (remapped to /odom for Cartographer and Nav2).
+    frequency: 30.0
+    sensor_timeout: 0.3
+    two_d_mode: true
+    publish_tf: true
+    print_diagnostics: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # Wheel encoders (esp32_encoder_bridge, /wheel/odom at 20 Hz): forward speed + "no sideways motion".
+    # Order: x y z, roll pitch yaw, vx vy vz, vroll vpitch vyaw, ax ay az
+    odom0: /wheel/odom
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  true,  false,
+                   false, false, false,
+                   false, false, false]
+    odom0_queue_size: 10
+    odom0_differential: false
+    odom0_relative: false
+
+    # Yaw rate from the Nano 33 BLE gyro (bias removed by imu_serial_node's start-up calibration)
+    imu0: /imu/data_raw
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_queue_size: 20
+    imu0_differential: false
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: false
