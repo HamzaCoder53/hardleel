@@ -38,7 +38,7 @@ HIDE_NODES = ('_ros2cli', 'transform_listener_impl', 'launch_ros', 'hardleel_tun
 # Nodes known to apply parameter changes while running; others usually need a restart (Save first).
 LIVE_NODES = ('esp32_teleop_bridge', 'controller_server', 'planner_server', 'local_costmap', 'global_costmap',
               'velocity_smoother', 'amcl', 'behavior_server', 'collision_monitor', 'smoother_server',
-              'bt_navigator', 'waypoint_follower', 'imu_serial_node', 'frontier_explorer', 'maze_explorer')
+              'bt_navigator', 'waypoint_follower', 'imu_serial_node', 'frontier_explorer', 'maze_explorer', 'esp32_encoder_bridge')
 # Never written by Save: the explorer must not start driving by itself on the next launch.
 NEVER_SAVE = {('/frontier_explorer', 'enabled'), ('/maze_explorer', 'enabled')}
 GREEN, YELLOW, RED, GREY = QColor(200, 240, 200), QColor(255, 240, 180), QColor(255, 205, 205), QColor(225, 225, 225)

@@ -23,6 +23,7 @@ setup(
             'motor_bridge = motor_teleop.motor_bridge:main',
             'esp32_teleop_bridge = motor_teleop.esp32_teleop_bridge:main',
             'pwm_calibrate = motor_teleop.pwm_calibrate:main',
+            'esp32_encoder_bridge = motor_teleop.esp32_encoder_bridge:main',   # 22 Nov: 6 V encoder motors firmware
         ],
     },
 )

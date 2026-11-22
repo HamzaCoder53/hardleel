@@ -53,6 +53,6 @@ if [ "$MODE" = auto ]; then
   tmux new-window -t robot -n odom "$RUN 'ros2 launch robot_slam pi_odom.launch.py 2>&1 | tee ~/odom.log'"
 fi
 echo "3/3 starting motor bridge + tuning helper ..."
-tmux new-window -t robot -n motors "$RUN 'ros2 run motor_teleop esp32_teleop_bridge $PFILE 2>&1 | tee ~/motors.log'"
+tmux new-window -t robot -n motors "$RUN 'ros2 run motor_teleop esp32_encoder_bridge $PFILE 2>&1 | tee ~/motors.log'"
 tmux new-window -t robot -n tuning "$RUN 'ros2 run robot_slam tuning_helper 2>&1 | tee ~/tuning.log'"
 echo "started ($MODE): tmux attach -t robot   (windows: $(tmux list-windows -t robot -F '#W' | paste -sd' '))"

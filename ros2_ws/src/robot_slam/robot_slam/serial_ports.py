@@ -37,13 +37,19 @@ def is_esp32(port):
     except Exception:  # noqa: BLE001 - busy / gone
         return False
     try:
-        time.sleep(1.5)                # in case opening rebooted it
+        # encoder firmware (22 Nov) streams 'E,...' telemetry at 20 Hz and prints '#' info lines
+        data, t = b'', time.time()
+        while time.time() - t < 1.5:   # also covers a reboot caused by opening the port
+            data += s.read(256)
+        if b'\nE,' in data or data.startswith(b'E,') or b'# ESP32' in data or b'# ceiling' in data:
+            return True
         s.reset_input_buffer()
-        s.write(b'h\n')
+        s.write(b'I\n')                # encoder firmware: '# ceiling duty ...'
+        s.write(b'h\n')                # old motor_code.ino: help text
         data, t = b'', time.time()
         while time.time() - t < 1.2:
             data += s.read(256)
-        return b'this help' in data or b'stop motors' in data
+        return any(k in data for k in (b'this help', b'stop motors', b'# ceiling', b'\nE,'))
     finally:
         s.close()
 

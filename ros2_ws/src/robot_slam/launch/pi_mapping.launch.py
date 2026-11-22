@@ -72,7 +72,14 @@ def generate_launch_description():
         # ROS logs go to stderr; check both streams of every process for the IMU's "Publishing."
         RegisterEventHandler(OnProcessIO(on_stdout=on_imu_output, on_stderr=on_imu_output)),
 
+        DeclareLaunchArgument('motor_bridge', default_value='encoder',
+                              description='encoder = 6 V encoder motors firmware (22 Nov, closed loop); '
+                                          'legacy = old motor_code.ino'),
+        Node(package='motor_teleop', executable='esp32_encoder_bridge', name='esp32_encoder_bridge',
+             output='screen', parameters=ts.with_saved({'port': ports['esp32']}),
+             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('motor_bridge'), "' == 'encoder'"]))),
         Node(package='motor_teleop', executable='esp32_teleop_bridge', name='esp32_teleop_bridge',
-             output='screen', parameters=ts.with_saved({'port': ports['esp32']})),
+             output='screen', parameters=ts.with_saved({'port': ports['esp32']}),
+             condition=IfCondition(PythonExpression(["'", LaunchConfiguration('motor_bridge'), "' == 'legacy'"]))),
         Node(package='robot_slam', executable='tuning_helper', name='tuning_helper', output='screen'),
     ])
