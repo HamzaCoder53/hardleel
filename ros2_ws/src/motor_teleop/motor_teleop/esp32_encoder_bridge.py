@@ -40,7 +40,7 @@ PARAMS = {
     'ki': (400.0, 'PI: command per (m/s * s) of accumulated error', (0.0, 20000.0)),
     'i_limit': (80.0, 'PI: integral term limit (command units)', (0.0, 255.0)),
     'min_cmd': (0.0, 'smallest non-zero command (static friction kick); 0 = off', (0.0, 255.0)),
-    'cmd_timeout': (0.5, 's without cmd_vel before the target goes to 0', (0.05, 5.0)),
+    'cmd_timeout': (1.0, 's without cmd_vel before the target goes to 0 (>0.5: covers the keyboard repeat delay)', (0.05, 5.0)),
     'send_rate': (20.0, 'Hz control loop / M commands (firmware stops after 500 ms of silence)', (5.0, 50.0)),
     # encoder-only stack (pi_encoder_mapping.launch.py, no IMU/EKF): publish odom->base_link + /odom for Nav2
     'publish_tf': (False, 'broadcast odom->base_link from the encoders (start only; only without an EKF)', None),
