@@ -8,13 +8,17 @@
 No IMU node, no EKF. Laptop: hmap (RViz + tuning GUI + teleop) to map, hauto (Nav2 on the live map) to send
 Nav2 goals from RViz.
 
-usage (on the Pi):  ros2 launch robot_slam pi_encoder_mapping.launch.py
+usage (on the Pi):  ros2 launch robot_slam pi_encoder_mapping.launch.py              mapping
+                    ros2 launch robot_slam pi_encoder_mapping.launch.py slam:=false  navigation (no Cartographer;
+                    laptop: laptop_nav.launch.py odom:=encoders map:=..., AMCL owns map->odom)
 """
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, LogInfo
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from robot_slam import tuning_store as ts
@@ -32,7 +36,10 @@ def generate_launch_description():
     port_info = f"serial ports: lidar {ports['lidar']} ({ports['how'].get('lidar')}), " \
                 f"ESP32 {ports['esp32']} ({ports['how'].get('esp32')})"
 
+    slam = IfCondition(LaunchConfiguration('slam'))
     return LaunchDescription([
+        DeclareLaunchArgument('slam', default_value='true',
+                              description='false = navigation: no Cartographer (AMCL on the laptop owns map->odom)'),
         LogInfo(msg=port_info),
         LogInfo(msg='encoder + lidar stack (no IMU): odom->base_link from the wheel encoders'),
 
@@ -55,11 +62,11 @@ def generate_launch_description():
              parameters=[{'use_sim_time': False}],
              arguments=['-configuration_directory', ts.effective_carto_dir(cfg, LUA),
                         '-configuration_basename', LUA],
-             remappings=[('scan', '/scan'), ('odom', '/odom')]),
+             remappings=[('scan', '/scan'), ('odom', '/odom')], condition=slam),
         Node(package='cartographer_ros', executable='cartographer_occupancy_grid_node',
              name='occupancy_grid_node', output='screen',
              parameters=[{'use_sim_time': False}],
-             arguments=['-resolution', '0.05', '-publish_period_sec', '1.0']),
+             arguments=['-resolution', '0.05', '-publish_period_sec', '1.0'], condition=slam),
 
         Node(package='robot_slam', executable='tuning_helper', name='tuning_helper', output='screen'),
     ])

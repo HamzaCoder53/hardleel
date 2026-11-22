@@ -7,6 +7,9 @@ Laptop runs (this file): base_link->laser, rf2o lidar odometry, EKF (rf2o + IMU 
 Same nodes and configs as nav.launch.py, minus the drivers.
 
 usage: ros2 launch robot_slam laptop_nav.launch.py map:=$HOME/maps/<name>.yaml
+       ... odom:=encoders   encoder + lidar robot without IMU (22 Nov): the Pi runs
+       pi_encoder_mapping.launch.py slam:=false (encoder bridge publishes odom->base_link, /odom and
+       base_link->laser), so this file starts only Nav2 + AMCL (no rf2o, no EKF, no laser TF).
 Then in RViz: "2D Pose Estimate" where the robot is, then "Nav2 Goal".
 """
 import os
@@ -14,8 +17,9 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 from robot_slam.tuning_store import merged_params_file, with_saved   # tuning GUI saved values (~/.hardleel)
@@ -28,9 +32,12 @@ LASER_X, LASER_Y, LASER_Z, LASER_YAW = -0.10, 0.0, 0.15, 0.0   # yaw 0: lidar fa
 def generate_launch_description():
     pkg = get_package_share_directory('robot_slam')
     nav2_pkg = get_package_share_directory('nav2_bringup')
+    not_enc = UnlessCondition(PythonExpression(["'", LaunchConfiguration('odom'), "' == 'encoders'"]))
 
     return LaunchDescription([
         DeclareLaunchArgument('map', default_value=os.path.expanduser('~/maps/my_map.yaml')),
+        DeclareLaunchArgument('odom', default_value='rf2o',
+                              description='rf2o = rf2o + IMU EKF here; encoders = Pi encoder bridge owns odom'),
         # nav2_params.yaml + values saved in the tuning GUI (merged into ~/.hardleel when anything is saved)
         DeclareLaunchArgument('params_file',
                               default_value=merged_params_file(os.path.join(pkg, 'config', 'nav2_params.yaml'))),
@@ -39,7 +46,8 @@ def generate_launch_description():
         Node(package='tf2_ros', executable='static_transform_publisher', name='base_to_laser',
              arguments=['--x', str(LASER_X), '--y', str(LASER_Y), '--z', str(LASER_Z),
                         '--yaw', str(LASER_YAW), '--pitch', '0', '--roll', '0',
-                        '--frame-id', 'base_link', '--child-frame-id', 'laser']),
+                        '--frame-id', 'base_link', '--child-frame-id', 'laser'],
+             condition=not_enc),
 
         # LiDAR odometry: publishes /odom_rf2o only (the EKF publishes the TF)
         Node(package='rf2o_laser_odometry', executable='rf2o_laser_odometry_node',
@@ -50,13 +58,14 @@ def generate_launch_description():
                                     'base_frame_id': 'base_link',
                                     'odom_frame_id': 'odom',
                                     'init_pose_from_topic': '',
-                                    'freq': 10.0})),
+                                    'freq': 10.0}),
+             condition=not_enc),
 
         # EKF: odom -> base_link, output topic remapped to /odom for Nav2
         Node(package='robot_localization', executable='ekf_node', name='ekf_nav_node',
              output='screen',
              parameters=with_saved(os.path.join(pkg, 'config', 'ekf_nav.yaml')),
-             remappings=[('odometry/filtered', '/odom')]),
+             remappings=[('odometry/filtered', '/odom')], condition=not_enc),
 
         # Nav2: map server, AMCL, planner, controller, costmaps, behaviors
         IncludeLaunchDescription(
