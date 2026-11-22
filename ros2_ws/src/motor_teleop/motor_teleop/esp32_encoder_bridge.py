@@ -35,12 +35,13 @@ PARAMS = {
                        (1.0, 100000.0)),
     'max_rpm': (210.0, 'wheel RPM at command 255 (6 V, no load) - feedforward scale', (10.0, 2000.0)),
     'max_speed': (0.45, 'wheel speed limit m/s', (0.02, 3.0)),
-    'max_accel': (1.0, 'wheel speed ramp m/s^2 (0 = jump)', (0.0, 20.0)),
+    'max_accel': (1.0, 'wheel speed ramp when speeding up m/s^2 (0 = jump)', (0.0, 20.0)),
+    'max_decel': (3.0, 'wheel speed ramp when slowing down / stopping m/s^2 (0 = jump)', (0.0, 20.0)),
     'kp': (150.0, 'PI: command per m/s of speed error', (0.0, 5000.0)),
     'ki': (400.0, 'PI: command per (m/s * s) of accumulated error', (0.0, 20000.0)),
     'i_limit': (80.0, 'PI: integral term limit (command units)', (0.0, 255.0)),
     'min_cmd': (0.0, 'smallest non-zero command (static friction kick); 0 = off', (0.0, 255.0)),
-    'cmd_timeout': (1.0, 's without cmd_vel before the target goes to 0 (>0.5: covers the keyboard repeat delay)', (0.05, 5.0)),
+    'cmd_timeout': (0.6, 's without cmd_vel before the target goes to 0 (just over the ~0.5 s keyboard repeat delay)', (0.05, 5.0)),
     'send_rate': (20.0, 'Hz control loop / M commands (firmware stops after 500 ms of silence)', (5.0, 50.0)),
     # encoder-only stack (pi_encoder_mapping.launch.py, no IMU/EKF): publish odom->base_link + /odom for Nav2
     'publish_tf': (False, 'broadcast odom->base_link from the encoders (start only; only without an EKF)', None),
@@ -258,9 +259,11 @@ class EncoderBridge(Node):
                                    throttle_duration_sec=3.0)
         cmds = []
         for i in range(2):
-            step = p['max_accel'] * dt
             r = self.ramped[i]
-            r = target[i] if p['max_accel'] <= 0 or abs(target[i] - r) <= step else r + math.copysign(step, target[i] - r)
+            slowing = abs(target[i]) < abs(r) or target[i] * r < 0
+            a = p['max_decel'] if slowing else p['max_accel']
+            step = a * dt
+            r = target[i] if a <= 0 or abs(target[i] - r) <= step else r + math.copysign(step, target[i] - r)
             self.ramped[i] = r
             if abs(r) < 1e-4 and abs(target[i]) < 1e-4:
                 self.integ[i] = 0.0
