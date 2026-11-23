@@ -1,0 +1,31 @@
+# hardleel waste-sorting mission (behaviour tree: hardleel_mission/mission_node.py)
+# All positions are in the MAP frame (metres, yaw in radians, 0 = map +x). To get a position: drive the
+# robot there with Nav2/AMCL (or SLAM) running and run   ros2 run hardleel_mission where
+# PLACEHOLDER COORDINATES - replace them with real ones from the competition map before running for real.
+
+auto_start: false        # false: wait for  ros2 topic pub --once /mission/start std_msgs/msg/Bool "{data: true}"
+tick_hz: 10.0
+
+nav_retries: 2           # attempts per drive (Nav2 goal) before giving up on it
+nav_timeout_s: 90.0      # one drive longer than this = failed attempt
+classify_retries: 3      # camera attempts when it sees nothing / is unsure ("none", "unknown")
+servo_wait_s: 1.0        # time the gripper/flap needs to move
+min_battery_v: 6.8       # 2S pack: don't start a new item below this (needs the Nano battery sensor)
+
+home: {x: 0.0, y: 0.0, yaw: 0.0}
+
+# Waste items, in the order to collect them. name is only for the logs.
+pickups:
+  - {name: item1, x: 1.0, y: 0.5, yaw: 0.0}
+  - {name: item2, x: 2.0, y: -0.5, yaw: 1.57}
+  - {name: item3, x: 3.0, y: 0.5, yaw: 3.14}
+
+# Bin for each camera colour (waste_classifier: plastic -> blue, organic -> white, metal -> black)
+bins:
+  blue:  {x: 4.0, y: 1.0, yaw: 0.0}
+  white: {x: 4.0, y: 0.0, yaw: 0.0}
+  black: {x: 4.0, y: -1.0, yaw: 0.0}
+
+# dry_run:=true only: simulated drive time and camera answers (cycled; "none" tests the classify retry)
+dry_run_nav_s: 2.0
+dry_run_colours: [blue, none, white, black]
