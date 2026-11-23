@@ -47,6 +47,8 @@ PARAMS = {
     # encoder-only stack (pi_encoder_mapping.launch.py, no IMU/EKF): publish odom->base_link + /odom for Nav2
     'publish_tf': (False, 'broadcast odom->base_link from the encoders (start only; only without an EKF)', None),
     'odom_topic': ('/wheel/odom', 'odometry topic (start only; /odom when this bridge is the only odometry)', None),
+    'encoder_mode': ('max', 'per side from the front/rear encoder: max (larger reading - ignores a loose encoder), '
+                            'mean, front, rear', None),
     'stall_cmd': (180.0, 'stall warning: |command| above this ...', (0.0, 255.0)),
     'stall_time': (1.0, '... for this long (s) with the side not turning', (0.2, 10.0)),
 }
@@ -69,10 +71,24 @@ def side_targets(v, w, track):
     return v - w * track / 2.0, v + w * track / 2.0
 
 
-def side_value(a, b):
-    """One side's two encoders (front, rear) -> one value. Both wheels of a side get the same command, so a
-    reading near 0 while the other one clearly moves is a dead/loose encoder (22 Nov: FL, later RR read 0):
-    use the moving one. Otherwise the mean."""
+ENCODER_MODES = ('max', 'mean', 'front', 'rear')
+
+
+def side_value(a, b, mode='max'):
+    """One side's two encoders (front a, rear b) -> one value.
+    max   (default, 23 Nov): the larger reading. A loose encoder only MISSES pulses (reads low, never high) and
+          both wheels of a side get the same command, so the larger one is the healthy one - also for partial
+          dropouts (23 Nov test: RR 35 rpm while FR 88). Opposite signs (noise around 0): the mean.
+    mean  the average, except a reading near 0 while the other clearly moves (dead encoder): the moving one.
+    front / rear  use only that encoder."""
+    if mode == 'front':
+        return a
+    if mode == 'rear':
+        return b
+    if mode == 'max':
+        if a * b >= 0 or min(abs(a), abs(b)) < 0.25 * max(abs(a), abs(b)):   # same sign, or one ~0 (dead)
+            return a if abs(a) >= abs(b) else b
+        return (a + b) / 2.0
     if abs(a) < 0.25 * abs(b):
         return b
     if abs(b) < 0.25 * abs(a):
@@ -86,14 +102,14 @@ class OdomIntegrator:
         self.x = self.y = self.th = 0.0
         self.last = None
 
-    def update(self, counts, m_per_count, track):
+    def update(self, counts, m_per_count, track, mode='max'):
         if self.last is None:
             self.last = list(counts)
             return 0.0, 0.0
         d = [c - p for c, p in zip(counts, self.last)]
         self.last = list(counts)
-        dl = side_value(d[0], d[1]) * m_per_count
-        dr = side_value(d[2], d[3]) * m_per_count
+        dl = side_value(d[0], d[1], mode) * m_per_count
+        dr = side_value(d[2], d[3], mode) * m_per_count
         ds, dth = (dl + dr) / 2.0, (dr - dl) / track
         self.x += ds * math.cos(self.th + dth / 2.0)
         self.y += ds * math.sin(self.th + dth / 2.0)
@@ -147,6 +163,8 @@ class EncoderBridge(Node):
         for name, value in new.items():
             if name in ('port', 'publish_tf', 'odom_topic'):
                 return SetParametersResult(successful=False, reason=f'{name} is read at start only')
+            if name == 'encoder_mode' and value not in ENCODER_MODES:
+                return SetParametersResult(successful=False, reason=f'encoder_mode must be one of {ENCODER_MODES}')
             rng = PARAMS.get(name, (None, None, None))[2]
             if rng and not rng[0] <= value <= rng[1]:
                 return SetParametersResult(successful=False, reason=f'{name} must be {rng[0]}..{rng[1]}')
@@ -199,12 +217,13 @@ class EncoderBridge(Node):
         now = time.monotonic()
         k = math.pi * self.p['wheel_diameter'] / 60.0
         with self.lock:
-            self.meas = [k * side_value(t['rpm'][0], t['rpm'][1]), k * side_value(t['rpm'][2], t['rpm'][3])]
+            mode = self.p['encoder_mode']
+            self.meas = [k * side_value(t['rpm'][0], t['rpm'][1], mode), k * side_value(t['rpm'][2], t['rpm'][3], mode)]
             self.last_tele = now
             if t['flags'] & 1 and not self.flags & 1:
                 self.get_logger().error(f'ESP32 LOW BATTERY ({t["batt"]:.2f} V): motors disabled')
             self.flags = t['flags']
-            ds, dth = self.odom.update(t['counts'], self.m_per_count(), self.p['track_width'])
+            ds, dth = self.odom.update(t['counts'], self.m_per_count(), self.p['track_width'], mode)
             meas = list(self.meas)
         dt = (now - self.last_odom_t) if self.last_odom_t else 0.05
         self.last_odom_t = now
