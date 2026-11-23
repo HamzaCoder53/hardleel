@@ -328,9 +328,11 @@ void setup() {
 
 void loop() {
   static uint32_t lastMotor = 0, lastBatt = 0, lastTele = 0;
-  uint32_t now = millis();
-
   readSerial();
+  // Read the clock AFTER readSerial(): a command handled there sets lastCmdMs = millis(), which could be later
+  // than a time taken before it -> "now - lastCmdMs" wrapped around (unsigned) to ~4e9 and the motors were cut
+  // as "command timeout" every 50-200 ms while driving (found 24 Nov, power-0 test: 40 false timeouts in 10 s).
+  uint32_t now = millis();
 
   if (!timedOut && now - lastCmdMs > CMD_TIMEOUT_MS) {
     timedOut = true;                        // Pi went quiet: stop
