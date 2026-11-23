@@ -9,15 +9,19 @@
               slip in turns, the gyro does not: better heading, straighter walls.
               Default: true when the Nano is plugged in (/dev/serial/by-id/usb-Arduino*).
               KEEP THE ROBOT STILL for the first ~5 s (gyro calibration).
-  Cartographer (cartographer_2d_encoders.lua: odometry on, IMU data not fed directly) -> map->odom, /map
+  SLAM -> map->odom, /map:
+    slam:=toolbox (default, 23 Nov)  SLAM Toolbox async (slam_toolbox_encoders.yaml)
+    slam:=cartographer               Cartographer (cartographer_2d_encoders.lua)
+    slam:=false                      none (navigation: AMCL on the laptop owns map->odom)
   tuning_helper (tuning GUI on the laptop)
 Laptop: hmap (RViz + tuning GUI + teleop) to map; navigation: Pi slam:=false + laptop
 laptop_nav.launch.py odom:=encoders map:=...
 
-usage (on the Pi):  ros2 launch robot_slam pi_encoder_mapping.launch.py              mapping
-                    ros2 launch robot_slam pi_encoder_mapping.launch.py slam:=false  navigation (no Cartographer;
-                    laptop: laptop_nav.launch.py odom:=encoders map:=..., AMCL owns map->odom)
+usage (on the Pi):  ros2 launch robot_slam pi_encoder_mapping.launch.py                     mapping (SLAM Toolbox)
+                    ros2 launch robot_slam pi_encoder_mapping.launch.py slam:=cartographer  mapping (Cartographer)
+                    ros2 launch robot_slam pi_encoder_mapping.launch.py slam:=false         navigation
                     ... imu:=false / imu:=true   force without / with the IMU
+Saving a SLAM Toolbox map: map_saver_cli (-> .yaml/.pgm) + /slam_toolbox/serialize_map (-> .posegraph/.data).
 """
 import glob
 import os
@@ -27,7 +31,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, LogInfo
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 from robot_slam import tuning_store as ts
@@ -47,13 +51,15 @@ def generate_launch_description():
                 f"ESP32 {ports['esp32']} ({ports['how'].get('esp32')})"
     nano = bool(glob.glob('/dev/serial/by-id/usb-Arduino*'))
 
-    slam = IfCondition(LaunchConfiguration('slam'))
+    def slam_is(*values):   # slam:=true (older usage) means the default, SLAM Toolbox
+        return IfCondition(PythonExpression(["'", LaunchConfiguration('slam'), "' in ", repr(list(values))]))
+    carto, toolbox = slam_is('cartographer'), slam_is('toolbox', 'true')
     with_imu, no_imu = IfCondition(LaunchConfiguration('imu')), UnlessCondition(LaunchConfiguration('imu'))
     bridge = {'port': ports['esp32'], 'max_speed': 3.0}   # user 22 Nov: no speed cap (motors top out ~0.88 m/s)
 
     return LaunchDescription([
-        DeclareLaunchArgument('slam', default_value='true',
-                              description='false = navigation: no Cartographer (AMCL on the laptop owns map->odom)'),
+        DeclareLaunchArgument('slam', default_value='toolbox',
+                              description='toolbox | cartographer | false (navigation: AMCL owns map->odom)'),
         DeclareLaunchArgument('imu', default_value='true' if nano else 'false',
                               description='true = encoder speed + IMU yaw rate in an EKF (default: Nano plugged in)'),
         LogInfo(msg=port_info),
@@ -91,11 +97,16 @@ def generate_launch_description():
              parameters=[{'use_sim_time': False}],
              arguments=['-configuration_directory', ts.effective_carto_dir(cfg, LUA),
                         '-configuration_basename', LUA],
-             remappings=[('scan', '/scan'), ('odom', '/odom')], condition=slam),
+             remappings=[('scan', '/scan'), ('odom', '/odom')], condition=carto),
         Node(package='cartographer_ros', executable='cartographer_occupancy_grid_node',
              name='occupancy_grid_node', output='screen',
              parameters=[{'use_sim_time': False}],
-             arguments=['-resolution', '0.05', '-publish_period_sec', '1.0'], condition=slam),
+             arguments=['-resolution', '0.05', '-publish_period_sec', '1.0'], condition=carto),
+
+        # SLAM Toolbox (async: drops scans when busy instead of lagging behind on the Pi)
+        Node(package='slam_toolbox', executable='async_slam_toolbox_node', name='slam_toolbox',
+             output='screen', parameters=[os.path.join(cfg, 'slam_toolbox_encoders.yaml')],
+             condition=toolbox),
 
         Node(package='robot_slam', executable='tuning_helper', name='tuning_helper', output='screen'),
     ])

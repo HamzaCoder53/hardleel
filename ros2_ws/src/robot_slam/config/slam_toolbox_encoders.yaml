@@ -1,0 +1,67 @@
+# SLAM Toolbox for the ENCODER + IMU robot (pi_encoder_mapping.launch.py slam:=toolbox, 23 Nov).
+# Odometry odom->base_link comes from the EKF (encoder forward speed + gyro yaw rate), which is good, so scans
+# are added by travelled distance/heading instead of every scan (the old slam_toolbox.yaml was for a robot
+# WITHOUT encoders: scan matching did everything). Lidar: RPLIDAR A1 at ~7.3 Hz (one scan every ~0.14 s).
+# Maze: 0.55-0.60 m corridors with look-alike walls -> fine correlation search, strict loop closure.
+slam_toolbox:
+  ros__parameters:
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_link
+    scan_topic: /scan
+    mode: mapping
+    use_sim_time: false
+    debug_logging: false
+
+    # map
+    resolution: 0.05
+    max_laser_range: 8.0
+    min_laser_range: 0.15
+    map_update_interval: 2.0         # s between /map publications (CPU on the Pi)
+    transform_publish_period: 0.05   # map->odom at 20 Hz
+    transform_timeout: 0.5
+    tf_buffer_duration: 30.0
+    stack_size_to_use: 40000000
+    throttle_scans: 1                # every scan is considered (7.3 Hz is already slow)
+
+    # when to add a scan to the graph: the odometry is trusted between scans
+    use_scan_matching: true
+    use_scan_barycenter: true
+    minimum_travel_distance: 0.10    # m
+    minimum_travel_heading: 0.10     # rad (~6 deg) - turns in the maze add scans often
+    minimum_time_interval: 0.15      # s: just over one scan period at 7.3 Hz (0.14 s)
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 8.0
+    link_match_minimum_response_fine: 0.1
+    link_scan_maximum_distance: 1.5
+
+    # local scan matching (corrects small odometry errors)
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+    distance_variance_penalty: 0.5   # how much matching may move away from the odometry guess
+    angle_variance_penalty: 1.0
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true
+
+    # loop closure: strict, look-alike maze corridors gave false closures with loose settings
+    do_loop_closing: true
+    loop_search_maximum_distance: 3.0
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.40
+    loop_match_minimum_response_fine: 0.50
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
