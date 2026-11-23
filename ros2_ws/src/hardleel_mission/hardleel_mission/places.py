@@ -14,6 +14,12 @@ facing the way it must face there, then
   ros2 run hardleel_mission mark --list       show all places
   ros2 run hardleel_mission mark --remove gate
 
+WITHOUT THE ROBOT, by clicking on a saved map (laptop):
+  ros2 launch hardleel_mission mark_on_map.launch.py map:=$HOME/maps/mymap.yaml     (map + RViz)
+  ros2 run hardleel_mission mark --click             asks for camera, collect, gate, blue, white, black, home
+  ros2 run hardleel_mission mark --click gate        only re-click one place
+  RViz "2D Goal Pose" tool: click = position, drag = the way the robot faces. Places show as arrows.
+
 Marks made during mapping belong to the map saved at the END OF THAT SAME mapping run (same map frame).
 A new mapping run = a new map frame: mark the places again.
 """
@@ -68,6 +74,87 @@ def current_pose(timeout_s=5.0):
     return pose
 
 
+def markers(places):
+    """visualization_msgs/MarkerArray: an arrow + a label per place (RViz: MarkerArray on /mission/places)."""
+    from visualization_msgs.msg import Marker, MarkerArray
+    colour = {'blue': (0.1, 0.3, 1.0), 'white': (0.9, 0.9, 0.9), 'black': (0.15, 0.15, 0.15),
+              'gate': (1.0, 0.5, 0.0), 'camera': (0.8, 0.2, 0.9), 'collect': (0.1, 0.8, 0.2), 'home': (1.0, 1.0, 0.0)}
+    arr = MarkerArray()
+    clear = Marker()
+    clear.action = Marker.DELETEALL
+    arr.markers.append(clear)
+    for i, (name, p) in enumerate(sorted(places.items())):
+        r, g, b = colour.get(name, (1.0, 0.2, 0.2))
+        for kind in ('arrow', 'text'):
+            m = Marker()
+            m.header.frame_id = 'map'
+            m.ns, m.id = kind, i
+            m.pose.position.x, m.pose.position.y = float(p['x']), float(p['y'])
+            yaw = float(p.get('yaw', 0.0))
+            m.pose.orientation.z, m.pose.orientation.w = math.sin(yaw / 2), math.cos(yaw / 2)
+            m.color.r, m.color.g, m.color.b, m.color.a = r, g, b, 1.0
+            if kind == 'arrow':
+                m.type = Marker.ARROW
+                m.scale.x, m.scale.y, m.scale.z = 0.30, 0.06, 0.06
+            else:
+                m.type = Marker.TEXT_VIEW_FACING
+                m.text = name
+                m.pose.position.z = 0.25
+                m.pose.orientation.z, m.pose.orientation.w = 0.0, 1.0
+                m.scale.z = 0.18
+            arr.markers.append(m)
+    return arr
+
+
+def click_main(names, path=PLACES_FILE):
+    """Mark places by clicking on the map in RViz ("2D Goal Pose" tool: click = position, drag = facing).
+    Works without the robot (only the map + RViz). Publishes the places as markers on /mission/places."""
+    import rclpy
+    from geometry_msgs.msg import PoseStamped
+    from rclpy.executors import ExternalShutdownException
+    from rclpy.qos import DurabilityPolicy, QoSProfile
+    from visualization_msgs.msg import MarkerArray
+    rclpy.init()
+    node = rclpy.create_node('mission_mark_click')
+    latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+    pub = node.create_publisher(MarkerArray, '/mission/places', latched)
+    places = load(path)
+    pub.publish(markers(places))
+    got = []
+    node.create_subscription(PoseStamped, '/goal_pose', got.append, 10)
+    todo = list(names)
+    print(f'RViz: choose "2D Goal Pose", then for each place CLICK on the spot and DRAG towards where the robot '
+          f'must face.\n(places file {path}; Ctrl+C to stop - every click is saved immediately)')
+    try:
+        while todo and rclpy.ok():
+            print(f'\n>>> click the place: {todo[0]}   ({len(todo) - 1} more after this)')
+            got.clear()
+            while not got and rclpy.ok():
+                rclpy.spin_once(node, timeout_sec=0.2)
+            q = got[-1].pose.orientation
+            yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+            p = got[-1].pose.position
+            places[todo[0]] = {'x': round(p.x, 3), 'y': round(p.y, 3), 'yaw': round(yaw, 3)}
+            save(places, path)
+            pub.publish(markers(places))
+            print('saved:' + fmt(todo[0], places[todo[0]])[1:])
+            todo.pop(0)
+        print('\nall done:')
+        for n in sorted(places):
+            print(fmt(n, places[n]))
+        missing = [n for n in REQUIRED + ['blue', 'white', 'black'] if n not in places]
+        print('missing: ' + (', '.join(missing) if missing else 'nothing'))
+        print('\nThe arrows stay visible in RViz until you press Ctrl+C here.')
+        while rclpy.ok():                         # keep the latched markers alive for RViz
+            rclpy.spin_once(node, timeout_sec=0.5)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        print('\nstopped (places clicked so far are saved)')
+    node.destroy_node()
+    if rclpy.ok():
+        rclpy.shutdown()
+    return 0
+
+
 def fmt(name, p):
     return f'  {name:8s} x {p["x"]:+7.2f}  y {p["y"]:+7.2f}  yaw {math.degrees(p.get("yaw", 0.0)):+6.0f} deg'
 
@@ -86,6 +173,8 @@ def mark_main(argv=None):
         missing = [n for n in REQUIRED + ['blue', 'white', 'black'] if n not in places]
         print('missing: ' + (', '.join(missing) if missing else 'nothing'))
         return 0
+    if args[0] in ('--click', '-c'):
+        return click_main(args[1:] or REQUIRED + ['blue', 'white', 'black', 'home'])
     if args[0] in ('--remove', '-r'):
         for n in args[1:]:
             print(f'removed {n}' if places.pop(n, None) else f'{n}: not marked')
