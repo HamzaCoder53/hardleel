@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
-"""hardleel mission: behaviour tree for waste sorting (23 Nov 2026).
+"""hardleel mission: behaviour tree for the waste-sorting run (23 Nov 2026, user's mission description).
 
   Mission (Sequence)
     WaitForStart                       auto_start, or a True on /mission/start
-    ForEach waste item (pickups)       a failed item is skipped, the mission goes on
-      HandleItem (Fallback)
-        DeliverItem (Sequence)
+    ForEach round (rounds)             a failed round releases what it holds and the mission goes on
+      Round (Fallback)
+        DoRound (Sequence)
           BatteryOk                    /battery/voltage (Float32) above min_battery_v (no sensor yet = OK)
-          Retry  NavigateTo item       Nav2 NavigateToPose (map frame)
-          Retry  Classify              /classify_waste (std_srvs/Trigger) -> "blue" | "white" | "black"
+          Retry  NavigateTo camera     Nav2 NavigateToPose to the marked place
+          Retry  Classify              AI camera /classify_waste (std_srvs/Trigger) -> "blue" | "white" | "black"
+          Retry  NavigateTo collect
           Servo  grab                  /servo/cmd (std_msgs/String) - the Nano servo firmware listens
-          Retry  NavigateTo bin[colour]
+          Retry  NavigateTo gate       wait spot, robot FACING the timed gate
+          WaitForGate                  lidar straight ahead clear (> gate_open_m) for gate_confirm_s
+          Retry  NavigateTo <colour>   dump place of the camera's colour
           Servo  release
-        GiveUp (Sequence)              release whatever is held, log it, continue with the next item
-    Retry  NavigateTo home
+        GiveUp (Sequence)              release, log, next round
+    NavigateTo home                    only if a "home" place is marked
 
-Positions, bins, retries and timings: config/mission.yaml (parameter mission_file). dry_run:=true simulates
-Nav2, the camera and the servo (test the logic on the laptop without the robot).
+Places (checkpoints): ~/.hardleel/mission_places.yaml, written by  ros2 run hardleel_mission mark <name>
+(see places.py). Settings: config/mission.yaml (parameter mission_file). dry_run:=true simulates Nav2, the
+camera, the servo and the gate (test the logic without the robot).
 Topics: /mission/status (String, one line), /mission/tree (String, whole tree with states, 1 Hz).
 
-usage:  ros2 run hardleel_mission mission --ros-args -p mission_file:=<yaml> [-p dry_run:=true]
+usage:  ros2 launch hardleel_mission mission.launch.py [dry_run:=true]
         ros2 topic pub --once /mission/start std_msgs/msg/Bool "{data: true}"     (when auto_start is false)
-        ros2 run hardleel_mission where      prints the robot's current map pose as a YAML line for mission.yaml
 """
 import math
 import os
@@ -35,9 +38,12 @@ from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool, Float32, String
 from std_srvs.srv import Trigger
 
+from hardleel_mission import places as places_mod
 from hardleel_mission.bt import (FAILURE, RUNNING, SUCCESS, Action, Blackboard, Condition, Fallback,
                                  ForEach, Retry, Sequence, Timeout)
 
@@ -118,12 +124,48 @@ class Classify(Action):
             if not self.fut.done():
                 return RUNNING
             colour = (self.fut.result().message or '').strip().lower()
-        bins = self.node.cfg['bins']
         bb.log(f'{self.name}: camera says "{colour}"')
-        if colour not in bins:
+        if colour not in self.node.cfg['colours']:
             return FAILURE                     # "none" / "unknown": retried by the parent Retry
+        if colour not in self.node.places:
+            bb.log(f'{self.name}: no dump place marked for "{colour}" (ros2 run hardleel_mission mark {colour})')
+            return FAILURE
         bb['colour'] = colour
         return SUCCESS
+
+
+class WaitForGate(Action):
+    """At the gate place (robot facing the gate): wait until the lidar sees free space straight ahead
+    (median range in +-gate_half_angle_deg > gate_open_m) for gate_confirm_s. Fails after gate_max_wait_s.
+    The lidar faces forward (yaw 0 in base_link), so angle 0 of /scan = straight ahead."""
+    def __init__(self, name, node):
+        super().__init__(name)
+        self.node, self.t0, self.open_since, self.last_log = node, None, None, 0.0
+
+    def start(self, bb):
+        self.t0, self.open_since, self.last_log = time.monotonic(), None, 0.0
+        bb.log(f'{self.name}: waiting for the gate to open (ahead > {self.node.cfg["gate_open_m"]} m)')
+        return RUNNING
+
+    def update(self, bb):
+        c, now = self.node.cfg, time.monotonic()
+        if self.node.dry_run:
+            return SUCCESS if now - self.t0 > c['dry_run_gate_s'] else RUNNING
+        if now - self.t0 > c['gate_max_wait_s']:
+            bb.log(f'{self.name}: gate still closed after {c["gate_max_wait_s"]:.0f} s')
+            return FAILURE
+        ahead = self.node.range_ahead()
+        if ahead is not None and ahead > c['gate_open_m']:
+            self.open_since = self.open_since or now
+            if now - self.open_since >= c['gate_confirm_s']:
+                bb.log(f'{self.name}: gate OPEN ({ahead:.2f} m ahead) after {now - self.t0:.1f} s')
+                return SUCCESS
+        else:
+            self.open_since = None
+            if now - self.last_log > 5.0:
+                self.last_log = now
+                bb.log(f'{self.name}: closed ({"no scan" if ahead is None else f"{ahead:.2f} m ahead"})')
+        return RUNNING
 
 
 class Servo(Action):
@@ -177,11 +219,15 @@ DEFAULTS = {
     'classify_retries': 3,
     'servo_wait_s': 1.0,
     'min_battery_v': 6.8,
+    'rounds': 1,
+    'colours': ['blue', 'white', 'black'],
+    'gate_open_m': 0.6,
+    'gate_half_angle_deg': 10.0,
+    'gate_confirm_s': 0.5,
+    'gate_max_wait_s': 120.0,
     'dry_run_nav_s': 2.0,
+    'dry_run_gate_s': 3.0,
     'dry_run_colours': ['blue', 'none', 'white', 'black'],
-    'home': {'x': 0.0, 'y': 0.0, 'yaw': 0.0},
-    'pickups': [],
-    'bins': {},
 }
 
 
@@ -191,12 +237,25 @@ class MissionNode(Node):
         share = get_package_share_directory('hardleel_mission')
         self.declare_parameter('mission_file', os.path.join(share, 'config', 'mission.yaml'))
         self.declare_parameter('dry_run', False)
+        self.declare_parameter('places_file', places_mod.PLACES_FILE)
         self.dry_run = self.get_parameter('dry_run').value
         path = self.get_parameter('mission_file').value
         with open(path) as f:
             self.cfg = {**DEFAULTS, **(yaml.safe_load(f) or {})}
-        self.get_logger().info(f'mission file {path}: {len(self.cfg["pickups"])} item(s), bins '
-                               f'{sorted(self.cfg["bins"])}{"  [DRY RUN]" if self.dry_run else ""}')
+        ppath = self.get_parameter('places_file').value
+        self.places = places_mod.load(ppath)
+        need = places_mod.REQUIRED + self.cfg['colours']
+        missing = [n for n in need if n not in self.places]
+        self.get_logger().info(f'settings {path}; places {ppath}: {sorted(self.places)}'
+                               f'{"  [DRY RUN]" if self.dry_run else ""}')
+        if missing:
+            self.get_logger().warn(f'places NOT marked: {missing} - mark them with: ros2 run hardleel_mission mark <name>'
+                                   + ('' if self.dry_run else ' (the mission fails at the first missing one)'))
+        if self.dry_run:                       # dry run: fill missing places with dummies to test the logic
+            for i, n in enumerate(missing):
+                self.places[n] = {'x': float(i), 'y': 0.0, 'yaw': 0.0}
+        self.scan = None
+        self.create_subscription(LaserScan, '/scan', lambda m: setattr(self, 'scan', m), qos_profile_sensor_data)
 
         self.nav = ActionClient(self, NavigateToPose, 'navigate_to_pose')
         self.classify = self.create_client(Trigger, '/classify_waste')
@@ -207,7 +266,7 @@ class MissionNode(Node):
         self.create_subscription(Float32, '/battery/voltage', lambda m: setattr(self, 'battery_v', m.data), 10)
         self.create_subscription(Bool, '/mission/start', self.on_start, 10)
 
-        self.bb = Blackboard(logger=self.get_logger().info, pickups=self.cfg['pickups'])
+        self.bb = Blackboard(logger=self.get_logger().info, rounds=list(range(1, int(self.cfg['rounds']) + 1)))
         self.tree = self.build_tree()
         self.done, self.last_tree_pub = False, 0.0
         self.create_timer(1.0 / self.cfg['tick_hz'], self.tick)
@@ -226,6 +285,27 @@ class MissionNode(Node):
         m.pose.orientation.z, m.pose.orientation.w = math.sin(yaw / 2), math.cos(yaw / 2)
         return m
 
+    def range_ahead(self):
+        """Median lidar range straight ahead (+-gate_half_angle_deg), or None without a fresh scan."""
+        s = self.scan
+        if s is None or s.angle_increment == 0.0:
+            return None
+        half = math.radians(self.cfg['gate_half_angle_deg'])
+        vals = []
+        for i, r in enumerate(s.ranges):
+            a = math.atan2(math.sin(s.angle_min + i * s.angle_increment), math.cos(s.angle_min + i * s.angle_increment))
+            if abs(a) <= half and math.isfinite(r) and s.range_min < r:
+                vals.append(min(r, s.range_max))
+            elif abs(a) <= half and math.isinf(r) and r > 0:
+                vals.append(s.range_max)       # nothing in range = open
+        if not vals:
+            return None
+        vals.sort()
+        return vals[len(vals) // 2]
+
+    def place(self, name):
+        return self.places.get(name)
+
     def battery_ok(self, bb):
         if self.battery_v is None:             # battery sensor not wired / not publishing yet
             return True
@@ -241,26 +321,32 @@ class MissionNode(Node):
             return Retry(f'retry {name}', c['nav_retries'],
                          Timeout(f'timeout {name}', c['nav_timeout_s'], NavigateTo(name, self, target)))
 
-        deliver = Sequence('DeliverItem', [
+        do_round = Sequence('DoRound', [
             Condition('BatteryOk', self.battery_ok),
-            nav('NavigateTo item', lambda bb: bb['item']),
+            nav('NavigateTo camera', lambda bb: self.place('camera')),
             Retry('retry Classify', c['classify_retries'], Classify('Classify', self)),
+            nav('NavigateTo collect', lambda bb: self.place('collect')),
             Servo('Servo grab', self, 'grab'),
-            nav('NavigateTo bin', lambda bb: c['bins'].get(bb.get('colour'))),
+            nav('NavigateTo gate', lambda bb: self.place('gate')),
+            WaitForGate('WaitForGate', self),
+            nav('NavigateTo dump', lambda bb: self.place(bb.get('colour'))),
             Servo('Servo release', self, 'release'),
-            Log('Delivered', lambda bb: f'item {bb["item"].get("name", "?")} delivered to the {bb["colour"]} bin'),
+            Log('Delivered', lambda bb: f'round {bb["round"]}: waste dumped at {bb["colour"]}'),
         ])
         give_up = Sequence('GiveUp', [
             Servo('Servo release (give up)', self, 'release'),
-            Log('Skipped', lambda bb: f'item {bb["item"].get("name", "?")} SKIPPED - continuing', FAILURE),
+            Log('Failed', lambda bb: f'round {bb["round"]} FAILED - released, continuing', FAILURE),
+        ])
+        home = Fallback('GoHome', [
+            Condition('no home place', lambda bb: 'home' not in self.places),
+            nav('NavigateTo home', lambda bb: self.place('home')),
         ])
         return Sequence('Mission', [
             WaitForStart(self),
-            ForEach('ForEach waste item', 'pickups', 'item',
-                    Fallback('HandleItem', [deliver, give_up])),
-            nav('NavigateTo home', lambda bb: c['home']),
+            ForEach('ForEach round', 'rounds', 'round', Fallback('Round', [do_round, give_up])),
+            home,
             Log('Finished', lambda bb: 'MISSION COMPLETE: ' + ', '.join(
-                f'{i.get("name", "?")}={s}' for i, s in bb.get('results', []))),
+                f'round {r}={s}' for r, s in bb.get('results', []))),
         ])
 
     def tick(self):

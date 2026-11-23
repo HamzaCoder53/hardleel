@@ -13,7 +13,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    default = os.path.join(get_package_share_directory('hardleel_mission'), 'config', 'mission.yaml')
+    default = os.path.join(get_package_share_directory('hardleel_mission'), 'config', 'mission.yaml')   # settings; places: ~/.hardleel/mission_places.yaml
     return LaunchDescription([
         DeclareLaunchArgument('mission_file', default_value=default),
         DeclareLaunchArgument('dry_run', default_value='false',

@@ -1,31 +1,30 @@
-# hardleel waste-sorting mission (behaviour tree: hardleel_mission/mission_node.py)
-# All positions are in the MAP frame (metres, yaw in radians, 0 = map +x). To get a position: drive the
-# robot there with Nav2/AMCL (or SLAM) running and run   ros2 run hardleel_mission where
-# PLACEHOLDER COORDINATES - replace them with real ones from the competition map before running for real.
+# hardleel waste-sorting mission - SETTINGS (behaviour tree: hardleel_mission/mission_node.py)
+# The PLACES (checkpoints) are not in this file: mark them with the robot standing on each spot,
+#   ros2 run hardleel_mission mark camera | collect | gate | blue | white | black | home
+# -> ~/.hardleel/mission_places.yaml   (ros2 run hardleel_mission mark --list  shows them)
+#
+# Order of one round: camera (AI picture -> colour) -> collect (servo grab) -> gate (wait until open)
+#                     -> dump place of that colour (servo release)
 
 auto_start: false        # false: wait for  ros2 topic pub --once /mission/start std_msgs/msg/Bool "{data: true}"
+rounds: 1                # how many times to do the whole round
 tick_hz: 10.0
 
 nav_retries: 2           # attempts per drive (Nav2 goal) before giving up on it
 nav_timeout_s: 90.0      # one drive longer than this = failed attempt
 classify_retries: 3      # camera attempts when it sees nothing / is unsure ("none", "unknown")
 servo_wait_s: 1.0        # time the gripper/flap needs to move
-min_battery_v: 6.8       # 2S pack: don't start a new item below this (needs the Nano battery sensor)
+min_battery_v: 6.8       # 2S pack: don't start a round below this (needs the Nano battery sensor)
 
-home: {x: 0.0, y: 0.0, yaw: 0.0}
+colours: [blue, white, black]     # camera answers that have a dump place (place name = colour)
 
-# Waste items, in the order to collect them. name is only for the logs.
-pickups:
-  - {name: item1, x: 1.0, y: 0.5, yaw: 0.0}
-  - {name: item2, x: 2.0, y: -0.5, yaw: 1.57}
-  - {name: item3, x: 3.0, y: 0.5, yaw: 3.14}
+# timed gate: robot stands at the "gate" place FACING the gate; lidar straight ahead decides
+gate_open_m: 0.6         # free distance straight ahead that counts as open (closed gate = closer than this)
+gate_half_angle_deg: 10  # width of the "straight ahead" lidar window (+- degrees)
+gate_confirm_s: 0.5      # must stay open this long (ignores a flicker)
+gate_max_wait_s: 120     # give up after this long
 
-# Bin for each camera colour (waste_classifier: plastic -> blue, organic -> white, metal -> black)
-bins:
-  blue:  {x: 4.0, y: 1.0, yaw: 0.0}
-  white: {x: 4.0, y: 0.0, yaw: 0.0}
-  black: {x: 4.0, y: -1.0, yaw: 0.0}
-
-# dry_run:=true only: simulated drive time and camera answers (cycled; "none" tests the classify retry)
+# dry_run:=true only: simulated drive/gate time and camera answers (cycled; "none" tests the classify retry)
 dry_run_nav_s: 2.0
+dry_run_gate_s: 3.0
 dry_run_colours: [blue, none, white, black]

@@ -23,6 +23,7 @@ setup(
         'console_scripts': [
             'mission = hardleel_mission.mission_node:main',
             'where = hardleel_mission.mission_node:where',
+            'mark = hardleel_mission.places:main',
         ],
     },
 )
