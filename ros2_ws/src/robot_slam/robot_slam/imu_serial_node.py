@@ -7,6 +7,7 @@ import time
 import rclpy
 import serial
 from rclpy.node import Node
+from robot_slam.servo_bridge import ServoBridge   # servo on the Nano (24 Nov)
 from sensor_msgs.msg import Imu, MagneticField
 
 G = 9.80665
@@ -40,6 +41,7 @@ class ImuSerialNode(Node):
         self.get_logger().info(f'Calibrating gyro for {self.calib_s:.0f} s: keep the robot still')
 
         self.add_on_set_parameters_callback(self.on_params)
+        self.servo = ServoBridge(self, self.ser)   # /servo/cmd + services; writes through this port
         threading.Thread(target=self.read_loop, daemon=True).start()
 
     def on_params(self, params):
@@ -88,6 +90,8 @@ class ImuSerialNode(Node):
             elif parts[0] == 'M' and len(parts) == 4:
                 mx, my, mz = (float(v) for v in parts[1:])
                 self.handle_mag(mx, my, mz)
+            elif parts[0] == 'S':                     # servo confirmation from the Nano
+                self.servo.on_reply(line)
         except ValueError:
             pass  # partial line at startup, ignore
 
