@@ -27,6 +27,9 @@
  *   S                  stop (brake)
  *   R                  reset encoder counts to 0
  *   I                  print config info (as a '#' line)
+ *   V,<volts>          battery voltage measured at the start of the run (6.4..8.6): ceiling = 6 V / volts,
+ *                      so 255 really is 6 V on a partly discharged pack. Not set / after a reset: assumes
+ *                      8.4 V (safe). The Pi bridge resends it every 2 s (parameter battery_voltage).
  *
  * ESP32 -> Pi   (every TELEMETRY_MS)
  *   E,<ms>,<cFL>,<cRL>,<cFR>,<cRR>,<rpmFL>,<rpmRL>,<rpmFR>,<rpmRR>,<battV>,<flags>
@@ -102,6 +105,12 @@ Encoder encoders[4] = {
 };
 
 float    batteryVolts = BATT_FULL_VOLTS;
+// Battery voltage told by the Pi with "V,<volts>" (measured at the start of a run). Without it the firmware
+// assumes a full pack (BATT_FULL_VOLTS) = the smallest, safe ceiling. Limited to SET_VOLTS_MIN..MAX so a typo
+// cannot push the motors far above MOTOR_MAX_VOLTS. Lost on reset (back to the safe assumption).
+const float SET_VOLTS_MIN = 6.4;       // 2S pack, 3.2 V/cell
+const float SET_VOLTS_MAX = 8.6;
+float    setVolts     = 0.0;    // 0 = not set by the Pi
 uint32_t maxDuty      = 0;      // THE PWM CEILING
 bool     lowBattery   = false;
 bool     timedOut     = true;   // stay stopped until the first command arrives
@@ -154,7 +163,7 @@ void updateBattery() {
       Serial.printf("# LOW BATTERY %.2f V - motors disabled until reset\n", batteryVolts);
     }
   } else {
-    batteryVolts = BATT_FULL_VOLTS;
+    batteryVolts = setVolts > 0.0 ? setVolts : BATT_FULL_VOLTS;   // told by the Pi, else assume full
   }
 
   float effective = batteryVolts - DRIVER_DROP_VOLTS;
@@ -233,6 +242,20 @@ void handleLine(char *line) {
     case 'R': case 'r':
       for (uint8_t i = 0; i < 4; i++) { encoders[i].count = 0; encoders[i].lastCount = 0; }
       break;
+    case 'V': case 'v': {                  // V,<volts>: battery voltage measured at the start of the run
+      float v;
+      if (sscanf(line + 1, "%f", &v) == 1) {
+        float clamped = constrain(v, SET_VOLTS_MIN, SET_VOLTS_MAX);
+        bool changed = fabs(clamped - setVolts) > 0.005;
+        setVolts = clamped;
+        updateBattery();                   // new ceiling right away
+        if (changed) {
+          if (clamped != v) Serial.printf("# V %.2f out of range, using %.2f\n", v, clamped);
+          printInfo();
+        }
+      }
+      break;
+    }
     case 'I': case 'i':
       printInfo();
       break;

@@ -21,6 +21,8 @@ usage (on the Pi):  ros2 launch robot_slam pi_encoder_mapping.launch.py         
                     ros2 launch robot_slam pi_encoder_mapping.launch.py slam:=cartographer  mapping (Cartographer)
                     ros2 launch robot_slam pi_encoder_mapping.launch.py slam:=false         navigation
                     ... imu:=false / imu:=true   force without / with the IMU
+                    ... battery_v:=7.9   battery voltage measured before the run -> ESP32 PWM ceiling exactly 6 V
+                                          (needs the ESP32 firmware with the V command; 0 = assume 8.4 V)
 Saving a SLAM Toolbox map: map_saver_cli (-> .yaml/.pgm) + /slam_toolbox/serialize_map (-> .posegraph/.data).
 """
 import glob
@@ -33,6 +35,7 @@ from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 from robot_slam import tuning_store as ts
 from robot_slam.serial_ports import ports_or_fallback
@@ -55,11 +58,14 @@ def generate_launch_description():
         return IfCondition(PythonExpression(["'", LaunchConfiguration('slam'), "' in ", repr(list(values))]))
     carto, toolbox = slam_is('cartographer'), slam_is('toolbox', 'true')
     with_imu, no_imu = IfCondition(LaunchConfiguration('imu')), UnlessCondition(LaunchConfiguration('imu'))
-    bridge = {'port': ports['esp32'], 'max_speed': 3.0}   # user 22 Nov: no speed cap (motors top out ~0.88 m/s)
+    bridge = {'port': ports['esp32'], 'max_speed': 3.0,   # user 22 Nov: no speed cap (motors top out ~0.88 m/s)
+              'battery_voltage': ParameterValue(LaunchConfiguration('battery_v'), value_type=float)}
 
     return LaunchDescription([
         DeclareLaunchArgument('slam', default_value='toolbox',
                               description='toolbox | cartographer | false (navigation: AMCL owns map->odom)'),
+        DeclareLaunchArgument('battery_v', default_value='0.0',
+                              description='battery V at the start of the run (6.4..8.6) -> exact 6 V PWM ceiling; 0 = assume 8.4 V'),
         DeclareLaunchArgument('imu', default_value='true' if nano else 'false',
                               description='true = encoder speed + IMU yaw rate in an EKF (default: Nano plugged in)'),
         LogInfo(msg=port_info),

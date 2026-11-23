@@ -47,6 +47,8 @@ PARAMS = {
     # encoder-only stack (pi_encoder_mapping.launch.py, no IMU/EKF): publish odom->base_link + /odom for Nav2
     'publish_tf': (False, 'broadcast odom->base_link from the encoders (start only; only without an EKF)', None),
     'odom_topic': ('/wheel/odom', 'odometry topic (start only; /odom when this bridge is the only odometry)', None),
+    'battery_voltage': (0.0, 'battery V measured at the start of the run -> ESP32 PWM ceiling exactly 6 V '
+                             '(needs firmware with the V command). 0 = not set: firmware assumes 8.4 V', (0.0, 8.6)),
     'encoder_mode': ('max', 'per side from the front/rear encoder: max (larger reading - ignores a loose encoder), '
                             'mean, front, rear', None),
     'stall_cmd': (180.0, 'stall warning: |command| above this ...', (0.0, 255.0)),
@@ -145,8 +147,12 @@ class EncoderBridge(Node):
         self.ser.open()
         time.sleep(1.0)
         self.send('S')
+        self.send_battery()
         self.send('I')
-        self.get_logger().info(f'ESP32 encoder controller on {port}')
+        self.get_logger().info(f'ESP32 encoder controller on {port}' + (
+            f', battery {self.p["battery_voltage"]:.2f} V -> 6 V ceiling = {600 / self.p["battery_voltage"]:.0f}% PWM'
+            if self.p['battery_voltage'] > 0 else ', battery voltage not set: firmware assumes 8.4 V (71% PWM)'))
+        self.create_timer(2.0, self.send_battery)  # resend: survives an ESP32 reset (it forgets the value)
 
         self.odom_pub = self.create_publisher(Odometry, self.p['odom_topic'], 10)
         self.tf_pub = TransformBroadcaster(self) if self.p['publish_tf'] else None
@@ -163,6 +169,8 @@ class EncoderBridge(Node):
         for name, value in new.items():
             if name in ('port', 'publish_tf', 'odom_topic'):
                 return SetParametersResult(successful=False, reason=f'{name} is read at start only')
+            if name == 'battery_voltage' and value != 0.0 and not 6.4 <= value <= 8.6:
+                return SetParametersResult(successful=False, reason='battery_voltage must be 0 (not set) or 6.4..8.6')
             if name == 'encoder_mode' and value not in ENCODER_MODES:
                 return SetParametersResult(successful=False, reason=f'encoder_mode must be one of {ENCODER_MODES}')
             rng = PARAMS.get(name, (None, None, None))[2]
@@ -170,12 +178,20 @@ class EncoderBridge(Node):
                 return SetParametersResult(successful=False, reason=f'{name} must be {rng[0]}..{rng[1]}')
         with self.lock:
             self.p.update({k: v for k, v in new.items() if k in PARAMS})
+        if 'battery_voltage' in new:
+            self.send_battery()
         if 'send_rate' in new:
             self.timer.cancel()
             self.destroy_timer(self.timer)
             self.timer = self.create_timer(1.0 / new['send_rate'], self.control)
         self.get_logger().info('tuned: ' + ', '.join(f'{k}={v}' for k, v in new.items()))
         return SetParametersResult(successful=True)
+
+    def send_battery(self):
+        """Tell the ESP32 the battery voltage so its PWM ceiling is exactly 6 V (firmware V command)."""
+        v = self.p['battery_voltage']
+        if v > 0:
+            self.send(f'V,{v:.2f}')
 
     def m_per_count(self):
         return math.pi * self.p['wheel_diameter'] / self.p['counts_per_rev']
