@@ -15,6 +15,7 @@ CLI:  python3 -m robot_slam.serial_ports            -> JSON
 """
 import glob
 import json
+import os
 import sys
 import time
 
@@ -90,7 +91,19 @@ def detect():
     others = [p for p in ports if p != res['esp32']]
     if res['lidar'] is None and res['esp32'] and len(others) == 1:
         res['lidar'], res['how']['lidar'] = others[0], 'by elimination (lidar silent)'
+    # 24 Nov: lidar answered but the ESP32 was still booting -> the hub-port fallback gave the ESP32 the LIDAR's
+    # port (plugs swapped), the motor bridge took it and the lidar never started. The other port it is.
+    others = [p for p in ports if p != res['lidar']]
+    if res['esp32'] is None and res['lidar'] and len(others) == 1:
+        res['esp32'], res['how']['esp32'] = others[0], 'by elimination (ESP32 silent)'
     return res
+
+
+def _same(a, b):
+    try:
+        return os.path.realpath(a) == os.path.realpath(b)
+    except Exception:  # noqa: BLE001
+        return a == b
 
 
 def ports_or_fallback():
@@ -102,6 +115,12 @@ def ports_or_fallback():
     for k in ('esp32', 'lidar'):
         if not res[k]:
             res[k], res['how'][k] = FALLBACK[k], 'FALLBACK hub port (not detected)'
+    # never give both devices the same port: if the fallback collides with the detected one, use the other
+    if _same(res['esp32'], res['lidar']):
+        k = 'esp32' if 'FALLBACK' in res['how'].get('esp32', '') else 'lidar'
+        other = 'lidar' if k == 'esp32' else 'esp32'
+        res[k] = FALLBACK[other]
+        res['how'][k] = f'FALLBACK swapped (the {other} is on its usual port)'
     return res
 
 
