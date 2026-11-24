@@ -10,7 +10,8 @@
           Retry  NavigateTo camera     Nav2 NavigateToPose to the marked place
           Retry  Classify              AI camera /classify_waste (std_srvs/Trigger) -> "blue" | "green" | "red"
           Retry  NavigateTo pickup     pickup_<colour> (else the shared "collect" place) - user 24 Nov
-          Servo  grab                  /servo/cmd (std_msgs/String) - the Nano servo firmware listens
+          Servo  grab                  /servo/cmd (std_msgs/String) - bed flat (0 deg)
+          Wait   pickup_wait_s         stay at the pickup while the item is loaded (5 s, user 24 Nov)
           [optional] NavigateTo gate  only when a "gate" place is marked; robot FACING the timed gate
           WaitForGate                  lidar straight ahead clear (> gate_open_m) for gate_confirm_s
           Retry  NavigateTo <colour>   drop-off place of the camera colour
@@ -199,6 +200,21 @@ class WaitForStart(Action):
         return SUCCESS if self.node.start_requested else RUNNING
 
 
+class Wait(Action):
+    """Stand still for seconds() (e.g. at the pickup while the item is loaded onto the bed)."""
+    def __init__(self, name, seconds):
+        super().__init__(name)
+        self.seconds, self.t0 = seconds, None
+
+    def start(self, bb):
+        self.t0 = time.monotonic()
+        bb.log(f'{self.name}: {self.seconds():.1f} s')
+        return RUNNING
+
+    def update(self, bb):
+        return SUCCESS if time.monotonic() - self.t0 >= self.seconds() else RUNNING
+
+
 class Log(Action):
     """Log a line; returns `result` (FAILURE for GiveUp so the item counts as not delivered)."""
     def __init__(self, name, fn, result=SUCCESS):
@@ -218,6 +234,7 @@ DEFAULTS = {
     'nav_timeout_s': 90.0,
     'classify_retries': 3,
     'servo_wait_s': 1.0,
+    'pickup_wait_s': 5.0,
     'min_battery_v': 6.8,
     'rounds': 1,
     'colours': ['blue', 'green', 'red'],   # rule book 2026: Blue = plastic, Green = organic, Red = metal
@@ -330,6 +347,7 @@ class MissionNode(Node):
             # pickup place of THAT class (user 24 Nov): pickup_<colour>, else the shared 'collect' place
             nav('NavigateTo pickup', lambda bb: self.pickup_place(bb.get('colour'))),
             Servo('Servo grab', self, 'grab'),
+            Wait('Wait at pickup (loading)', lambda: c['pickup_wait_s']),   # user 24 Nov: stay 5 s at the pickup
             Fallback('Gate (optional)', [                  # only when a 'gate' place is marked
                 Condition('no gate place', lambda bb: 'gate' not in self.places),
                 Sequence('PassGate', [nav('NavigateTo gate', lambda bb: self.place('gate')),
