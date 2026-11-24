@@ -8,8 +8,8 @@ facing the way it must face there, then
   ros2 run hardleel_mission mark collect      waste collection spot
   ros2 run hardleel_mission mark gate         wait spot in front of the timed gate (FACE THE GATE)
   ros2 run hardleel_mission mark blue         dump spot for plastic   (camera colour "blue")
-  ros2 run hardleel_mission mark white        dump spot for organic   (camera colour "white")
-  ros2 run hardleel_mission mark black        dump spot for metal     (camera colour "black")
+  ros2 run hardleel_mission mark green        drop-off for organic    (camera colour "green")
+  ros2 run hardleel_mission mark red          drop-off for metal      (camera colour "red")
   ros2 run hardleel_mission mark home         optional: where to end
   ros2 run hardleel_mission mark --list       show all places
   ros2 run hardleel_mission mark --remove gate
@@ -32,8 +32,8 @@ import yaml
 
 PLACES_FILE = os.path.expanduser('~/.hardleel/mission_places.yaml')
 REQUIRED = ['camera']                            # + per colour: a pickup (pickup_<c> or 'collect') and a drop-off (<c>)
-COLOURS = ['blue', 'white', 'black']             # camera classes: plastic -> blue, organic -> white, metal -> black
-CLICK_ORDER = ['camera', 'pickup_blue', 'pickup_white', 'pickup_black', 'blue', 'white', 'black', 'gate']   # no home in the competition (user 24 Nov); 'mark home' still works
+COLOURS = ['blue', 'green', 'red']               # rule book 2026: plastic -> Blue, organic -> Green, metal -> Red
+CLICK_ORDER = ['camera', 'pickup_blue', 'pickup_green', 'pickup_red', 'blue', 'green', 'red', 'gate']   # no home in the competition (user 24 Nov); 'mark home' still works
 
 
 def missing(places, colours=COLOURS):
@@ -90,7 +90,7 @@ def current_pose(timeout_s=5.0):
 def markers(places):
     """visualization_msgs/MarkerArray: an arrow + a label per place (RViz: MarkerArray on /mission/places)."""
     from visualization_msgs.msg import Marker, MarkerArray
-    colour = {'blue': (0.1, 0.3, 1.0), 'white': (0.9, 0.9, 0.9), 'black': (0.15, 0.15, 0.15),
+    colour = {'blue': (0.1, 0.3, 1.0), 'green': (0.1, 0.8, 0.2), 'red': (0.9, 0.1, 0.1),
               'gate': (1.0, 0.5, 0.0), 'camera': (0.8, 0.2, 0.9), 'collect': (0.1, 0.8, 0.2), 'home': (1.0, 1.0, 0.0)}
     arr = MarkerArray()
     clear = Marker()

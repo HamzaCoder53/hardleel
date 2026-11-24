@@ -1,6 +1,6 @@
 # hardleel waste-sorting mission - SETTINGS (behaviour tree: hardleel_mission/mission_node.py)
 # The PLACES (checkpoints) are not in this file: mark them with the robot standing on each spot,
-#   ros2 run hardleel_mission mark camera | collect | gate | blue | white | black | home
+#   ros2 run hardleel_mission mark camera | pickup_blue | pickup_green | pickup_red | blue | green | red | gate
 # -> ~/.hardleel/mission_places.yaml   (ros2 run hardleel_mission mark --list  shows them)
 #
 # Order of one round: camera (AI picture -> colour) -> collect (servo grab) -> gate (wait until open)
@@ -16,7 +16,7 @@ classify_retries: 3      # camera attempts when it sees nothing / is unsure ("no
 servo_wait_s: 1.0        # time the gripper/flap needs to move
 min_battery_v: 6.8       # 2S pack: don't start a round below this (needs the Nano battery sensor)
 
-colours: [blue, white, black]     # camera answers that have a dump place (place name = colour)
+colours: [blue, green, red]       # rule book 2026: plastic -> Blue, organic -> Green, metal -> Red (place name = colour)
 
 # timed gate: robot stands at the "gate" place FACING the gate; lidar straight ahead decides
 gate_open_m: 0.6         # free distance straight ahead that counts as open (closed gate = closer than this)
@@ -27,4 +27,4 @@ gate_max_wait_s: 120     # give up after this long
 # dry_run:=true only: simulated drive/gate time and camera answers (cycled; "none" tests the classify retry)
 dry_run_nav_s: 2.0
 dry_run_gate_s: 3.0
-dry_run_colours: [blue, none, white, black]
+dry_run_colours: [blue, none, green, red]

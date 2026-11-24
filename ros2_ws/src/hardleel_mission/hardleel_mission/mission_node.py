@@ -8,7 +8,7 @@
         DoRound (Sequence)
           BatteryOk                    /battery/voltage (Float32) above min_battery_v (no sensor yet = OK)
           Retry  NavigateTo camera     Nav2 NavigateToPose to the marked place
-          Retry  Classify              AI camera /classify_waste (std_srvs/Trigger) -> "blue" | "white" | "black"
+          Retry  Classify              AI camera /classify_waste (std_srvs/Trigger) -> "blue" | "green" | "red"
           Retry  NavigateTo pickup     pickup_<colour> (else the shared "collect" place) - user 24 Nov
           Servo  grab                  /servo/cmd (std_msgs/String) - the Nano servo firmware listens
           [optional] NavigateTo gate  only when a "gate" place is marked; robot FACING the timed gate
@@ -220,14 +220,14 @@ DEFAULTS = {
     'servo_wait_s': 1.0,
     'min_battery_v': 6.8,
     'rounds': 1,
-    'colours': ['blue', 'white', 'black'],
+    'colours': ['blue', 'green', 'red'],   # rule book 2026: Blue = plastic, Green = organic, Red = metal
     'gate_open_m': 0.6,
     'gate_half_angle_deg': 10.0,
     'gate_confirm_s': 0.5,
     'gate_max_wait_s': 120.0,
     'dry_run_nav_s': 2.0,
     'dry_run_gate_s': 3.0,
-    'dry_run_colours': ['blue', 'none', 'white', 'black'],
+    'dry_run_colours': ['blue', 'none', 'green', 'red'],
 }
 
 

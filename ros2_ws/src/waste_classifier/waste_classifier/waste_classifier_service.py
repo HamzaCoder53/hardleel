@@ -5,9 +5,9 @@ waste_classifier_service.py - ON-DEMAND waste classification (camera is NOT runn
 Each call to the service:  open camera -> let exposure/focus settle -> grab 1 frame
                            -> close camera -> classify -> return color
 
-    plastic -> blue      organic -> white      metal -> black      (nothing in view -> "none")
+    plastic -> blue      organic -> green      metal -> red     (rule book 2026: Blue/Green/Red stations)      (nothing in view -> "none")
 
-Service    : /classify_waste   (std_srvs/Trigger)   response.message = "blue" | "white" | "black" | "none" | "unknown"
+Service    : /classify_waste   (std_srvs/Trigger)   response.message = "blue" | "green" | "red" | "none" | "unknown"
 Publishes  : /waste/class, /waste/color            (std_msgs/String, same result)
 
 Do NOT run camera_ros at the same time - only one program can own the camera.
@@ -50,7 +50,7 @@ except ImportError:
             raise SystemExit("No TFLite runtime. On the Pi (Python 3.12):  "
                              "pip3 install --user --break-system-packages ai-edge-litert 'numpy<2'")
 
-CLASS_TO_COLOR = {"plastic": "blue", "organic": "white", "metal": "black", "empty": "none"}
+CLASS_TO_COLOR = {"plastic": "blue", "organic": "green", "metal": "red", "empty": "none"}
 
 
 class WasteClassifierService(Node):
