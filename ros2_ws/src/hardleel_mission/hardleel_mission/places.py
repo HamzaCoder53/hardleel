@@ -33,7 +33,7 @@ import yaml
 PLACES_FILE = os.path.expanduser('~/.hardleel/mission_places.yaml')
 REQUIRED = ['camera']                            # + per colour: a pickup (pickup_<c> or 'collect') and a drop-off (<c>)
 COLOURS = ['blue', 'white', 'black']             # camera classes: plastic -> blue, organic -> white, metal -> black
-CLICK_ORDER = ['camera', 'pickup_blue', 'pickup_white', 'pickup_black', 'blue', 'white', 'black', 'gate', 'home']
+CLICK_ORDER = ['camera', 'pickup_blue', 'pickup_white', 'pickup_black', 'blue', 'white', 'black', 'gate']   # no home in the competition (user 24 Nov); 'mark home' still works
 
 
 def missing(places, colours=COLOURS):
@@ -156,7 +156,7 @@ def click_main(names, path=PLACES_FILE):
         for n in sorted(places):
             print(fmt(n, places[n]))
         missing_ = missing(places)
-        print('missing: ' + (', '.join(missing_) if missing_ else 'nothing') + '   (gate, home: optional)')
+        print('missing: ' + (', '.join(missing_) if missing_ else 'nothing') + '   (gate optional; no home in the competition)')
         print('\nThe arrows stay visible in RViz until you press Ctrl+C here.')
         while rclpy.ok():                         # keep the latched markers alive for RViz
             rclpy.spin_once(node, timeout_sec=0.5)
@@ -184,7 +184,7 @@ def mark_main(argv=None):
         for n in sorted(places):
             print(fmt(n, places[n]))
         missing_ = missing(places)
-        print('missing: ' + (', '.join(missing_) if missing_ else 'nothing') + '   (gate, home: optional)')
+        print('missing: ' + (', '.join(missing_) if missing_ else 'nothing') + '   (gate optional; no home in the competition)')
         return 0
     if args[0] in ('--click', '-c'):
         return click_main(args[1:] or CLICK_ORDER)
