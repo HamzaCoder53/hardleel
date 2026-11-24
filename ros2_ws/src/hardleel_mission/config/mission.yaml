@@ -11,8 +11,10 @@ rounds: 1                # how many times to do the whole round
 mission_max_s: 240       # time BUDGET for the whole mission (user: 4 min) - only a warning, the robot never stops at it
 tick_hz: 10.0
 
-nav_retries: 2           # attempts per drive (Nav2 goal) before giving up on it
-nav_timeout_s: 45.0      # one drive longer than this = failed attempt (x nav_retries)
+nav_retries: 3           # attempts per drive (Nav2 goal) before giving up on it (24 Nov audit: was 2)
+nav_retry_backoff_s: 2.5 # pause before a retry, so a short TF / Wi-Fi / scan stall passes (was 0: retried inside it)
+nav_timeout_s: 90.0      # one drive longer than this = failed attempt. Was 45: the closed-gate ramp detour is ~10-11 m
+                         # through 0.6-0.8 m corridors at 0.15-0.3 m/s. Nav2's progress checker still aborts a STUCK drive
 classify_retries: 3      # camera attempts when it sees nothing / is unsure ("none", "unknown")
 servo_wait_s: 1.0        # time the servo bed needs to move
 pickup_wait_s: 5.0       # stay at the pickup spot this long while the item is loaded (user 24 Nov)
@@ -34,3 +36,4 @@ gate_max_wait_s: 10      # (user 24 Nov) then carry on to the drop-off anyway (N
 dry_run_nav_s: 2.0
 dry_run_gate_s: 3.0
 dry_run_colours: [blue, none, green, red]
+dry_run_fail_nav: []     # drives that fail in the dry run, e.g. [gate] = gate place blocked (tests the skip)

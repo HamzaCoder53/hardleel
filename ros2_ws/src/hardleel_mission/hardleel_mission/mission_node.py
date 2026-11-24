@@ -85,7 +85,12 @@ class NavigateTo(Action):
 
     def update(self, bb):
         if self.node.dry_run:
-            return SUCCESS if time.monotonic() - self.t0 > self.node.cfg['dry_run_nav_s'] else RUNNING
+            if time.monotonic() - self.t0 <= self.node.cfg['dry_run_nav_s']:
+                return RUNNING
+            if self.name.split()[-1] in self.node.cfg['dry_run_fail_nav']:   # e.g. [gate]: blocked gate
+                bb.log(f'{self.name}: FAILED (dry run: simulated blocked goal)')
+                return FAILURE
+            return SUCCESS
         if self.result is None:
             return RUNNING
         ok = self.result == GoalStatus.STATUS_SUCCEEDED
@@ -233,8 +238,9 @@ class Log(Action):
 DEFAULTS = {
     'auto_start': False,
     'tick_hz': 10.0,
-    'nav_retries': 2,
-    'nav_timeout_s': 45.0,
+    'nav_retries': 3,
+    'nav_retry_backoff_s': 2.5,
+    'nav_timeout_s': 90.0,
     'mission_max_s': 240.0,
     'classify_retries': 3,
     'servo_wait_s': 1.0,
@@ -251,6 +257,7 @@ DEFAULTS = {
     'dry_run_nav_s': 2.0,
     'dry_run_gate_s': 3.0,
     'dry_run_colours': ['blue', 'none', 'green', 'red'],
+    'dry_run_fail_nav': [],
 }
 
 
@@ -353,9 +360,11 @@ class MissionNode(Node):
     def build_tree(self):
         c = self.cfg
 
-        def nav(name, target):
-            return Retry(f'retry {name}', c['nav_retries'],
-                         Timeout(f'timeout {name}', c['nav_timeout_s'], NavigateTo(name, self, target)))
+        def nav(name, target, retries=None, timeout_s=None):
+            return Retry(f'retry {name}', int(retries if retries is not None else c['nav_retries']),
+                         Timeout(f'timeout {name}', float(timeout_s if timeout_s is not None else c['nav_timeout_s']),
+                                 NavigateTo(name, self, target)),
+                         backoff_s=float(c['nav_retry_backoff_s']))
 
         do_round = Sequence('DoRound', [
             Condition('BatteryOk', self.battery_ok),
@@ -367,7 +376,7 @@ class MissionNode(Node):
             Wait('Wait at pickup (loading)', lambda: c['pickup_wait_s']),   # user 24 Nov: stay 5 s at the pickup
             Fallback('Gate (optional)', [                  # only when a 'gate' place is marked
                 Condition('no gate place', lambda bb: 'gate' not in self.places),
-                Sequence('PassGate', [nav('NavigateTo gate', lambda bb: self.place('gate')),
+                Sequence('PassGate', [nav('NavigateTo gate', lambda bb: self.place('gate'), retries=1, timeout_s=45.0),
                                       # gate still closed after gate_max_wait_s: carry on to the drop-off anyway -
                                       # Nav2 sees the closed gate as an obstacle and plans another route (ramp)
                                       Fallback('Gate open or go round', [
@@ -375,6 +384,10 @@ class MissionNode(Node):
                                           Log('Gate closed', lambda bb: 'gate still CLOSED - going on, Nav2 '
                                                                        'plans around it (ramp route)'),
                                       ])]),
+                # 24 Nov audit: the gate leg must never fail the round - if the gate place cannot be reached
+                # (closed gate in the way, blocked goal) skip it and drive to the drop-off (ramp route)
+                Log('Gate skipped', lambda bb: 'gate place NOT reached - skipping the gate, going to the drop-off '
+                                               '(Nav2 plans around it, ramp route)'),
             ]),
             nav('NavigateTo drop-off', lambda bb: self.dock_goal(self.place(bb.get('colour')))),
             Servo('Servo release', self, 'release'),

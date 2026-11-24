@@ -105,18 +105,28 @@ class Decorator(Node):
 
 
 class Retry(Decorator):
-    """Run the child up to n times until it succeeds."""
-    def __init__(self, name, n, child):
+    """Run the child up to n times until it succeeds, waiting backoff_s between attempts (RUNNING meanwhile).
+    The pause lets a short TF / Wi-Fi / scan stall pass instead of retrying inside it (24 Nov: two attempts
+    0.1 s apart both failed in the same stall)."""
+    def __init__(self, name, n, child, backoff_s=0.0, clock=time.monotonic):
         super().__init__(name, child)
-        self.n, self.tries = n, 0
+        self.n, self.tries, self.backoff_s, self.clock = n, 0, backoff_s, clock
+        self.wait_until = None
 
     def _tick(self, bb):
+        if self.wait_until is not None:
+            if self.clock() < self.wait_until:
+                return RUNNING
+            self.wait_until = None
         s = self.child.tick(bb)
         if s == FAILURE:
             self.tries += 1
             self.child.reset()
             if self.tries < self.n:
-                bb.log(f'{self.name}: attempt {self.tries} failed, retrying ({self.tries + 1}/{self.n})')
+                pause = f' in {self.backoff_s:.1f} s' if self.backoff_s > 0 else ''
+                bb.log(f'{self.name}: attempt {self.tries} failed, retrying ({self.tries + 1}/{self.n}){pause}')
+                if self.backoff_s > 0:
+                    self.wait_until = self.clock() + self.backoff_s
                 return RUNNING
             self.tries = 0
             return FAILURE
@@ -126,7 +136,7 @@ class Retry(Decorator):
 
     def reset(self):
         super().reset()
-        self.tries = 0
+        self.tries, self.wait_until = 0, None
 
 
 class Timeout(Decorator):
