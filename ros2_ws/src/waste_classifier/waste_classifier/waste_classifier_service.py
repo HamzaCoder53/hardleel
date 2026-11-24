@@ -13,9 +13,12 @@ Publishes  : /waste/class, /waste/color            (std_msgs/String, same result
 Do NOT run camera_ros at the same time - only one program can own the camera.
 
 Camera backends (parameter `backend`):
+    cam        libcamera's `cam` tool (libcamera-tools) - what works on the robot (Ubuntu 24.04, 24 Nov)
     picamera2  Python library (python3-picamera2). Fastest, keeps everything in Python.
     rpicam     calls `rpicam-still` (or `libcamera-still`) as a subprocess. Works if those tools exist.
-    auto       try picamera2 first, then rpicam   (default)
+    auto       try cam, then picamera2, then rpicam   (default)
+Run:  ros2 run waste_classifier waste_classifier_service
+Test: ros2 service call /classify_waste std_srvs/srv/Trigger
 
 Parameters: model_path, labels_path (labels.txt from training - recommended), labels, backend, width, height, settle_time, conf_threshold,
             crop_square, save_dir (save every captured frame, handy for collecting retraining data)
@@ -30,6 +33,7 @@ import time
 import cv2
 import numpy as np
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -40,7 +44,11 @@ except ImportError:
     try:
         from ai_edge_litert.interpreter import Interpreter
     except ImportError:
-        from tensorflow.lite.python.interpreter import Interpreter
+        try:
+            from tensorflow.lite.python.interpreter import Interpreter
+        except ImportError:
+            raise SystemExit("No TFLite runtime. On the Pi (Python 3.12):  "
+                             "pip3 install --user --break-system-packages ai-edge-litert 'numpy<2'")
 
 CLASS_TO_COLOR = {"plastic": "blue", "organic": "white", "metal": "black", "empty": "none"}
 
@@ -48,8 +56,9 @@ CLASS_TO_COLOR = {"plastic": "blue", "organic": "white", "metal": "black", "empt
 class WasteClassifierService(Node):
     def __init__(self):
         super().__init__("waste_classifier_service")
-        self.declare_parameter("model_path", "/home/pi/waste_model.tflite")
-        self.declare_parameter("labels_path", "")        # path to labels.txt written by the training script
+        share = get_package_share_directory("waste_classifier")   # model + labels installed with the package
+        self.declare_parameter("model_path", os.path.join(share, "models", "waste_model.tflite"))
+        self.declare_parameter("labels_path", os.path.join(share, "models", "labels.txt"))
         self.declare_parameter("labels", ["metal", "organic", "plastic"])   # used only if labels_path is empty
         self.declare_parameter("backend", "auto")
         self.declare_parameter("width", 640)
@@ -123,9 +132,33 @@ class WasteClassifierService(Node):
             raise RuntimeError("rpicam-still produced no image")
         return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
+    def _capture_cam(self) -> np.ndarray:
+        """libcamera's own `cam` tool (Ubuntu package libcamera-tools). 24 Nov: on the robot (Ubuntu 24.04, Camera
+        Module 3 / IMX708) picamera2 and rpicam-still are not installed and ROS camera_ros crashes (unsigned IPA),
+        but `cam` streams 30 fps. Capture ~settle_time worth of frames (auto exposure settles) and keep the last."""
+        exe = shutil.which("cam")
+        if exe is None:
+            raise RuntimeError("`cam` not found (sudo apt install libcamera-tools)")
+        n = max(5, int(self.settle * 30))
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ)
+            env.pop("LD_LIBRARY_PATH", None)       # use Ubuntu's libcamera, NOT the ROS build (it crashes)
+            subprocess.run([exe, "-c1", f"--capture={n}",
+                            "-s", f"width={self.w},height={self.h},pixelformat=BGR888",
+                            f"--file={d}/frame#.bin"],
+                           check=True, timeout=20, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            frames = sorted(f for f in os.listdir(d) if f.endswith(".bin"))
+            if not frames:
+                raise RuntimeError("`cam` wrote no frame")
+            raw = np.fromfile(os.path.join(d, frames[-1]), np.uint8)
+        if raw.size != self.w * self.h * 3:
+            raise RuntimeError(f"`cam` frame has {raw.size} bytes, expected {self.w * self.h * 3}")
+        return raw.reshape(self.h, self.w, 3)      # libcamera BGR888 = bytes R,G,B in memory -> already RGB
+
     def capture(self) -> np.ndarray:
-        order = {"picamera2": [self._capture_picamera2], "rpicam": [self._capture_rpicam],
-                 "auto": [self._capture_picamera2, self._capture_rpicam]}[self.backend]
+        order = {"cam": [self._capture_cam], "picamera2": [self._capture_picamera2],
+                 "rpicam": [self._capture_rpicam],
+                 "auto": [self._capture_cam, self._capture_picamera2, self._capture_rpicam]}[self.backend]
         err = None
         for fn in order:
             try:

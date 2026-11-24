@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'classify_service = waste_classifier.classify_service:main',
             'test_photos = waste_classifier.test_photos:main',
+            'waste_classifier_service = waste_classifier.waste_classifier_service:main',   # /classify_waste (24 Nov)
         ],
     },
 )
