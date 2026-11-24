@@ -28,8 +28,8 @@ from std_msgs.msg import Float32, Float32MultiArray
 # name: (default, description, (min, max) or None)
 PARAMS = {
     'port': ('', 'ESP32 serial port (start only; pi_mapping.launch.py passes the detected one)', None),
-    'wheel_diameter': (0.080, 'wheel diameter m (80 mm, user 22 Nov; fine-tune with a 2 m straight run)', (0.01, 0.5)),
-    'track_width': (0.25, 'EFFECTIVE left-right wheel distance m (skid steer: calibrate with a 360 deg spin)',
+    'wheel_diameter': (0.0804, 'wheel diameter m (24 Nov: 2 m straight run, real 2.02 m vs encoders 2.009 m)', (0.01, 0.5)),
+    'track_width': (0.61, 'EFFECTIVE left-right wheel distance m (24 Nov 360 deg spin vs IMU: 0.25 x 2.44; skid steer)',
                     (0.05, 1.0)),
     'counts_per_rev': (748.0, 'encoder counts per WHEEL turn (firmware: 11 PPR x 34 gear x 2 edges)',
                        (1.0, 100000.0)),
@@ -40,7 +40,7 @@ PARAMS = {
     'max_decel': (0.0, 'wheel speed ramp when slowing down / stopping m/s^2 (0 = off: only the firmware ramp)', (0.0, 20.0)),
     'kp': (150.0, 'PI: command per m/s of speed error', (0.0, 5000.0)),
     'ki': (400.0, 'PI: command per (m/s * s) of accumulated error', (0.0, 20000.0)),
-    'i_limit': (80.0, 'PI: integral term limit (command units)', (0.0, 255.0)),
+    'i_limit': (175.0, 'PI: integral term limit (command units; 24 Nov 80 -> 175: turns on the spot reached only 25-50%)', (0.0, 255.0)),
     'min_cmd': (0.0, 'smallest non-zero command (static friction kick); 0 = off', (0.0, 255.0)),
     'cmd_timeout': (0.6, 's without cmd_vel before the target goes to 0 (just over the ~0.5 s keyboard repeat delay)', (0.05, 5.0)),
     'send_rate': (20.0, 'Hz control loop / M commands (firmware stops after 500 ms of silence)', (5.0, 50.0)),
