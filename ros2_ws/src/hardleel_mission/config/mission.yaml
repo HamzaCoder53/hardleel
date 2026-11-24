@@ -8,10 +8,11 @@
 
 auto_start: false        # false: wait for  ros2 topic pub --once /mission/start std_msgs/msg/Bool "{data: true}"
 rounds: 1                # how many times to do the whole round
+mission_max_s: 240       # time BUDGET for the whole mission (user: 4 min) - only a warning, the robot never stops at it
 tick_hz: 10.0
 
 nav_retries: 2           # attempts per drive (Nav2 goal) before giving up on it
-nav_timeout_s: 90.0      # one drive longer than this = failed attempt
+nav_timeout_s: 45.0      # one drive longer than this = failed attempt (x nav_retries)
 classify_retries: 3      # camera attempts when it sees nothing / is unsure ("none", "unknown")
 servo_wait_s: 1.0        # time the servo bed needs to move
 pickup_wait_s: 5.0       # stay at the pickup spot this long while the item is loaded (user 24 Nov)
@@ -23,7 +24,7 @@ colours: [blue, green, red]       # rule book 2026: plastic -> Blue, organic -> 
 gate_open_m: 0.6         # free distance straight ahead that counts as open (closed gate = closer than this)
 gate_half_angle_deg: 10  # width of the "straight ahead" lidar window (+- degrees)
 gate_confirm_s: 0.5      # must stay open this long (ignores a flicker)
-gate_max_wait_s: 120     # give up after this long
+gate_max_wait_s: 30      # then carry on to the drop-off anyway (Nav2 plans around the closed gate, ramp route)
 
 # dry_run:=true only: simulated drive/gate time and camera answers (cycled; "none" tests the classify retry)
 dry_run_nav_s: 2.0

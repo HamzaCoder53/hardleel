@@ -151,6 +151,9 @@ class WaitForGate(Action):
     def update(self, bb):
         c, now = self.node.cfg, time.monotonic()
         if self.node.dry_run:
+            if now - self.t0 > c['gate_max_wait_s']:
+                bb.log(f'{self.name}: gate still closed after {c["gate_max_wait_s"]:.0f} s (dry run)')
+                return FAILURE
             return SUCCESS if now - self.t0 > c['dry_run_gate_s'] else RUNNING
         if now - self.t0 > c['gate_max_wait_s']:
             bb.log(f'{self.name}: gate still closed after {c["gate_max_wait_s"]:.0f} s')
@@ -231,7 +234,8 @@ DEFAULTS = {
     'auto_start': False,
     'tick_hz': 10.0,
     'nav_retries': 2,
-    'nav_timeout_s': 90.0,
+    'nav_timeout_s': 45.0,
+    'mission_max_s': 240.0,
     'classify_retries': 3,
     'servo_wait_s': 1.0,
     'pickup_wait_s': 5.0,
@@ -241,7 +245,7 @@ DEFAULTS = {
     'gate_open_m': 0.6,
     'gate_half_angle_deg': 10.0,
     'gate_confirm_s': 0.5,
-    'gate_max_wait_s': 120.0,
+    'gate_max_wait_s': 30.0,
     'dry_run_nav_s': 2.0,
     'dry_run_gate_s': 3.0,
     'dry_run_colours': ['blue', 'none', 'green', 'red'],
@@ -351,7 +355,13 @@ class MissionNode(Node):
             Fallback('Gate (optional)', [                  # only when a 'gate' place is marked
                 Condition('no gate place', lambda bb: 'gate' not in self.places),
                 Sequence('PassGate', [nav('NavigateTo gate', lambda bb: self.place('gate')),
-                                      WaitForGate('WaitForGate', self)]),
+                                      # gate still closed after gate_max_wait_s: carry on to the drop-off anyway -
+                                      # Nav2 sees the closed gate as an obstacle and plans another route (ramp)
+                                      Fallback('Gate open or go round', [
+                                          WaitForGate('WaitForGate', self),
+                                          Log('Gate closed', lambda bb: 'gate still CLOSED - going on, Nav2 '
+                                                                       'plans around it (ramp route)'),
+                                      ])]),
             ]),
             nav('NavigateTo drop-off', lambda bb: self.place(bb.get('colour'))),
             Servo('Servo release', self, 'release'),
@@ -365,18 +375,37 @@ class MissionNode(Node):
             Condition('no home place', lambda bb: 'home' not in self.places),
             nav('NavigateTo home', lambda bb: self.place('home')),
         ])
+        def started(bb):
+            bb['t_start'] = time.monotonic()
+            return f'MISSION STARTED - time budget {c["mission_max_s"]:.0f} s'
+
+        def elapsed(bb):
+            return time.monotonic() - bb.get('t_start', time.monotonic())
+
+        def finished(bb):
+            t = elapsed(bb)
+            verdict = 'within' if t <= c['mission_max_s'] else 'OVER'
+            return (f'MISSION COMPLETE in {t:.1f} s ({verdict} the {c["mission_max_s"]:.0f} s budget): '
+                    + ', '.join(f'round {r}={s}' for r, s in bb.get('results', [])))
+
+        # user 24 Nov: aim for 4 min, but NEVER stop at the time limit - always carry on to the end. The budget
+        # only produces a warning (tick) and the verdict in the final message.
         return Sequence('Mission', [
             WaitForStart(self),
+            Log('Started', started),
             ForEach('ForEach round', 'rounds', 'round', Fallback('Round', [do_round, give_up])),
             home,
-            Log('Finished', lambda bb: 'MISSION COMPLETE: ' + ', '.join(
-                f'round {r}={s}' for r, s in bb.get('results', []))),
+            Log('Finished', finished),
         ])
 
     def tick(self):
         if self.done:
             return
         s = self.tree.tick(self.bb)
+        t0 = self.bb.get('t_start')
+        if t0 is not None and not self.bb.get('over_budget') and time.monotonic() - t0 > self.cfg['mission_max_s']:
+            self.bb['over_budget'] = True              # warn once, keep going (user: never stop at the limit)
+            self.get_logger().warn(f'mission passed the {self.cfg["mission_max_s"]:.0f} s budget - carrying on to the end')
         running = [n for n in self.walk(self.tree) if n.status == RUNNING and not n.children()]
         self.status_pub.publish(String(data=f'{s}: ' + (running[0].name if running else '-')))
         now = time.monotonic()
