@@ -378,10 +378,12 @@ class MissionNode(Node):
             ]),
             nav('NavigateTo drop-off', lambda bb: self.dock_goal(self.place(bb.get('colour')))),
             Servo('Servo release', self, 'release'),
+            Servo('Bed back flat', self, 'grab'),        # user 24 Nov: the bed always returns to 0 deg (flat)
             Log('Delivered', lambda bb: f'round {bb["round"]}: {bb["colour"]} item picked up and dropped off'),
         ])
         give_up = Sequence('GiveUp', [
             Servo('Servo release (give up)', self, 'release'),
+            Servo('Bed back flat (give up)', self, 'grab'),
             Log('Failed', lambda bb: f'round {bb["round"]} FAILED - released, continuing', FAILURE),
         ])
         home = Fallback('GoHome', [
