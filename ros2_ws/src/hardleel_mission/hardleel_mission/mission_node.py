@@ -9,11 +9,11 @@
           BatteryOk                    /battery/voltage (Float32) above min_battery_v (no sensor yet = OK)
           Retry  NavigateTo camera     Nav2 NavigateToPose to the marked place
           Retry  Classify              AI camera /classify_waste (std_srvs/Trigger) -> "blue" | "white" | "black"
-          Retry  NavigateTo collect
+          Retry  NavigateTo pickup     pickup_<colour> (else the shared "collect" place) - user 24 Nov
           Servo  grab                  /servo/cmd (std_msgs/String) - the Nano servo firmware listens
-          Retry  NavigateTo gate       wait spot, robot FACING the timed gate
+          [optional] NavigateTo gate  only when a "gate" place is marked; robot FACING the timed gate
           WaitForGate                  lidar straight ahead clear (> gate_open_m) for gate_confirm_s
-          Retry  NavigateTo <colour>   dump place of the camera's colour
+          Retry  NavigateTo <colour>   drop-off place of the camera colour
           Servo  release
         GiveUp (Sequence)              release, log, next round
     NavigateTo home                    only if a "home" place is marked
@@ -244,8 +244,7 @@ class MissionNode(Node):
             self.cfg = {**DEFAULTS, **(yaml.safe_load(f) or {})}
         ppath = self.get_parameter('places_file').value
         self.places = places_mod.load(ppath)
-        need = places_mod.REQUIRED + self.cfg['colours']
-        missing = [n for n in need if n not in self.places]
+        missing = places_mod.missing(self.places, self.cfg['colours'])
         self.get_logger().info(f'settings {path}; places {ppath}: {sorted(self.places)}'
                                f'{"  [DRY RUN]" if self.dry_run else ""}')
         if missing:
@@ -306,6 +305,9 @@ class MissionNode(Node):
     def place(self, name):
         return self.places.get(name)
 
+    def pickup_place(self, colour):
+        return self.places.get(f'pickup_{colour}') or self.places.get('collect')
+
     def battery_ok(self, bb):
         if self.battery_v is None:             # battery sensor not wired / not publishing yet
             return True
@@ -325,13 +327,17 @@ class MissionNode(Node):
             Condition('BatteryOk', self.battery_ok),
             nav('NavigateTo camera', lambda bb: self.place('camera')),
             Retry('retry Classify', c['classify_retries'], Classify('Classify', self)),
-            nav('NavigateTo collect', lambda bb: self.place('collect')),
+            # pickup place of THAT class (user 24 Nov): pickup_<colour>, else the shared 'collect' place
+            nav('NavigateTo pickup', lambda bb: self.pickup_place(bb.get('colour'))),
             Servo('Servo grab', self, 'grab'),
-            nav('NavigateTo gate', lambda bb: self.place('gate')),
-            WaitForGate('WaitForGate', self),
-            nav('NavigateTo dump', lambda bb: self.place(bb.get('colour'))),
+            Fallback('Gate (optional)', [                  # only when a 'gate' place is marked
+                Condition('no gate place', lambda bb: 'gate' not in self.places),
+                Sequence('PassGate', [nav('NavigateTo gate', lambda bb: self.place('gate')),
+                                      WaitForGate('WaitForGate', self)]),
+            ]),
+            nav('NavigateTo drop-off', lambda bb: self.place(bb.get('colour'))),
             Servo('Servo release', self, 'release'),
-            Log('Delivered', lambda bb: f'round {bb["round"]}: waste dumped at {bb["colour"]}'),
+            Log('Delivered', lambda bb: f'round {bb["round"]}: {bb["colour"]} item picked up and dropped off'),
         ])
         give_up = Sequence('GiveUp', [
             Servo('Servo release (give up)', self, 'release'),

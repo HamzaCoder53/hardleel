@@ -31,7 +31,20 @@ import time
 import yaml
 
 PLACES_FILE = os.path.expanduser('~/.hardleel/mission_places.yaml')
-REQUIRED = ['camera', 'collect', 'gate']          # plus one dump place per camera colour
+REQUIRED = ['camera']                            # + per colour: a pickup (pickup_<c> or 'collect') and a drop-off (<c>)
+COLOURS = ['blue', 'white', 'black']             # camera classes: plastic -> blue, organic -> white, metal -> black
+CLICK_ORDER = ['camera', 'pickup_blue', 'pickup_white', 'pickup_black', 'blue', 'white', 'black', 'gate', 'home']
+
+
+def missing(places, colours=COLOURS):
+    """Places the mission still needs. 'gate' and 'home' are optional."""
+    out = [n for n in REQUIRED if n not in places]
+    for c in colours:
+        if f'pickup_{c}' not in places and 'collect' not in places:
+            out.append(f'pickup_{c}')
+        if c not in places:
+            out.append(c)
+    return out
 
 
 def load(path=PLACES_FILE):
@@ -142,8 +155,8 @@ def click_main(names, path=PLACES_FILE):
         print('\nall done:')
         for n in sorted(places):
             print(fmt(n, places[n]))
-        missing = [n for n in REQUIRED + ['blue', 'white', 'black'] if n not in places]
-        print('missing: ' + (', '.join(missing) if missing else 'nothing'))
+        missing_ = missing(places)
+        print('missing: ' + (', '.join(missing_) if missing_ else 'nothing') + '   (gate, home: optional)')
         print('\nThe arrows stay visible in RViz until you press Ctrl+C here.')
         while rclpy.ok():                         # keep the latched markers alive for RViz
             rclpy.spin_once(node, timeout_sec=0.5)
@@ -170,11 +183,11 @@ def mark_main(argv=None):
         print(f'{PLACES_FILE}:')
         for n in sorted(places):
             print(fmt(n, places[n]))
-        missing = [n for n in REQUIRED + ['blue', 'white', 'black'] if n not in places]
-        print('missing: ' + (', '.join(missing) if missing else 'nothing'))
+        missing_ = missing(places)
+        print('missing: ' + (', '.join(missing_) if missing_ else 'nothing') + '   (gate, home: optional)')
         return 0
     if args[0] in ('--click', '-c'):
-        return click_main(args[1:] or REQUIRED + ['blue', 'white', 'black', 'home'])
+        return click_main(args[1:] or CLICK_ORDER)
     if args[0] in ('--remove', '-r'):
         for n in args[1:]:
             print(f'removed {n}' if places.pop(n, None) else f'{n}: not marked')
