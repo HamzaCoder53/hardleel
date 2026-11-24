@@ -93,7 +93,7 @@ controller_server:
       max_lookahead_dist: 0.9
       lookahead_time: 1.5
       rotate_to_heading_angular_vel: 1.2   # 24 Nov measured: asking 1.2 gives ~1.4 real (track 0.52); 2.6 was jerky
-      transform_tolerance: 0.3
+      transform_tolerance: 1.0
       use_velocity_scaled_lookahead_dist: false
       min_approach_linear_velocity: 0.12   # 24 Nov: slow final approach for the 0.1 m goal tolerance
       approach_velocity_scaling_dist: 0.6
@@ -238,7 +238,7 @@ behavior_server:
     local_frame: odom
     global_frame: map
     robot_base_frame: base_link
-    transform_tolerance: 0.1
+    transform_tolerance: 1.0
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.2
     min_rotational_vel: 0.6
@@ -312,7 +312,7 @@ collision_monitor:
     cmd_vel_in_topic: cmd_vel_smoothed
     cmd_vel_out_topic: cmd_vel
     state_topic: collision_monitor_state
-    transform_tolerance: 0.2
+    transform_tolerance: 1.0
     source_timeout: 2.0          # was 1.0: Wi-Fi/Pi-load bursts made scans >1 s old -> robot stopped (15 Nov)
     base_shift_correction: true
     stop_pub_timeout: 2.0
@@ -334,7 +334,7 @@ collision_monitor:
       topic: scan
       min_height: 0.15
       max_height: 2.0
-      enabled: true
+      enabled: false   # 24 Nov: no polygon active, it only stopped the robot on late scans
 docking_server:
   ros__parameters:
     controller_frequency: 50.0
