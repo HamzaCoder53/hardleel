@@ -17,7 +17,7 @@
 #include <Servo.h>
 
 const int SERVO_PIN = 9;
-const int SERVO_START = 0;                    // angle at power-up: 0 = bed FLAT, ready for the item (24 Nov)
+const int SERVO_START = 90;                   // angle at power-up / reset: 90 = bed FLAT (user 24 Nov: 180 = tipped)
 
 ReefwingLSM9DS1 imu;
 Servo servo;

@@ -9,7 +9,7 @@ ROS interface (created by imu_serial_node):
   /servo/release std_srvs/Trigger  move to servo_release_angle
   /servo/off     std_srvs/Trigger  stop driving the servo (limp)
   /servo/state   std_msgs/String   the Nano's last confirmation, e.g. "120" or "off"
-Parameters (live): servo_grab_angle (0), servo_release_angle (90) - measured on the robot 24 Nov.
+Parameters (live): servo_grab_angle (90 = bed flat), servo_release_angle (180 = tipped), servo_start_angle (90).
 Test:  ros2 service call /servo/grab std_srvs/srv/Trigger
        ros2 topic pub --once /servo/cmd std_msgs/msg/String "{data: '90'}"
 """
@@ -26,8 +26,8 @@ class ServoBridge:
         self.lock = threading.Lock()
         self.reply = None
         self.reply_event = threading.Event()
-        node.declare_parameter('servo_grab_angle', 0)       # 24 Nov, user: grab = 0 deg
-        node.declare_parameter('servo_release_angle', 90)   # 24 Nov, user: release = 90 deg (Nano starts at 90)
+        node.declare_parameter('servo_grab_angle', 90)      # 24 Nov, user: bed FLAT = 90 deg (a Nano reset also goes to 90)
+        node.declare_parameter('servo_release_angle', 180)  # 24 Nov, user: bed TIPPED (drop-off) = 180 deg
         self.state_pub = node.create_publisher(String, '/servo/state', 10)
         node.create_subscription(String, '/servo/cmd', self.on_cmd, 10)
         node.create_service(Trigger, '/servo/grab', lambda req, res: self.on_srv('grab', res))
@@ -35,10 +35,10 @@ class ServoBridge:
         node.create_service(Trigger, '/servo/off', lambda req, res: self.on_srv('off', res))
         node.get_logger().info(f'servo: /servo/cmd + /servo/grab ({self.angle("grab")} deg) '
                                f'/servo/release ({self.angle("release")} deg) /servo/off')
-        # The servo holds a BED (user 24 Nov): 0 deg = flat, the item falls onto it at the loading station and
-        # rides on it; 90 deg = tipped, offloads at the drop-off. The Nano powers up at 90 (old firmware), so put
-        # the bed flat as soon as the robot starts. -1 = leave it where it is.
-        node.declare_parameter('servo_start_angle', 0)
+        # The servo holds a BED (user 24 Nov): 90 deg = flat, the item falls onto it at the loading station and
+        # rides on it; 180 deg = tipped, offloads at the drop-off. The Nano powers up / resets to 90 = flat, and
+        # the robot also sets 90 at start. -1 = leave it where it is.
+        node.declare_parameter('servo_start_angle', 90)
         self._start_timer = node.create_timer(2.0, self._start_position)
 
     def _start_position(self):
