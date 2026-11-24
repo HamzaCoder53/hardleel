@@ -239,6 +239,8 @@ DEFAULTS = {
     'classify_retries': 3,
     'servo_wait_s': 1.0,
     'pickup_wait_s': 5.0,
+    'dock_offset_x': 0.06,
+    'dock_offset_y': 0.0,
     'min_battery_v': 6.8,
     'rounds': 1,
     'colours': ['blue', 'green', 'red'],   # rule book 2026: Blue = plastic, Green = organic, Red = metal
@@ -327,7 +329,18 @@ class MissionNode(Node):
         return self.places.get(name)
 
     def pickup_place(self, colour):
-        return self.places.get(f'pickup_{colour}') or self.places.get('collect')
+        return self.dock_goal(self.places.get(f'pickup_{colour}') or self.places.get('collect'))
+
+    def dock_goal(self, p):
+        """A marked pickup / drop-off point is where the robot's DOCK centre must end up (user 24 Nov). The dock
+        sits dock_offset_x m ahead (and dock_offset_y m left) of base_link, so the robot itself goes to the point
+        moved back by that offset, along the arrow direction (yaw)."""
+        if p is None:
+            return None
+        yaw = float(p.get('yaw', 0.0))
+        ox, oy = float(self.cfg['dock_offset_x']), float(self.cfg['dock_offset_y'])
+        return {'x': p['x'] - (ox * math.cos(yaw) - oy * math.sin(yaw)),
+                'y': p['y'] - (ox * math.sin(yaw) + oy * math.cos(yaw)), 'yaw': yaw}
 
     def battery_ok(self, bb):
         if self.battery_v is None:             # battery sensor not wired / not publishing yet
@@ -363,7 +376,7 @@ class MissionNode(Node):
                                                                        'plans around it (ramp route)'),
                                       ])]),
             ]),
-            nav('NavigateTo drop-off', lambda bb: self.place(bb.get('colour'))),
+            nav('NavigateTo drop-off', lambda bb: self.dock_goal(self.place(bb.get('colour')))),
             Servo('Servo release', self, 'release'),
             Log('Delivered', lambda bb: f'round {bb["round"]}: {bb["colour"]} item picked up and dropped off'),
         ])

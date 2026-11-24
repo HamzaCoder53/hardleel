@@ -16,6 +16,10 @@ nav_timeout_s: 45.0      # one drive longer than this = failed attempt (x nav_re
 classify_retries: 3      # camera attempts when it sees nothing / is unsure ("none", "unknown")
 servo_wait_s: 1.0        # time the servo bed needs to move
 pickup_wait_s: 5.0       # stay at the pickup spot this long while the item is loaded (user 24 Nov)
+# pickup_* and drop-off places are where the DOCK centre (11 x 9.5 cm) must be. Dock centre = 16 cm ahead of the
+# lidar, lidar 10 cm behind base_link -> 0.06 m ahead of base_link (+x forward, +y left)
+dock_offset_x: 0.06
+dock_offset_y: 0.0
 min_battery_v: 6.8       # 2S pack: don't start a round below this (needs the Nano battery sensor)
 
 colours: [blue, green, red]       # rule book 2026: plastic -> Blue, organic -> Green, metal -> Red (place name = colour)
