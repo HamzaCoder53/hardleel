@@ -101,8 +101,11 @@ controller_server:
       max_allowed_time_to_collision_up_to_carrot: 1.0
       use_regulated_linear_velocity_scaling: true
       regulated_linear_scaling_min_radius: 0.9
-      regulated_linear_scaling_min_speed: 0.27
-      use_cost_regulated_linear_velocity_scaling: false
+      regulated_linear_scaling_min_speed: 0.15   # 24 Nov: slowest speed near obstacles / in tight curves (was 0.27)
+      use_cost_regulated_linear_velocity_scaling: true   # 24 Nov, user: slow down near the (fixed) obstacles
+      cost_scaling_dist: 0.25            # start slowing when an obstacle/wall is closer than this (corridor centre ~0.28-0.32)
+      cost_scaling_gain: 1.0
+      inflation_cost_scaling_factor: 6.0 # must equal the costmaps' cost_scaling_factor
       allow_reversing: false
       use_rotate_to_heading: true
       rotate_to_heading_min_angle: 0.785
