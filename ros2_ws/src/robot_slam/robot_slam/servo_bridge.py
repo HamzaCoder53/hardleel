@@ -35,6 +35,18 @@ class ServoBridge:
         node.create_service(Trigger, '/servo/off', lambda req, res: self.on_srv('off', res))
         node.get_logger().info(f'servo: /servo/cmd + /servo/grab ({self.angle("grab")} deg) '
                                f'/servo/release ({self.angle("release")} deg) /servo/off')
+        # The servo holds a BED (user 24 Nov): 0 deg = flat, the item falls onto it at the loading station and
+        # rides on it; 90 deg = tipped, offloads at the drop-off. The Nano powers up at 90 (old firmware), so put
+        # the bed flat as soon as the robot starts. -1 = leave it where it is.
+        node.declare_parameter('servo_start_angle', 0)
+        self._start_timer = node.create_timer(2.0, self._start_position)
+
+    def _start_position(self):
+        self._start_timer.cancel()
+        a = int(self.node.get_parameter('servo_start_angle').value)
+        if a >= 0:
+            reply = self.send(str(a), wait_s=1.0)
+            self.node.get_logger().info(f'servo: start position {a} deg (bed flat) -> Nano: {reply}')
 
     def angle(self, name):
         return int(self.node.get_parameter(f'servo_{name}_angle').value)
