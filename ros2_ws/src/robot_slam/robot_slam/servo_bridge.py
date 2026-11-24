@@ -9,7 +9,7 @@ ROS interface (created by imu_serial_node):
   /servo/release std_srvs/Trigger  move to servo_release_angle
   /servo/off     std_srvs/Trigger  stop driving the servo (limp)
   /servo/state   std_msgs/String   the Nano's last confirmation, e.g. "120" or "off"
-Parameters (live): servo_grab_angle (120, placeholder), servo_release_angle (0, placeholder).
+Parameters (live): servo_grab_angle (0), servo_release_angle (90) - measured on the robot 24 Nov.
 Test:  ros2 service call /servo/grab std_srvs/srv/Trigger
        ros2 topic pub --once /servo/cmd std_msgs/msg/String "{data: '90'}"
 """
@@ -26,8 +26,8 @@ class ServoBridge:
         self.lock = threading.Lock()
         self.reply = None
         self.reply_event = threading.Event()
-        node.declare_parameter('servo_grab_angle', 120)     # placeholder until the gripper is built
-        node.declare_parameter('servo_release_angle', 0)    # placeholder
+        node.declare_parameter('servo_grab_angle', 0)       # 24 Nov, user: grab = 0 deg
+        node.declare_parameter('servo_release_angle', 90)   # 24 Nov, user: release = 90 deg (Nano starts at 90)
         self.state_pub = node.create_publisher(String, '/servo/state', 10)
         node.create_subscription(String, '/servo/cmd', self.on_cmd, 10)
         node.create_service(Trigger, '/servo/grab', lambda req, res: self.on_srv('grab', res))
