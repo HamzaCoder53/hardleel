@@ -29,7 +29,7 @@ from std_msgs.msg import Float32, Float32MultiArray
 PARAMS = {
     'port': ('', 'ESP32 serial port (start only; pi_mapping.launch.py passes the detected one)', None),
     'wheel_diameter': (0.0804, 'wheel diameter m (24 Nov: 2 m straight run, real 2.02 m vs encoders 2.009 m)', (0.01, 0.5)),
-    'track_width': (0.61, 'EFFECTIVE left-right wheel distance m (24 Nov 360 deg spin vs IMU: 0.25 x 2.44; skid steer)',
+    'track_width': (0.52, 'EFFECTIVE left-right wheel distance m (24 Nov: skid steer slip depends on speed - 0.52 gives 77-116% of the asked turn rate at 0.6-1.2 rad/s)',
                     (0.05, 1.0)),
     'counts_per_rev': (748.0, 'encoder counts per WHEEL turn (firmware: 11 PPR x 34 gear x 2 edges)',
                        (1.0, 100000.0)),
