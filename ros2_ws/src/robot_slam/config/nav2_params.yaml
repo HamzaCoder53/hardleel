@@ -83,7 +83,7 @@ controller_server:
     general_goal_checker:
       stateful: true
       plugin: nav2_controller::SimpleGoalChecker
-      xy_goal_tolerance: 0.2
+      xy_goal_tolerance: 0.1   # 24 Nov, user: stop within 10 cm of each place (stations)
       yaw_goal_tolerance: 0.4
     FollowPath:
       plugin: nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController
@@ -95,7 +95,7 @@ controller_server:
       rotate_to_heading_angular_vel: 1.2   # 24 Nov measured: asking 1.2 gives ~1.4 real (track 0.52); 2.6 was jerky
       transform_tolerance: 0.3
       use_velocity_scaled_lookahead_dist: false
-      min_approach_linear_velocity: 0.27
+      min_approach_linear_velocity: 0.10   # 24 Nov: slow final approach for the 0.1 m goal tolerance
       approach_velocity_scaling_dist: 0.6
       use_collision_detection: true
       max_allowed_time_to_collision_up_to_carrot: 1.0
