@@ -245,7 +245,7 @@ DEFAULTS = {
     'gate_open_m': 0.6,
     'gate_half_angle_deg': 10.0,
     'gate_confirm_s': 0.5,
-    'gate_max_wait_s': 30.0,
+    'gate_max_wait_s': 10.0,
     'dry_run_nav_s': 2.0,
     'dry_run_gate_s': 3.0,
     'dry_run_colours': ['blue', 'none', 'green', 'red'],
